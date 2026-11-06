@@ -1,0 +1,196 @@
+@import "tailwindcss";
+
+/* ───────────────────────────────────────────────────────────
+   Tokens de Home Outlet. Ninguna pantalla usa valores fuera de aquí.
+   Son variables CSS para poder agregar un tema oscuro después
+   (basta redefinirlas bajo [data-tema="oscuro"]).
+   ─────────────────────────────────────────────────────────── */
+:root {
+  --carbon: #2e2c2d;
+  --carbon-soft: #3a3839;
+  --naranja: #ff9400;
+  --naranja-texto: #a85800;
+  --naranja-suave: #fff1dc;
+  --fondo: #f6f5f4;
+  --superficie: #ffffff;
+  --linea: #e4e2e1;
+  --texto: #2e2c2d;
+  --texto-suave: #6b6869;
+  --texto-sobre-carbon: #ffffff;
+  --texto-sobre-carbon-suave: #b3afb0;
+  --exito: #1f7a4d;
+  --aviso: #9a5b00;
+  --error: #c0362c;
+  /* Fondos suaves de estado (insignias y avisos). Derivados de exito, aviso y error. */
+  --exito-suave: #e4f3ea;
+  --aviso-suave: #fbefd5;
+  --error-suave: #fbe7e5;
+  /* Paleta de estados (pulido de UI, 1.2). Fondo tenue y texto oscuro; ninguna insignia es sólida. */
+  --estado-neutro-fondo: #efedec;
+  --estado-neutro-texto: #4a4748;
+  --estado-info-fondo: #e6eef8;
+  --estado-info-texto: #1f4e8c;
+  --estado-aviso-fondo: #fff1dc;
+  --estado-aviso-texto: #8a4e00;
+  --estado-exito-fondo: #e3f3ea;
+  --estado-exito-texto: #1f7a4d;
+  --estado-peligro-fondo: #fbe7e5;
+  --estado-peligro-texto: #b0302a;
+  /* Un color fijo por canal en todas las gráficas y leyendas (1.4). */
+  --canal-whatsapp: #1f7a4d;
+  --canal-tiktok: #2e2c2d;
+  --canal-instagram: #b5487a;
+  --canal-facebook: #3b6fb6;
+  --canal-otros: #8a8687;
+  /* Punto de color de las etiquetas de cliente: la insignia es neutra, solo el punto lleva color. */
+  --etiqueta-carbon: #2e2c2d;
+  --etiqueta-azul: #3b6fb6;
+  --etiqueta-verde: #1f7a4d;
+  --etiqueta-rosa: #b5487a;
+  --etiqueta-rojo: #c0362c;
+  --etiqueta-gris: #8a8687;
+}
+
+@theme inline {
+  --color-*: initial;
+  --color-white: #ffffff;
+  --color-transparent: transparent;
+  --color-carbon: var(--carbon);
+  --color-carbon-soft: var(--carbon-soft);
+  --color-naranja: var(--naranja);
+  --color-naranja-texto: var(--naranja-texto);
+  --color-naranja-suave: var(--naranja-suave);
+  --color-fondo: var(--fondo);
+  --color-superficie: var(--superficie);
+  --color-linea: var(--linea);
+  --color-texto: var(--texto);
+  --color-texto-suave: var(--texto-suave);
+  --color-sobre-carbon: var(--texto-sobre-carbon);
+  --color-sobre-carbon-suave: var(--texto-sobre-carbon-suave);
+  --color-exito: var(--exito);
+  --color-aviso: var(--aviso);
+  --color-error: var(--error);
+  --color-exito-suave: var(--exito-suave);
+  --color-aviso-suave: var(--aviso-suave);
+  --color-error-suave: var(--error-suave);
+  --color-estado-neutro-fondo: var(--estado-neutro-fondo);
+  --color-estado-neutro-texto: var(--estado-neutro-texto);
+  --color-estado-info-fondo: var(--estado-info-fondo);
+  --color-estado-info-texto: var(--estado-info-texto);
+  --color-estado-aviso-fondo: var(--estado-aviso-fondo);
+  --color-estado-aviso-texto: var(--estado-aviso-texto);
+  --color-estado-exito-fondo: var(--estado-exito-fondo);
+  --color-estado-exito-texto: var(--estado-exito-texto);
+  --color-estado-peligro-fondo: var(--estado-peligro-fondo);
+  --color-estado-peligro-texto: var(--estado-peligro-texto);
+  --color-canal-whatsapp: var(--canal-whatsapp);
+  --color-canal-tiktok: var(--canal-tiktok);
+  --color-canal-instagram: var(--canal-instagram);
+  --color-canal-facebook: var(--canal-facebook);
+  --color-canal-otros: var(--canal-otros);
+
+  /* Escala de 4 px: 4, 8, 12, 16, 24, 32, 48 → p-1, p-2, p-3, p-4, p-6, p-8, p-12 */
+  --spacing: 4px;
+
+  --radius-campo: 6px;
+  --radius-tarjeta: 10px;
+  --radius-burbuja: 16px;
+  --radius-pildora: 999px;
+
+  --font-titulo: var(--font-montserrat), system-ui, sans-serif;
+  --font-cuerpo: var(--font-nunito), system-ui, sans-serif;
+
+  --shadow-menu: 0 4px 16px rgb(46 44 45 / 0.16);
+  --shadow-minima: 0 1px 2px rgb(46 44 45 / 0.16);
+}
+
+/* ── Estilos tipográficos (sección 2.2) ── */
+@utility titulo-pagina {
+  font-family: var(--font-titulo);
+  font-size: 24px;
+  line-height: 32px;
+  font-weight: 700;
+}
+@utility titulo-panel {
+  font-size: 18px;
+  line-height: 26px;
+  font-weight: 700;
+}
+@utility cuerpo {
+  font-size: 15px;
+  line-height: 22px;
+  font-weight: 400;
+}
+@utility cuerpo-fuerte {
+  font-size: 15px;
+  line-height: 22px;
+  font-weight: 700;
+}
+@utility meta {
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 600;
+}
+@utility mini {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 700;
+}
+
+/* Número grande de las tarjetas KPI: 28 px en teléfono, 34 px desde tablet. */
+@utility numero-kpi {
+  font-size: 28px;
+  line-height: 34px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  @media (min-width: 768px) {
+    font-size: 34px;
+    line-height: 40px;
+  }
+}
+/* Títulos de sección de la ficha: meta en mayúsculas con espaciado de 0.4 px. */
+@utility titulo-seccion {
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+@layer base {
+  html {
+    font-family: var(--font-cuerpo);
+    background: var(--fondo);
+    color: var(--texto);
+  }
+  body {
+    font-size: 15px;
+    line-height: 22px;
+    font-variant-numeric: tabular-nums;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* Foco: anillo de dos tonos. El naranja (2 px, pegado al elemento) es la marca; el carbón (2 px, con
+     2 px de separación) da el contraste de más de 3:1 sobre blanco. Sobre fondos oscuros se ve el naranja. */
+  :focus-visible {
+    outline: 2px solid var(--carbon);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 2px var(--naranja);
+  }
+  input[type="checkbox"] {
+    accent-color: var(--carbon);
+  }
+  ::placeholder {
+    color: var(--texto-suave);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

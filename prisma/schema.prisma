@@ -1,0 +1,609 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Rol {
+  admin
+  agente
+}
+
+/// Disponibilidad de un asesor (rol agente) para recibir conversaciones nuevas.
+enum EstadoAsesor {
+  disponible
+  en_pausa
+  desconectado
+}
+
+/// Por qué cambió el estado de un asesor (para reportes futuros).
+enum OrigenEstadoAsesor {
+  manual // el propio asesor (pausar, activarme)
+  inicio_sesion
+  cierre_sesion
+  latido // volvió a abrir la app con la sesión válida
+  sin_senal // 5 minutos sin latido
+  admin // lo cambió un administrador
+}
+
+enum ModoAsignacion {
+  manual
+  automatica
+}
+
+enum Autor {
+  cliente
+  asesor
+  asistente
+}
+
+enum AtendidaPor {
+  asistente
+  asesor
+  nadie
+}
+
+enum Motivo {
+  precio
+  existencia
+  envio
+  horario
+  compra
+  reclamo
+  garantia
+  otro
+}
+
+enum ModoAsistente {
+  siempre
+  fuera_de_horario
+  sin_asesores
+}
+
+enum ResultadoIa {
+  respondio
+  paso_a_asesor
+  error
+}
+
+enum Canal {
+  whatsapp
+  tiktok
+  instagram
+  facebook
+  simulado
+}
+
+enum EstadoConversacion {
+  abierta
+  pendiente
+  cerrada
+}
+
+enum Direccion {
+  entrante
+  saliente
+}
+
+enum TipoMensaje {
+  text
+  image
+  audio
+  video
+  document
+  location
+  product
+  unsupported
+}
+
+enum EstadoEntrega {
+  enviando
+  enviado
+  entregado
+  leido
+  fallo
+}
+
+// Precios en centavos de quetzal (enteros). Teléfonos en E.164.
+
+model User {
+  id                  String    @id @default(cuid())
+  nombre              String
+  correo              String    @unique
+  passwordHash        String
+  rol                 Rol       @default(agente)
+  activo              Boolean   @default(true)
+  creado              DateTime  @default(now())
+  ultimaSenal         DateTime? // último latido (el sondeo de la barra lateral); 5 min sin señal = desconectado
+  puedeVerificarPagos Boolean   @default(false) // el admin siempre puede; un agente solo si se lo activan
+
+  // Disponibilidad (solo tiene efecto en los asesores, rol agente)
+  estadoAsesor       EstadoAsesor @default(desconectado)
+  estadoDesde        DateTime     @default(now())
+  motivoPausa        String?
+  ultimaAsignacionEn DateTime? // desempate: gana quien lleva más tiempo sin recibir una conversación
+
+  conversaciones   Conversation[]
+  resumenes        ConversationSummary[]
+  mensajes         Message[]
+  notas            Note[]
+  actividad        ActivityLog[]
+  pedidosCreados   Order[]               @relation("PedidoCreador")
+  pagosRegistrados Payment[]             @relation("PagoRegistrador")
+  pagosVerificados Payment[]             @relation("PagoVerificador")
+  eventosPedido    OrderEvent[]
+
+  contactosResponsable Contact[]               @relation("AsesorResponsable")
+  contactosCreados     Contact[]               @relation("ContactoCreador")
+  historialEstado      HistorialEstadoAsesor[] @relation("HistorialDelAsesor")
+  cambiosDeEstado      HistorialEstadoAsesor[] @relation("HistorialCambiadoPor")
+}
+
+/// Cada tramo de estado de un asesor: `fin` queda vacío mientras sigue vigente.
+model HistorialEstadoAsesor {
+  id            String             @id @default(cuid())
+  usuarioId     String
+  estado        EstadoAsesor
+  motivo        String?
+  origen        OrigenEstadoAsesor
+  cambiadoPorId String? // quién lo cambió cuando no fue el propio asesor
+  inicio        DateTime           @default(now())
+  fin           DateTime?
+
+  usuario     User  @relation("HistorialDelAsesor", fields: [usuarioId], references: [id], onDelete: Cascade)
+  cambiadoPor User? @relation("HistorialCambiadoPor", fields: [cambiadoPorId], references: [id], onDelete: SetNull)
+
+  @@index([usuarioId, inicio])
+}
+
+/// Ajustes del equipo (una sola fila).
+model AjustesEquipo {
+  id                   String         @id @default("equipo")
+  modoAsignacion       ModoAsignacion @default(automatica)
+  asesoresVenSoloSuyas Boolean        @default(true)
+}
+
+model Contact {
+  id                  String   @id @default(cuid())
+  nombre              String
+  telefono            String?  @unique
+  correo              String?
+  notas               String?
+  municipio           String?
+  creado              DateTime @default(now())
+  /// El asesor que lo atiende de forma habitual: tiene prioridad al asignarle una conversación nueva.
+  asesorResponsableId String?
+  /// Quién lo creó a mano (así no desaparece de la vista de ese asesor antes de tener conversación).
+  creadoPorId         String?
+
+  asesorResponsable User? @relation("AsesorResponsable", fields: [asesorResponsableId], references: [id], onDelete: SetNull)
+  creadoPor         User? @relation("ContactoCreador", fields: [creadoPorId], references: [id], onDelete: SetNull)
+
+  identidades    ChannelIdentity[]
+  conversaciones Conversation[]
+  etiquetas      Tag[]
+
+  pedidos Order[]
+}
+
+model ChannelIdentity {
+  id                String  @id @default(cuid())
+  contactoId        String
+  canal             Canal
+  externalContactId String
+  alias             String?
+
+  contacto Contact @relation(fields: [contactoId], references: [id], onDelete: Cascade)
+
+  @@unique([canal, externalContactId])
+}
+
+model Conversation {
+  id                   String             @id @default(cuid())
+  contactoId           String
+  canal                Canal
+  estado               EstadoConversacion @default(abierta)
+  asignadaAId          String?
+  lastMessageAt        DateTime           @default(now())
+  lastInboundAt        DateTime?
+  noLeidos             Int                @default(0)
+  atendidaPor          AtendidaPor        @default(nadie)
+  motivo               Motivo?
+  esperandoAsesorDesde DateTime?
+  creada               DateTime           @default(now())
+  /// El asesor que la devolvió a la cola: no se le vuelve a asignar en el siguiente reparto.
+  excluirAsesorId      String?
+
+  contacto  Contact               @relation(fields: [contactoId], references: [id], onDelete: Cascade)
+  asignadaA User?                 @relation(fields: [asignadaAId], references: [id])
+  mensajes  Message[]
+  notas     Note[]
+  resumenes ConversationSummary[]
+  aiRuns    AiRun[]
+  pedidos   Order[]
+
+  @@index([estado, lastMessageAt])
+  @@index([atendidaPor, esperandoAsesorDesde])
+  @@index([creada])
+  @@index([asignadaAId])
+}
+
+model Message {
+  id                String         @id @default(cuid())
+  conversacionId    String
+  direccion         Direccion
+  tipo              TipoMensaje    @default(text)
+  texto             String?
+  archivoUrl        String?
+  productoId        String?
+  externalMessageId String?        @unique
+  estado            EstadoEntrega?
+  enviadoPorId      String?
+  autor             Autor          @default(cliente)
+  aiRunId           String?
+  pedidoId          String? // el resumen o el aviso de un pedido
+  fecha             DateTime       @default(now())
+
+  conversacion Conversation @relation(fields: [conversacionId], references: [id], onDelete: Cascade)
+  producto     Product?     @relation(fields: [productoId], references: [id])
+  enviadoPor   User?        @relation(fields: [enviadoPorId], references: [id])
+  aiRun        AiRun?       @relation(fields: [aiRunId], references: [id], onDelete: SetNull)
+  pedido       Order?       @relation(fields: [pedidoId], references: [id], onDelete: SetNull)
+  comprobantes Payment[]
+
+  @@index([conversacionId, fecha])
+}
+
+// Notas internas: el cliente nunca las ve.
+model Note {
+  id             String   @id @default(cuid())
+  conversacionId String
+  autorId        String
+  texto          String
+  fecha          DateTime @default(now())
+
+  conversacion Conversation @relation(fields: [conversacionId], references: [id], onDelete: Cascade)
+  autor        User         @relation(fields: [autorId], references: [id])
+
+  @@index([conversacionId, fecha])
+}
+
+// color: uno de los 6 tonos de etiqueta (carbon, naranja, exito, aviso, error, gris)
+model Tag {
+  id     String @id @default(cuid())
+  nombre String @unique
+  color  String @default("gris")
+
+  contactos Contact[]
+}
+
+model Category {
+  id        String    @id @default(cuid())
+  nombre    String    @unique
+  orden     Int       @default(0)
+  productos Product[]
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  sku         String   @unique
+  nombre      String
+  descripcion String?
+  categoriaId String?
+  precio      Int // centavos de quetzal
+  imagenes    String[]
+  activo      Boolean  @default(true)
+  creado      DateTime @default(now())
+
+  categoria Category?   @relation(fields: [categoriaId], references: [id])
+  stock     Stock[]
+  mensajes  Message[]
+  lineas    OrderItem[]
+}
+
+model Location {
+  id             String           @id @default(cuid())
+  nombre         String           @unique
+  activa         Boolean          @default(true)
+  stock          Stock[]
+  lineas         OrderItem[]
+  ajustesRecoger AjustesPedidos[] @relation("UbicacionRecoger")
+  ajustesEnvio   AjustesPedidos[] @relation("UbicacionEnvio")
+}
+
+// Existencias por ubicación. Disponible = cantidad − apartado (lib/pedidos/existencias.ts).
+// Con inventario "compartido" (Ajustes → Pagos y envíos) la existencia del producto es la suma de las ubicaciones.
+model Stock {
+  id          String @id @default(cuid())
+  productoId  String
+  ubicacionId String
+  cantidad    Int    @default(0)
+  apartado    Int    @default(0) // unidades reservadas por pedidos pendientes de pago
+
+  producto  Product  @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  ubicacion Location @relation(fields: [ubicacionId], references: [id])
+
+  @@unique([productoId, ubicacionId])
+}
+
+model QuickReply {
+  id    String @id @default(cuid())
+  atajo String @unique // por ejemplo /horario
+  texto String
+}
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  usuarioId String?
+  accion    String // asignar, cerrar, existencias, editar_producto…
+  entidad   String // Conversation, Product…
+  entidadId String
+  detalle   Json?
+  fecha     DateTime @default(now())
+
+  usuario User? @relation(fields: [usuarioId], references: [id])
+
+  @@index([entidad, entidadId])
+}
+
+// Datos del negocio (una sola fila). Se usan en las respuestas rápidas con {negocio}, {horario} y {direccion},
+// y más adelante en el asistente con IA.
+model Negocio {
+  id             String  @id @default("negocio")
+  nombre         String  @default("Home Outlet Internacional")
+  horario        String?
+  direccion      String?
+  pagos          String?
+  envios         String?
+  garantia       String?
+  // Horario por día para saber si la tienda está abierta: 7 elementos (lunes a domingo), cada uno { abre, cierra } o null si cierra.
+  horarioSemanal Json?
+}
+
+/**
+ * ── Fase 2: asistente con IA ──
+ */
+
+model AiSettings {
+  id                    String        @id @default("ia")
+  encendido             Boolean       @default(true)
+  canales               Canal[]       @default([whatsapp, tiktok, instagram, facebook, simulado])
+  modo                  ModoAsistente @default(siempre)
+  bienvenida            String        @default("Hola, soy el asistente virtual de Home Outlet. Puedo ayudarle con precios, existencias, horarios y envíos. Si prefiere hablar con un asesor, escriba *asesor*.")
+  limiteRespuestas      Int           @default(6)
+  presupuestoMensualUsd Float?
+}
+
+model KnowledgeItem {
+  id        String   @id @default(cuid())
+  pregunta  String
+  respuesta String
+  categoria String   @default("general")
+  activa    Boolean  @default(true)
+  creado    DateTime @default(now())
+}
+
+model AiRun {
+  id             String      @id @default(cuid())
+  conversacionId String?
+  tipo           String      @default("respuesta") // respuesta, sugerencia, resumen, motivo, prueba
+  proveedor      String
+  modelo         String
+  tokensEntrada  Int
+  tokensSalida   Int
+  costoUsd       Float
+  ms             Int
+  herramientas   String[]
+  consultado     String[] // texto para el equipo: "Pantalla 9 pulgadas · existencia"
+  productos      String[] // ids de los productos consultados
+  resultado      ResultadoIa
+  sinRespuesta   Boolean     @default(false)
+  creado         DateTime    @default(now())
+
+  conversacion Conversation? @relation(fields: [conversacionId], references: [id], onDelete: SetNull)
+  mensajes     Message[]
+
+  @@index([creado])
+  @@index([conversacionId])
+}
+
+model ConversationSummary {
+  id             String   @id @default(cuid())
+  conversacionId String
+  texto          String
+  creado         DateTime @default(now())
+  generadoPorId  String?
+
+  conversacion Conversation @relation(fields: [conversacionId], references: [id], onDelete: Cascade)
+  generadoPor  User?        @relation(fields: [generadoPorId], references: [id], onDelete: SetNull)
+
+  @@index([conversacionId, creado])
+}
+
+/**
+ * ── Fase 2.5: pedidos y pagos por transferencia o depósito ──
+ */
+
+enum EstadoPedido {
+  borrador
+  pendiente_pago
+  en_revision
+  pagado
+  preparando
+  listo_para_recoger
+  enviado
+  entregado
+  cancelado
+  vencido
+}
+
+enum Entrega {
+  recoger
+  envio
+}
+
+// "tarjeta" queda deshabilitada hasta la fase 3.
+enum TipoPago {
+  transferencia
+  deposito
+  efectivo_en_tienda
+  tarjeta
+}
+
+enum EstadoPago {
+  en_revision
+  verificado
+  rechazado
+}
+
+enum TipoCuenta {
+  monetaria
+  ahorro
+}
+
+enum ModoInventario {
+  separado
+  compartido
+}
+
+// Montos en centavos de quetzal. El servidor calcula los totales; el navegador nunca los manda.
+model Order {
+  id              String       @id @default(cuid())
+  codigo          String       @unique // HO-000123
+  contactoId      String
+  conversacionId  String?
+  canal           Canal
+  estado          EstadoPedido @default(borrador)
+  subtotal        Int          @default(0)
+  descuentoMonto  Int          @default(0)
+  descuentoMotivo String?
+  costoEnvio      Int          @default(0)
+  total           Int          @default(0)
+  entrega         Entrega      @default(recoger)
+  direccion       String?
+  municipio       String?
+  zona            String?
+  guia            String?
+  notas           String?
+  creadoPorId     String?
+  reservadoHasta  DateTime?
+  sobrePedido     Boolean      @default(false)
+  creada          DateTime     @default(now())
+  actualizada     DateTime     @updatedAt
+
+  contacto     Contact       @relation(fields: [contactoId], references: [id])
+  conversacion Conversation? @relation(fields: [conversacionId], references: [id], onDelete: SetNull)
+  creadoPor    User?         @relation("PedidoCreador", fields: [creadoPorId], references: [id], onDelete: SetNull)
+  lineas       OrderItem[]
+  pagos        Payment[]
+  eventos      OrderEvent[]
+  mensajes     Message[]
+
+  @@index([estado, creada])
+  @@index([contactoId])
+  @@index([conversacionId])
+  @@index([estado, reservadoHasta])
+}
+
+// Nombre y precio se copian al hacer el pedido: un cambio posterior en el catálogo no altera pedidos ya hechos.
+model OrderItem {
+  id          String  @id @default(cuid())
+  pedidoId    String
+  productoId  String?
+  sku         String
+  nombre      String
+  precio      Int
+  cantidad    Int
+  ubicacionId String? // de dónde sale la mercancía
+
+  pedido    Order     @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+  producto  Product?  @relation(fields: [productoId], references: [id], onDelete: SetNull)
+  ubicacion Location? @relation(fields: [ubicacionId], references: [id], onDelete: SetNull)
+
+  @@index([pedidoId])
+  @@index([productoId])
+}
+
+model Payment {
+  id              String     @id @default(cuid())
+  pedidoId        String
+  tipo            TipoPago
+  banco           String?
+  referencia      String?
+  monto           Int
+  fechaPago       DateTime
+  mensajeId       String? // la imagen del comprobante en la conversación
+  archivoUrl      String? // o un archivo subido desde el detalle del pedido
+  estado          EstadoPago @default(en_revision)
+  verificadoPorId String?
+  verificadoEn    DateTime?
+  motivoRechazo   String?
+  registradoPorId String?
+  creado          DateTime   @default(now())
+
+  pedido        Order    @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+  mensaje       Message? @relation(fields: [mensajeId], references: [id], onDelete: SetNull)
+  verificadoPor User?    @relation("PagoVerificador", fields: [verificadoPorId], references: [id], onDelete: SetNull)
+  registradoPor User?    @relation("PagoRegistrador", fields: [registradoPorId], references: [id], onDelete: SetNull)
+
+  @@index([pedidoId])
+  @@index([estado])
+  @@index([banco, referencia]) // para avisar de posibles duplicados
+}
+
+model OrderEvent {
+  id        String        @id @default(cuid())
+  pedidoId  String
+  deEstado  EstadoPedido?
+  aEstado   EstadoPedido
+  usuarioId String? // vacío cuando lo hizo el sistema o el asistente
+  origen    String        @default("usuario") // usuario, sistema, asistente
+  nota      String?
+  fecha     DateTime      @default(now())
+
+  pedido  Order @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+  usuario User? @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+
+  @@index([pedidoId, fecha])
+}
+
+model BankAccount {
+  id      String     @id @default(cuid())
+  banco   String
+  tipo    TipoCuenta @default(monetaria)
+  numero  String
+  titular String
+  activa  Boolean    @default(true)
+  orden   Int        @default(0)
+}
+
+model ShippingZone {
+  id         String   @id @default(cuid())
+  nombre     String
+  municipios String[]
+  costo      Int // centavos
+  tiempo     String // por ejemplo "1 a 2 días"
+  activa     Boolean  @default(true)
+  orden      Int      @default(0)
+}
+
+// Una sola fila.
+model AjustesPedidos {
+  id                 String         @id @default("pedidos")
+  prefijo            String         @default("HO-")
+  siguienteNumero    Int            @default(1)
+  horasReserva       Int            @default(24)
+  descuentoMaxAgente Int            @default(0) // porcentaje que un agente puede dar sin un admin
+  inventario         ModoInventario @default(separado)
+  metodos            TipoPago[]     @default([transferencia, deposito])
+  envioGratisDesde   Int? // centavos; vacío = desactivado
+  ubicacionRecogerId String?
+  ubicacionEnvioId   String?
+  mensajes           Json? // textos editados de lo que se le manda al cliente: { clave: { activo, texto } }
+
+  ubicacionRecoger Location? @relation("UbicacionRecoger", fields: [ubicacionRecogerId], references: [id], onDelete: SetNull)
+  ubicacionEnvio   Location? @relation("UbicacionEnvio", fields: [ubicacionEnvioId], references: [id], onDelete: SetNull)
+}
