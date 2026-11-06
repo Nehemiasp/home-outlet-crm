@@ -3,7 +3,10 @@
 //
 //   1. npm run db y npm run dev (la aplicación en http://localhost:3000, o la dirección de E2E_URL)
 //   2. npm run e2e
-// E2E_CAPTURAS=<carpeta> guarda capturas de la página de pago y del detalle del pedido.
+// Si hay otra persona con la aplicación abierta en su navegador, el servidor de desarrollo recarga todas las páginas conectadas cada
+// vez que otra recompila y estas pruebas entran en un ciclo de recargas: arranque el servidor en otro puerto (npx next dev -p 3100)
+// y use E2E_URL=http://localhost:3100.
+// E2E_CAPTURAS=<carpeta> guarda capturas del panel de crear pedido, de la página de pago y del detalle del pedido.
 // El pago con tarjeta solo se prueba si la aplicación corre con PASARELA=simulada y se define E2E_PASARELA=1 al correr las pruebas.
 //
 // No usa los datos de demostración ni las contraseñas de nadie: crea su propio usuario, producto, ubicación y cuenta
@@ -112,6 +115,8 @@ describe("flujos críticos (navegador real)", { timeout: 240_000 }, () => {
     const panel = agente.getByRole("dialog", { name: "Crear pedido" });
     await panel.getByLabel("Buscar en el catálogo").fill("PRUEBA-E2E");
     await panel.getByRole("button", { name: "Agregar PRUEBA-E2E Licuadora" }).click();
+    assert.equal(await panel.getByRole("button", { name: "Enviar al cliente" }).isDisabled(), true, "sin forma de pago no se puede enviar");
+    await panel.getByRole("radio", { name: "Transferencia bancaria" }).check();
     await panel.getByRole("button", { name: "Enviar al cliente" }).click();
     await agente.getByText(/Pedido E2E-000001/).first().waitFor({ timeout: 15_000 });
   });
@@ -154,13 +159,16 @@ describe("flujos críticos (navegador real)", { timeout: 240_000 }, () => {
     const panel = agente.getByRole("dialog", { name: "Crear pedido" });
     await panel.getByLabel("Buscar en el catálogo").fill("PRUEBA-E2E");
     await panel.getByRole("button", { name: "Agregar PRUEBA-E2E Licuadora" }).click();
+    await panel.getByRole("radio", { name: "Tarjeta de crédito o débito" }).check();
+    if (process.env.E2E_CAPTURAS) await agente.screenshot({ path: `${process.env.E2E_CAPTURAS}/panel-forma-pago.png` });
     await panel.getByRole("button", { name: "Enviar al cliente" }).click();
     await agente.getByText(/Pedido E2E-000002/).first().waitFor({ timeout: 15_000 });
     const pedido = await db.order.findFirstOrThrow({ where: { codigo: "E2E-000002" } });
+    assert.equal(pedido.metodoPago, "tarjeta");
     await agente.goto(`${URL_BASE}/pedidos/${pedido.id}`); // directo: en la conversación hay un «Ver pedido» por cada pedido y el orden de los enlaces no es lo que se prueba aquí
     await agente.getByRole("heading", { name: "E2E-000002" }).waitFor();
-    await agente.getByRole("button", { name: "Enviar enlace de pago con tarjeta" }).click();
-    await agente.getByText(/esperando el pago del cliente/).waitFor({ timeout: 15_000 });
+    await agente.getByText("Tarjeta de crédito o débito").first().waitFor(); // «Forma de pago» en el detalle
+    await agente.getByText(/esperando el pago del cliente/).waitFor({ timeout: 15_000 }); // el enlace salió con el resumen, sin botón aparte
 
     const cobro = await db.cobroTarjeta.findFirstOrThrow({ where: { pedidoId: pedido.id } });
     assert.equal(cobro.estado, "creado");

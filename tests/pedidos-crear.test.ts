@@ -68,7 +68,7 @@ describe("crear y enviar pedidos (con base de datos)", () => {
     pedidoId: null, conversacionId: convSim,
     cliente: { nombre: "PRUEBA-CR cliente", telefono: "", municipio: "" },
     lineas: [{ productoId: producto.id, cantidad: 2, ubicacionId: null }],
-    entrega: "recoger", direccion: "", referencia: "", descuento: null, descuentoMotivo: "", notas: "", ...sobre,
+    entrega: "recoger", direccion: "", referencia: "", descuento: null, descuentoMotivo: "", notas: "", metodoPago: "transferencia", ...sobre,
   });
   const nuevoProducto = async (stockA: number, stockB: number) => {
     const p = await db.product.create({ data: { sku: `PRUEBA-CR-${++n}`, nombre: `PRUEBA-CR producto ${n}`, precio: 10_000 } });

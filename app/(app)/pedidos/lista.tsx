@@ -17,6 +17,7 @@ import { formatQ } from "@/lib/utils";
 import { listar, obtener, rechazar, verificar, type PedidoConPermisos } from "./actions";
 import { AvisoCopiar } from "./[id]/aviso-copiar";
 import { Verificacion } from "./[id]/verificacion";
+import { NOMBRE_CORTO } from "@/lib/pedidos/metodos";
 
 const POR_PAGINA = 30;
 const fecha = (iso: string) => new Date(iso).toLocaleString("es-GT", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "America/Guatemala" });
@@ -155,6 +156,7 @@ export function ListaPedidos({ vistaInicial, puedeVerificar, veTodo, asesores }:
                 { clave: "canal", titulo: "Canal", ocultarMovil: true, render: (p) => <IconoCanal canal={p.canal} /> },
                 { clave: "fecha", titulo: "Fecha", ocultarMovil: true, render: (p) => <span className="whitespace-nowrap">{fecha(p.fecha)}</span> },
                 { clave: "entrega", titulo: "Entrega", ocultarMovil: true, ocultarHastaXl: true, render: (p) => (p.entrega === "envio" ? "Envío" : "Recoger") },
+                { clave: "metodo", titulo: "Pago", ocultarMovil: true, ocultarHastaXl: true, render: (p) => (p.metodoPago ? NOMBRE_CORTO[p.metodoPago] : <span className="text-texto-suave">—</span>) },
                 { clave: "estado", titulo: "Estado", render: (p) => <InsigniaEstado estado={p.estado} /> },
                 { clave: "total", titulo: "Total", alinear: "der", render: (p) => <span className="cuerpo-fuerte whitespace-nowrap">{formatQ(p.total)}</span> },
                 ...(vista === "por-verificar" && puedeVerificar

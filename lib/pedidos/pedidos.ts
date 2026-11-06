@@ -7,20 +7,35 @@ import { puedeDescontar, puedeSobrePedido } from "@/lib/permisos";
 import { aplicarDatos, textoCuentas } from "@/lib/plantillas";
 import { normalizarTelefono } from "@/lib/telefono";
 import { formatTelefono } from "@/lib/utils";
-import type { Prisma } from "@/generated/prisma/client";
+import { abrirCobro, cancelarCobrosAbiertos } from "@/lib/pagos-tarjeta/abrir";
+import { pasarela } from "@/lib/pagos-tarjeta";
+import type { Prisma, TipoPago } from "@/generated/prisma/client";
 import { listarZonas, obtenerAjustesPedidos } from "./ajustes";
 import { costoEnvio, zonaPara } from "./envio";
 import { disponibleDe, disponibleProducto, apartadoProducto } from "./existencias";
 import { cambiarEstado } from "./flujo";
-import { MENSAJES, rellenar, textoHoras, textoResumen } from "./mensajes";
-import { calcularTotales, type Descuento } from "./totales";
+import { compatibleConEntrega, METODOS, nombreMetodo } from "./metodos";
+import { rellenar, textoHoras, textoResumen } from "./mensajes";
+import { calcularTotales, saldoDe, type Descuento } from "./totales";
 import type { DatosPanelPedido, EntradaPedido, ProductoPedido, ResultadoPedido, VistaPedido } from "./tipos";
 import type { Rol } from "@/lib/permisos";
 import { veTodo } from "@/lib/permisos";
 
 export type ActorPedidos = { id: string; nombre: string; rol: Rol };
 const fallo = (error: string): { ok: false; error: string } => ({ ok: false, error });
+type ResultadoAviso = import("./avisos").ResultadoAviso;
 const MAX_LINEAS = 40;
+
+/**
+ * Por qué una forma de pago no se puede usar en este pedido, o null si sirve: tiene que estar activa en Ajustes, la tarjeta
+ * necesita una pasarela conectada y el efectivo en tienda solo vale cuando el cliente recoge.
+ */
+export function errorDeForma(metodo: TipoPago, entrega: "recoger" | "envio", activos: readonly TipoPago[]): string | null {
+  if (!activos.includes(metodo)) return `${nombreMetodo(metodo)} no está activo en Ajustes → Pagos y envíos.`;
+  if (metodo === "tarjeta" && !pasarela()) return "El pago con tarjeta necesita una pasarela de pago conectada.";
+  if (!compatibleConEntrega(metodo, entrega)) return "El pago en efectivo en tienda solo sirve cuando el cliente recoge el pedido.";
+  return null;
+}
 const ABIERTOS = ["borrador", "pendiente_pago", "en_revision"] as const;
 
 /* ── Productos para armar el pedido ── */
@@ -145,14 +160,20 @@ async function preparar(e: EntradaPedido, actor: ActorPedidos) {
     if (!puedeDescontar(actor, t.descuentoMonto, t.subtotal, aj.descuentoMaxAgente)) return fallo(`Un descuento de más de ${aj.descuentoMaxAgente} % lo autoriza un administrador o un jefe de tienda.`);
   }
   if (e.notas.length > 500) return fallo("Las notas pasan de 500 caracteres.");
+  const metodoPago = e.metodoPago ?? null;
+  if (metodoPago) {
+    const error = errorDeForma(metodoPago, e.entrega, aj.metodos);
+    if (error) return fallo(error);
+  }
 
-  if ((await db.bankAccount.count({ where: { activa: true } })) === 0) avisos.push("No hay cuentas bancarias activas: el resumen saldría sin cuentas. Agréguelas en Ajustes → Pagos y envíos.");
+  if ((metodoPago === null || metodoPago === "transferencia" || metodoPago === "deposito") && (await db.bankAccount.count({ where: { activa: true } })) === 0) avisos.push("No hay cuentas bancarias activas: el resumen saldría sin cuentas. Agréguelas en Ajustes → Pagos y envíos.");
 
   return {
     ok: true as const,
     lineas, ...t, zona, direccion, municipio, avisos, sinExistencia,
     descuentoMotivo: t.descuentoMonto > 0 ? motivo : null,
     notas: e.notas.trim() || null,
+    metodoPago,
   };
 }
 
@@ -193,7 +214,7 @@ export async function guardarBorrador(e: EntradaPedido, actor: ActorPedidos): Pr
 
   const datos = {
     entrega: e.entrega, direccion: p.direccion, municipio: p.municipio, zona: p.zona?.nombre ?? null, subtotal: p.subtotal, descuentoMonto: p.descuentoMonto,
-    descuentoMotivo: p.descuentoMotivo, costoEnvio: p.costoEnvio, total: p.total, notas: p.notas,
+    descuentoMotivo: p.descuentoMotivo, costoEnvio: p.costoEnvio, total: p.total, notas: p.notas, metodoPago: p.metodoPago,
   };
   const lineas = p.lineas.map((l) => ({ productoId: l.productoId, sku: l.sku, nombre: l.nombre, precio: l.precio, cantidad: l.cantidad, ubicacionId: l.ubicacionId }));
 
@@ -244,7 +265,7 @@ export async function cargarBorrador(pedidoId: string, conversacionId: string): 
       lineas: lineas.map((l) => ({ productoId: l.productoId!, cantidad: l.cantidad, ubicacionId: l.ubicacionId })),
       entrega: o.entrega, direccion: dir ?? "", referencia: ref ?? "",
       descuento: o.descuentoMonto > 0 ? { tipo: "monto", valor: (o.descuentoMonto / 100).toFixed(2) } : null,
-      descuentoMotivo: o.descuentoMotivo ?? "", notas: o.notas ?? "",
+      descuentoMotivo: o.descuentoMotivo ?? "", notas: o.notas ?? "", metodoPago: o.metodoPago,
     },
   };
 }
@@ -259,17 +280,24 @@ export async function descartarBorrador(pedidoId: string, actor: ActorPedidos): 
 
 /* ── Enviar al cliente ── */
 
-/** El resumen tal como lo ve el cliente, con las cuentas activas y los textos de Ajustes. */
+/**
+ * El resumen tal como lo ve el cliente. El pie depende de la forma de pago del pedido (transferencia o depósito: las cuentas;
+ * tarjeta: el enlace de pago abierto; efectivo: pagará al recoger) y usa los textos que el administrador dejó en Ajustes.
+ */
 export async function construirResumen(pedidoId: string): Promise<string> {
-  const [o, aj, negocio, cuentas] = await Promise.all([
+  const { configMensajes } = await import("./avisos"); // import dinámico: avisos.ts importa este archivo
+  const [o, aj, negocio, cuentas, cfg, cobro] = await Promise.all([
     db.order.findUniqueOrThrow({ where: { id: pedidoId }, include: { lineas: { orderBy: { id: "asc" } } } }),
     obtenerAjustesPedidos(),
     obtenerNegocio(),
     db.bankAccount.findMany({ where: { activa: true }, orderBy: [{ orden: "asc" }, { banco: "asc" }] }),
+    configMensajes(),
+    db.cobroTarjeta.findFirst({ where: { pedidoId, estado: "creado" }, orderBy: { creado: "desc" }, select: { url: true } }),
   ]);
-  const pie = rellenar(MENSAJES.resumen.texto, {
+  const clave = o.metodoPago === "tarjeta" ? "resumen_tarjeta" : o.metodoPago === "efectivo_en_tienda" ? "resumen_efectivo" : "resumen";
+  const pie = rellenar(cfg[clave].texto, {
     cuentas: textoCuentas(cuentas) || aplicarDatos("{cuentas}", { ...negocio, cuentas: "" }),
-    horas: textoHoras(aj.horasReserva), codigo: o.codigo,
+    horas: textoHoras(aj.horasReserva), codigo: o.codigo, enlace: cobro?.url ?? "",
   });
   return textoResumen({ codigo: o.codigo, lineas: o.lineas, descuentoMonto: o.descuentoMonto, costoEnvio: o.costoEnvio, total: o.total, entrega: o.entrega, municipio: o.municipio, direccionTienda: negocio.direccion }, pie);
 }
@@ -290,14 +318,25 @@ export async function puedeEnviarPorCanal(conversacionId: string) {
  * Con modo «copiado» no lo manda: devuelve el texto para copiarlo y deja constancia de que salió fuera del sistema.
  */
 export async function enviarAlCliente(pedidoId: string, actor: ActorPedidos, o: { modo: "enviar" | "copiado"; sobrePedido: boolean }): Promise<ResultadoPedido<{ texto: string }>> {
-  const pedido = await db.order.findUnique({ where: { id: pedidoId }, select: { estado: true, conversacionId: true, codigo: true } });
+  const pedido = await db.order.findUnique({ where: { id: pedidoId }, select: { estado: true, conversacionId: true, codigo: true, metodoPago: true, entrega: true, total: true } });
   if (!pedido?.conversacionId) return fallo("El pedido no existe o no tiene conversación.");
   if (pedido.estado !== "borrador") return fallo("Este pedido ya se envió.");
+  if (!pedido.metodoPago) return fallo("Elija la forma de pago del pedido antes de enviarlo al cliente.");
+  const errorForma = errorDeForma(pedido.metodoPago, pedido.entrega, (await obtenerAjustesPedidos()).metodos);
+  if (errorForma) return fallo(errorForma);
   if (o.sobrePedido && !puedeSobrePedido(actor)) return fallo("Solo un administrador o un jefe de tienda puede apartar «sobre pedido».");
   if (o.modo === "enviar" && !(await puedeEnviarPorCanal(pedido.conversacionId))) return fallo("Este canal no permite enviar mensajes ahora. Use «Copiar mensaje y marcar como enviado».");
 
+  // Con tarjeta, el cobro se pide antes de apartar: si la pasarela no responde, no se aparta nada.
+  if (pedido.metodoPago === "tarjeta") {
+    const c = await abrirCobro({ pedidoId, codigo: pedido.codigo, monto: pedido.total, creadoPorId: actor.id });
+    if (!c.ok) return fallo(c.error);
+  }
   const r = await cambiarEstado({ pedidoId, a: "pendiente_pago", quien: { usuarioId: actor.id }, sobrePedido: o.sobrePedido, nota: o.modo === "copiado" ? "Resumen enviado fuera del sistema" : "Resumen enviado al cliente" });
-  if (!r.ok) return r;
+  if (!r.ok) {
+    await cancelarCobrosAbiertos(pedidoId); // no quedó apartado: el enlace no debe quedar vivo
+    return r;
+  }
   const texto = await construirResumen(pedidoId);
   await log(actor, "enviar_pedido", "Order", pedidoId, { codigo: pedido.codigo, modo: o.modo });
 
@@ -331,9 +370,42 @@ export async function datosPanel(conversacionId: string, actor: ActorPedidos): P
       ubicaciones,
       ubicacionPorEntrega: { recoger: aj.ubicacionRecogerId, envio: aj.ubicacionEnvioId },
       envioGratisDesde: aj.envioGratisDesde,
+      metodosPago: METODOS.filter((m) => m.disponible && aj.metodos.includes(m.id) && (m.id !== "tarjeta" || !!pasarela())).map((m) => ({ id: m.id, nombre: m.nombre })),
       zonas: zonas.filter((z) => z.activa).map((z) => ({ nombre: z.nombre, municipios: z.municipios, costo: z.costo, tiempo: z.tiempo })),
       abiertos,
       sugeridos,
     },
   };
+}
+
+/* ── Cambiar la forma de pago (el cliente cambió de idea con el pedido ya enviado) ── */
+
+/**
+ * Cambia la forma de pago de un pedido pendiente de pago y le manda al cliente el resumen nuevo. Al pasar a tarjeta abre el
+ * cobro por el saldo; al salir de tarjeta anula el cobro abierto. Con un comprobante por verificar no se puede: primero se resuelve.
+ */
+export async function cambiarFormaDePago(pedidoId: string, metodo: TipoPago, actor: ActorPedidos): Promise<ResultadoPedido<{ aviso: ResultadoAviso }>> {
+  const o = await db.order.findUnique({ where: { id: pedidoId }, select: { id: true, estado: true, codigo: true, conversacionId: true, metodoPago: true, entrega: true, total: true } });
+  if (!o) return fallo("El pedido no existe.");
+  if (o.estado !== "pendiente_pago") return fallo("Solo se puede cambiar la forma de pago de un pedido pendiente de pago.");
+  if (o.metodoPago === metodo) return fallo("El pedido ya tiene esa forma de pago.");
+  const error = errorDeForma(metodo, o.entrega, (await obtenerAjustesPedidos()).metodos);
+  if (error) return fallo(error);
+  if (await db.payment.count({ where: { pedidoId, estado: "en_revision" } })) return fallo("Hay un comprobante por verificar. Resuélvalo antes de cambiar la forma de pago.");
+
+  if (metodo === "tarjeta") {
+    const verificado = (await db.payment.aggregate({ where: { pedidoId, estado: "verificado" }, _sum: { monto: true } }))._sum.monto ?? 0;
+    const c = await abrirCobro({ pedidoId, codigo: o.codigo, monto: saldoDe(o.total, verificado), creadoPorId: actor.id });
+    if (!c.ok) return fallo(c.error);
+  }
+  await db.order.update({ where: { id: pedidoId }, data: { metodoPago: metodo } });
+  if (o.metodoPago === "tarjeta") await cancelarCobrosAbiertos(pedidoId);
+  await log(actor, "cambiar_forma_pago", "Order", pedidoId, { codigo: o.codigo, de: o.metodoPago, a: metodo });
+  if (!o.conversacionId) return { ok: true, aviso: { estado: "sin-conversacion" } };
+  await lineaDeSistema(actor, o.conversacionId, `${actor.nombre} cambió la forma de pago del pedido ${o.codigo} a ${nombreMetodo(metodo).toLowerCase()}`);
+
+  const texto = await construirResumen(pedidoId);
+  if (!(await puedeEnviarPorCanal(o.conversacionId))) return { ok: true, aviso: { estado: "copiar", texto } };
+  const envio = await enviarMensaje({ conversacionId: o.conversacionId, usuarioId: actor.id, autor: "asesor", aviso: true, pedidoId, mensaje: { type: "text", text: texto } });
+  return { ok: true, aviso: envio.ok ? { estado: "enviado", texto } : { estado: "fallo", texto, error: envio.error } };
 }

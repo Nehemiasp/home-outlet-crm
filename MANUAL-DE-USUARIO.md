@@ -104,10 +104,16 @@ Desde la conversación: botón **Crear pedido** (se abre un panel).
 1. **Cliente:** nombre, teléfono y municipio (ya vienen de la ficha).
 2. **Productos:** busque en el catálogo y **Agregar**. Cada producto muestra su precio y «Disponible N · Apartado N».
 3. **Entrega:** **Recoger en tienda** o **Envío** (elija la zona; el costo se calcula solo).
-4. **Descuento** (opcional): monto o porcentaje, con motivo. El agente tiene un límite; el jefe de tienda y el administrador no.
-5. **Notas del pedido**: solo las ve el equipo.
-6. Revise el **Resumen** (lo calcula el servidor, no se puede alterar).
-7. **Guardar borrador** (no aparta nada) o **Enviar al cliente**: aparta las existencias y le manda el resumen con las cuentas bancarias.
+4. **Forma de pago**: pregúntele al cliente cómo quiere pagar y elíjalo (**Transferencia bancaria**, **Depósito bancario**, **Tarjeta de crédito o débito** o **Efectivo en la tienda**, según lo que el administrador haya activado). Es obligatorio para enviar el pedido; en un borrador puede quedar vacío. El efectivo solo aparece si el cliente recoge. Si hay una sola forma activa, ya viene elegida.
+5. **Descuento** (opcional): monto o porcentaje, con motivo. El agente tiene un límite; el jefe de tienda y el administrador no.
+6. **Notas del pedido**: solo las ve el equipo.
+7. Revise el **Resumen** (lo calcula el servidor, no se puede alterar).
+8. **Guardar borrador** (no aparta nada) o **Enviar al cliente**: aparta las existencias y le manda el resumen. Lo que lleva el resumen depende de la forma de pago:
+   - **Transferencia o depósito:** las cuentas bancarias.
+   - **Tarjeta:** un enlace seguro para pagar (no lleva cuentas).
+   - **Efectivo:** «Pagará en efectivo al recoger».
+
+En la lista de **Pedidos** y en el detalle se ve la forma de pago elegida.
 
 Si el canal no permite enviar (por ejemplo, pasaron las 24 horas), el botón dice **Copiar mensaje y marcar como enviado**: copia el texto para que lo mande por otro medio y deja el pedido igualmente apartado.
 
@@ -126,8 +132,14 @@ En **Pedidos → Por verificar** (o en el detalle: **Verificar pago**) se ve el 
 - **Rechazar:** escriba el motivo; puede editar el mensaje que recibirá el cliente. El pedido vuelve a **Pendiente de pago**.
 - **Pagos parciales:** si se paga una parte, el pedido muestra «Pagado Q800 de Q1,250 · Falta Q450» y vuelve a esperar el resto (ya no vence solo).
 
-### Pago con tarjeta (cuando el administrador lo haya activado)
-En un pedido **pendiente de pago** aparece **Enviar enlace de pago con tarjeta**: el sistema le manda al cliente un enlace seguro por el saldo. Cuando el cliente paga, el pedido pasa solo a **Pagado**, sin que nadie verifique. Si el monto no coincide o el pedido ya no esperaba pago, queda **en revisión** con un aviso para que lo resuelva una persona.
+### Pago con tarjeta
+Se elige al crear el pedido (**Forma de pago → Tarjeta**) y el administrador tiene que haberla activado. El resumen que recibe el cliente ya trae el enlace seguro. Cuando el cliente paga, el pedido pasa solo a **Pagado**, sin que nadie verifique. Si necesita reenviar el enlace, en el detalle del pedido use **Reenviar enlace de pago**. Si el monto no coincide, o el pedido ya no esperaba pago, queda **en revisión** con un aviso para que lo resuelva una persona.
+
+### Pago en efectivo
+El cliente paga en la tienda al recoger. Cuando llegue, registre el pago (**Registrar comprobante**, método **Efectivo en la tienda**) y confírmelo con **Verificar pago**.
+
+### Si el cliente cambia de idea
+Mientras el pedido siga **pendiente de pago**, en el detalle use **Cambiar forma de pago** y elija la nueva: el sistema le manda al cliente el resumen actualizado (con el enlace si es tarjeta, con las cuentas si es banco). Si ya hay un comprobante por verificar, primero resuélvalo. Si cambió **desde tarjeta** y el cliente igualmente pagó el enlace anterior, ese pago queda **en revisión** (no se pierde) para que lo revise una persona.
 
 ### Estados de un pedido
 **Borrador → Pendiente de pago → Pago en revisión → Pagado → Preparando → Listo para recoger / Enviado → Entregado.** También **Cancelado** y **Vencido**.
@@ -176,7 +188,7 @@ Al entrar, si aún faltan cosas para trabajar con datos reales, se abre **Primer
 | **Asistente** | Encendido, mensaje de bienvenida, canales donde responde, tope mensual de gasto, **Preguntas frecuentes** y una zona para **probar** al asistente |
 | **Canales** | Qué canales están conectados y qué falta de cada uno |
 | **Datos del negocio** | Nombre, dirección, horario semanal, y los textos de formas de pago, envíos y garantía que usa el asistente |
-| **Pagos y envíos** | Métodos de pago activos, prefijo y horas de reserva, descuento máximo del agente, inventario separado o compartido, envío gratis, **cuentas bancarias**, **zonas de envío** y los **mensajes** que se mandan al cliente (se pueden editar y apagar) |
+| **Pagos y envíos** | Métodos de pago activos (son las opciones que se pueden elegir al crear un pedido; la tarjeta solo se puede activar si hay una pasarela conectada), prefijo y horas de reserva, descuento máximo del agente, inventario separado o compartido, envío gratis, **cuentas bancarias**, **zonas de envío** y los **mensajes** que se mandan al cliente (se pueden editar y apagar) |
 
 **Importante al dar de baja a alguien:** *Desactivar* bloquea su entrada al instante y deja sin asignar sus conversaciones para que nadie quede esperando. Siempre debe quedar al menos un administrador activo.
 

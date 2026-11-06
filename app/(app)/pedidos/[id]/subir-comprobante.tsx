@@ -24,7 +24,7 @@ export function SubirComprobante({ abierto, onCerrar, pedido, metodos, bancos, o
 
   useEffect(() => {
     if (!abierto) return;
-    setTipo(metodos[0]?.id ?? "transferencia");
+    setTipo(metodos.find((m) => m.id === pedido.metodoPago)?.id ?? metodos[0]?.id ?? "transferencia"); // la forma que pidió el cliente
     setBanco("");
     setReferencia("");
     setMonto(pedido.resumenPagos.saldo > 0 ? (pedido.resumenPagos.saldo / 100).toFixed(2) : "");

@@ -1,5 +1,5 @@
 // Datos de pedidos que viajan entre el servidor y las pantallas (todo serializable).
-import type { EstadoPedido } from "@/generated/prisma/client";
+import type { EstadoPedido, TipoPago } from "@/generated/prisma/client";
 
 export type ProductoPedido = {
   id: string;
@@ -24,6 +24,8 @@ export type EntradaPedido = {
   descuento: { tipo: "monto" | "porcentaje"; valor: string } | null;
   descuentoMotivo: string;
   notas: string;
+  /** La forma de pago que pidió el cliente. Opcional en un borrador; obligatoria para enviarlo. */
+  metodoPago?: TipoPago | null;
 };
 
 export type VistaPedido = {
@@ -49,6 +51,8 @@ export type DatosPanelPedido = {
   ubicaciones: { id: string; nombre: string }[];
   ubicacionPorEntrega: { recoger: string | null; envio: string | null };
   envioGratisDesde: number | null;
+  /** Formas de pago que se pueden elegir (las activas en Ajustes; la tarjeta solo si hay pasarela). El efectivo se filtra según la entrega. */
+  metodosPago: { id: TipoPago; nombre: string }[];
   zonas: { nombre: string; municipios: string[]; costo: number; tiempo: string }[];
   abiertos: AbiertoPedido[];
   sugeridos: ProductoPedido[];

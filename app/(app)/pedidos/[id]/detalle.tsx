@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Insignia, InsigniaPago, InsigniaEstado, LogoCanal, nombreCanal } from "@/components/ui/etiquetas";
 import { Boton, Casilla, CampoTexto } from "@/components/ui/form";
-import { EncabezadoPagina, LineaDePasos, Modal } from "@/components/ui/estructura";
+import { EncabezadoPagina, LineaDePasos, MenuDesplegable, Modal } from "@/components/ui/estructura";
 import { avanceDePedido } from "@/lib/pedidos/pasos";
 import { AvisoCopiar } from "./aviso-copiar";
 import { useToast } from "@/components/ui/toast";
@@ -13,7 +13,8 @@ import { siguientes } from "@/lib/pedidos/estados";
 import type { ResultadoAviso } from "@/lib/pedidos/avisos";
 import { useActualizacion } from "@/lib/tiempo-real";
 import { formatQ, formatTelefono } from "@/lib/utils";
-import { actualizarGuia, avanzar, enviarEnlaceTarjeta, obtener, rechazar, verificar, type PedidoConPermisos } from "../actions";
+import { actualizarGuia, avanzar, cambiarFormaPago, enviarEnlaceTarjeta, obtener, rechazar, verificar, type PedidoConPermisos } from "../actions";
+import { nombreMetodo } from "@/lib/pedidos/metodos";
 import { EnlaceDuplicado } from "@/components/ui/pedidos";
 import { SubirComprobante } from "./subir-comprobante";
 import { EstadoPagoPill, Verificacion } from "./verificacion";
@@ -24,7 +25,7 @@ const soloFecha = (iso: string) => new Date(iso).toLocaleDateString("es-GT", { d
 export function Detalle({ inicial }: { inicial: PedidoConPermisos }) {
   const avisar = useToast();
   const { datos, refrescar } = useActualizacion(`pedido-${inicial.pedido.id}`, () => obtener(inicial.pedido.id), 6000);
-  const { pedido: p, puedeVerificar, puedeCancelar, sinLimites, metodos, bancos, tarjeta } = datos ?? inicial;
+  const { pedido: p, puedeVerificar, puedeCancelar, sinLimites, metodos, bancos, tarjeta, formasPago } = datos ?? inicial;
 
   const [verPago, setVerPago] = useState<string | null>(null);
   const [subir, setSubir] = useState(false);
@@ -86,6 +87,15 @@ export function Detalle({ inicial }: { inicial: PedidoConPermisos }) {
     tras(r.aviso);
   };
 
+  const cambiarForma = async (metodo: string) => {
+    setTrabajando(true);
+    const r = await cambiarFormaPago(p.id, metodo);
+    setTrabajando(false);
+    if (!r.ok) return avisar(r.error, "error");
+    avisar("Forma de pago cambiada");
+    tras(r.aviso);
+  };
+
   const sig = siguientes(p.estado, p.entrega);
   const puedeReactivar = p.estado === "vencido";
   const puedeCancelarAhora = puedeCancelar && sig.includes("cancelado");
@@ -109,7 +119,8 @@ export function Detalle({ inicial }: { inicial: PedidoConPermisos }) {
   const pagoSeleccionado = p.pagos.find((x) => x.id === verPago) ?? null;
   const acepta = p.estado === "pendiente_pago" || p.estado === "en_revision";
   const r = p.resumenPagos;
-  const puedeEnlace = tarjeta && p.estado === "pendiente_pago" && r.saldo > 0 && r.enRevision === 0; // se cobra el saldo, y sin comprobantes por revisar
+  const puedeEnlace = tarjeta && (p.metodoPago === null || p.metodoPago === "tarjeta") && p.estado === "pendiente_pago" && r.saldo > 0 && r.enRevision === 0;
+  const otrasFormas = p.estado === "pendiente_pago" && r.enRevision === 0 ? formasPago.filter((f) => f.id !== p.metodoPago) : []; // se cobra el saldo, y sin comprobantes por revisar
   const cobroAbierto = p.cobrosTarjeta.find((c) => c.estado === "creado");
   const cobroFallido = !cobroAbierto && p.cobrosTarjeta[0]?.estado === "fallido";
   const imprimible = ["pagado", "preparando", "listo_para_recoger", "enviado", "entregado"].includes(p.estado);
@@ -235,9 +246,10 @@ export function Detalle({ inicial }: { inicial: PedidoConPermisos }) {
               <div className="flex flex-wrap items-center gap-2">
                 {puedeEnlace && (
                   <Boton variante="secundario" tamano="sm" disabled={trabajando} onClick={enviarEnlace}>
-                    Enviar enlace de pago con tarjeta
+                    {p.metodoPago === "tarjeta" ? "Reenviar enlace de pago" : "Enviar enlace de pago con tarjeta"}
                   </Boton>
                 )}
+                {otrasFormas.length > 0 && <MenuDesplegable etiqueta="Cambiar forma de pago" opciones={otrasFormas.map((f) => ({ texto: f.nombre, onElegir: () => void cambiarForma(f.id) }))} />}
                 {acepta && p.pagos.length > 0 && (
                   <Boton variante="secundario" tamano="sm" onClick={() => setSubir(true)}>
                     Registrar comprobante
@@ -245,6 +257,11 @@ export function Detalle({ inicial }: { inicial: PedidoConPermisos }) {
                 )}
               </div>
             </div>
+            {p.metodoPago && (
+              <p className="cuerpo">
+                Forma de pago: <strong>{nombreMetodo(p.metodoPago)}</strong>
+              </p>
+            )}
             <p className="cuerpo" aria-live="polite">
               Pagado <strong>{formatQ(r.verificado)}</strong> de <strong>{formatQ(r.total)}</strong>
               {r.saldo > 0 ? <> · Falta <strong>{formatQ(r.saldo)}</strong></> : null}

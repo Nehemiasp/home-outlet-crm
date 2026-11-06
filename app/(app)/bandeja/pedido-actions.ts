@@ -19,6 +19,7 @@ const entrada = z.object({
   descuento: z.object({ tipo: z.enum(["monto", "porcentaje"]), valor: z.string().max(20) }).nullable(),
   descuentoMotivo: z.string().max(400),
   notas: z.string().max(1000),
+  metodoPago: z.enum(["transferencia", "deposito", "efectivo_en_tienda", "tarjeta"]).nullish(),
 });
 
 async function actor() {

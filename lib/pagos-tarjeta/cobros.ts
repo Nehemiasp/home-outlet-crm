@@ -5,6 +5,7 @@ import { avisarCliente, resumenPagos, type ResultadoAviso } from "@/lib/pedidos/
 import { confirmarPago, type ActorPagos } from "@/lib/pedidos/pagos";
 import { lineaDeSistema } from "@/lib/pedidos/pedidos";
 import { formatQ } from "@/lib/utils";
+import { abrirCobro } from "./abrir";
 import { pasarela } from "./index";
 import type { EventoPasarela, Pasarela } from "./tipos";
 
@@ -32,17 +33,14 @@ export async function crearEnlaceDePago(pedidoId: string, actor: ActorPagos): Pr
   if (saldo <= 0) return fallo("El pedido no tiene saldo por pagar.");
   if (enRevision > 0) return fallo("Hay un comprobante por verificar. Revíselo antes de pedir otro pago.");
 
-  const abierto = await db.cobroTarjeta.findFirst({ where: { pedidoId: pedido.id, estado: "creado", monto: saldo }, orderBy: { creado: "desc" } });
-  let cobro = abierto;
-  if (!cobro) {
-    const nuevo = await p.crearCobro({ referencia: pedido.codigo, monto: saldo, descripcion: `Pedido ${pedido.codigo}` }).catch(() => null);
-    if (!nuevo) return fallo("La pasarela no respondió. Intente de nuevo en un momento.");
-    cobro = await db.cobroTarjeta.create({ data: { pedidoId: pedido.id, pasarela: p.nombre, externoId: nuevo.externoId, monto: saldo, url: nuevo.url, creadoPorId: actor.id } });
-    await log(actor, "crear_cobro_tarjeta", "CobroTarjeta", cobro.id, { pedido: pedido.codigo, monto: saldo });
+  const cobro = await abrirCobro({ pedidoId: pedido.id, codigo: pedido.codigo, monto: saldo, creadoPorId: actor.id });
+  if (!cobro.ok) return fallo(cobro.error);
+  if (!cobro.reutilizado) {
+    await log(actor, "crear_cobro_tarjeta", "CobroTarjeta", cobro.cobroId, { pedido: pedido.codigo, monto: saldo });
     if (pedido.conversacionId) await lineaDeSistema(actor, pedido.conversacionId, `${actor.nombre} envió un enlace de pago con tarjeta de ${formatQ(saldo)} del pedido ${pedido.codigo}`);
   }
   const aviso = await avisarCliente(pedido.id, "enlace_tarjeta", { usuarioId: actor.id, extra: { enlace: cobro.url, saldo: formatQ(saldo) } });
-  return { ok: true, url: cobro.url, monto: saldo, reutilizado: !!abierto, aviso };
+  return { ok: true, url: cobro.url, monto: saldo, reutilizado: cobro.reutilizado, aviso };
 }
 
 export type ResultadoEvento = { ok: true; estado: "pagado" | "fallido" | "repetido"; revisar?: boolean } | Fallo;
@@ -55,9 +53,11 @@ export type ResultadoEvento = { ok: true; estado: "pagado" | "fallido" | "repeti
 export async function procesarEventoPasarela(e: EventoPasarela, p: Pasarela): Promise<ResultadoEvento> {
   const cobro = await db.cobroTarjeta.findUnique({ where: { externoId: e.externoId }, include: { pedido: { select: { id: true, codigo: true, estado: true, conversacionId: true } } } });
   if (!cobro || cobro.pasarela !== p.nombre) return fallo("Cobro desconocido.");
-  if (cobro.estado !== "creado") return { ok: true, estado: "repetido" };
+  // Un cobro cancelado (se cambió la forma de pago) que aun así se paga NO se pierde: el pago queda en revisión (ver abajo).
+  const eraCancelado = cobro.estado === "cancelado" && e.estado === "pagado";
+  if (cobro.estado !== "creado" && !eraCancelado) return { ok: true, estado: "repetido" };
   // Solo el primer aviso lo logra, aunque lleguen dos a la vez.
-  const reclamado = await db.cobroTarjeta.updateMany({ where: { id: cobro.id, estado: "creado" }, data: { estado: e.estado, resueltoEn: new Date() } });
+  const reclamado = await db.cobroTarjeta.updateMany({ where: { id: cobro.id, estado: eraCancelado ? "cancelado" : "creado" }, data: { estado: e.estado, resueltoEn: new Date() } });
   if (reclamado.count === 0) return { ok: true, estado: "repetido" };
   const o = cobro.pedido;
 
@@ -68,10 +68,10 @@ export async function procesarEventoPasarela(e: EventoPasarela, p: Pasarela): Pr
   }
 
   const pago = await db.payment.create({ data: { pedidoId: o.id, tipo: "tarjeta", banco: p.nombre, referencia: e.referencia ?? e.externoId, monto: e.monto, fechaPago: new Date(), estado: "en_revision" } });
-  const aplicable = e.monto === cobro.monto && (o.estado === "pendiente_pago" || o.estado === "en_revision");
+  const aplicable = !eraCancelado && e.monto === cobro.monto && (o.estado === "pendiente_pago" || o.estado === "en_revision");
   if (!aplicable) {
     await db.activityLog.create({ data: { accion: "cobro_tarjeta_por_revisar", entidad: "Payment", entidadId: pago.id, detalle: { pedido: o.codigo, pedido_estado: o.estado, monto_pedido: cobro.monto, monto_pagado: e.monto } } });
-    if (o.conversacionId) await lineaDeSistema(null, o.conversacionId, `Se recibió un pago con tarjeta de ${formatQ(e.monto)} del pedido ${o.codigo} que no se pudo aplicar solo (${e.monto !== cobro.monto ? "el monto no coincide" : "el pedido ya no espera pago"}). Revíselo y, si hace falta, devuélvalo.`);
+    if (o.conversacionId) await lineaDeSistema(null, o.conversacionId, `Se recibió un pago con tarjeta de ${formatQ(e.monto)} del pedido ${o.codigo} que no se pudo aplicar solo (${eraCancelado ? "era de un enlace que se había cancelado" : e.monto !== cobro.monto ? "el monto no coincide" : "el pedido ya no espera pago"}). Revíselo y, si hace falta, devuélvalo.`);
     return { ok: true, estado: "pagado", revisar: true };
   }
   const r = await confirmarPago(pago.id, "sistema");

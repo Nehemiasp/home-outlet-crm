@@ -507,6 +507,7 @@ model Order {
   @@index([contactoId])
   @@index([conversacionId])
   @@index([estado, reservadoHasta])
+  metodoPago    TipoPago? // la forma de pago que pidió el cliente y se eligió al crear el pedido (los anteriores no la tienen)
   cobrosTarjeta CobroTarjeta[]
 }
 
@@ -630,6 +631,7 @@ enum EstadoCobro {
   creado
   pagado
   fallido
+  cancelado // lo anuló el sistema (se cambió la forma de pago); si aun así se paga, queda en revisión
 }
 
 /// Un cobro con tarjeta pedido a la pasarela de pagos: el cliente paga en la página del proveedor y un webhook firmado avisa.

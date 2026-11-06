@@ -7,7 +7,9 @@ import { Insignia } from "@/components/ui/etiquetas";
 import { AreaTexto, Boton, Buscador, Casilla, CampoTexto, Selector } from "@/components/ui/form";
 import { PanelLateral } from "@/components/ui/estructura";
 import { useToast } from "@/components/ui/toast";
+import type { TipoPago } from "@/generated/prisma/client";
 import { ETIQUETA_ESTADO } from "@/lib/pedidos/estados";
+import { compatibleConEntrega } from "@/lib/pedidos/metodos";
 import type { DatosPanelPedido, EntradaPedido, ProductoPedido, VistaPedido } from "@/lib/pedidos/tipos";
 import { formatQ } from "@/lib/utils";
 import { abrirPanelPedido, buscarProductosPedido, cargarBorradorPedido, enviarPedido, guardarBorradorPedido, previsualizarPedido } from "./pedido-actions";
@@ -31,6 +33,7 @@ export function PanelPedido({ abierto, onCerrar, conversacionId, puedeEnviar, on
   const [cliente, setCliente] = useState({ nombre: "", telefono: "", municipio: "" });
   const [lineas, setLineas] = useState<Linea[]>([]);
   const [entrega, setEntrega] = useState<"recoger" | "envio">("recoger");
+  const [metodoPago, setMetodoPago] = useState<TipoPago | null>(null);
   const [direccion, setDireccion] = useState("");
   const [referencia, setReferencia] = useState("");
   const [descTipo, setDescTipo] = useState<"monto" | "porcentaje">("monto");
@@ -51,6 +54,7 @@ export function PanelPedido({ abierto, onCerrar, conversacionId, puedeEnviar, on
     setCliente(d.contacto);
     setLineas([]);
     setEntrega("recoger");
+    setMetodoPago(d.metodosPago.length === 1 ? d.metodosPago[0]!.id : null); // con una sola opción no hay nada que elegir
     setDireccion("");
     setReferencia("");
     setDescTipo("monto");
@@ -96,11 +100,11 @@ export function PanelPedido({ abierto, onCerrar, conversacionId, puedeEnviar, on
     () => ({
       pedidoId, conversacionId, cliente,
       lineas: lineas.map((l) => ({ productoId: l.p.id, cantidad: l.cantidad, ubicacionId: l.ubicacionId })),
-      entrega, direccion, referencia,
+      entrega, direccion, referencia, metodoPago,
       descuento: descValor.trim() ? { tipo: descTipo, valor: descValor } : null,
       descuentoMotivo: descMotivo, notas,
     }),
-    [pedidoId, conversacionId, cliente, lineas, entrega, direccion, referencia, descTipo, descValor, descMotivo, notas],
+    [pedidoId, conversacionId, cliente, lineas, entrega, direccion, referencia, metodoPago, descTipo, descValor, descMotivo, notas],
   );
 
   // El resumen lo calcula el servidor: el navegador solo manda lo que eligió la persona.
@@ -144,6 +148,7 @@ export function PanelPedido({ abierto, onCerrar, conversacionId, puedeEnviar, on
     setCliente(e.cliente);
     setLineas(e.lineas.map((l, i) => ({ p: r.productos[i]!, cantidad: l.cantidad, ubicacionId: l.ubicacionId })));
     setEntrega(e.entrega);
+    setMetodoPago(e.metodoPago ?? null);
     setDireccion(e.direccion);
     setReferencia(e.referencia);
     setDescTipo(e.descuento?.tipo ?? "monto");
@@ -192,7 +197,8 @@ export function PanelPedido({ abierto, onCerrar, conversacionId, puedeEnviar, on
   const sugeridos = datos?.sugeridos ?? [];
   const mostrados = busqueda.trim() ? resultados : sugeridos.length ? sugeridos : resultados;
   const ubicacionDeLinea = (l: Linea) => l.ubicacionId ?? datos?.ubicacionPorEntrega[entrega] ?? null;
-  const bloqueado = !vista || !!errorVista || lineas.length === 0 || (vista.sinExistencia && !(datos?.sinLimites && sobrePedido));
+  const formas = (datos?.metodosPago ?? []).filter((m) => compatibleConEntrega(m.id, entrega)); // el efectivo solo si el cliente recoge
+  const bloqueado = !vista || !!errorVista || lineas.length === 0 || !metodoPago || (vista.sinExistencia && !(datos?.sinLimites && sobrePedido));
 
   return (
     <PanelLateral abierto={abierto} onCerrar={onCerrar} titulo="Crear pedido">
@@ -329,7 +335,16 @@ export function PanelPedido({ abierto, onCerrar, conversacionId, puedeEnviar, on
             <div role="radiogroup" aria-label="Tipo de entrega" className="flex flex-wrap gap-2">
               {(["recoger", "envio"] as const).map((v) => (
                 <label key={v} className={`cuerpo-fuerte inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-campo border px-3 ${entrega === v ? "border-carbon bg-fondo" : "border-linea"}`}>
-                  <input type="radio" name="entrega" className="size-4" checked={entrega === v} onChange={() => setEntrega(v)} />
+                  <input
+                    type="radio"
+                    name="entrega"
+                    className="size-4"
+                    checked={entrega === v}
+                    onChange={() => {
+                      setEntrega(v);
+                      if (metodoPago && !compatibleConEntrega(metodoPago, v)) setMetodoPago(null); // el efectivo no sirve para un envío
+                    }}
+                  />
                   {v === "recoger" ? "Recoger en tienda" : "Envío"}
                 </label>
               ))}
@@ -343,6 +358,33 @@ export function PanelPedido({ abierto, onCerrar, conversacionId, puedeEnviar, on
                     Zona: {vista.zona.nombre} · {vista.zona.tiempo}
                   </p>
                 )}
+              </>
+            )}
+          </section>
+
+          <section aria-label="Forma de pago" className="flex flex-col gap-3">
+            <h3 className="cuerpo-fuerte">Forma de pago</h3>
+            {formas.length === 0 ? (
+              <p className="meta rounded-campo bg-fondo p-3 text-texto-suave">No hay formas de pago activas. El administrador las enciende en Ajustes → Pagos y envíos.</p>
+            ) : (
+              <>
+                <div role="radiogroup" aria-label="Forma de pago" className="flex flex-wrap gap-2">
+                  {formas.map((m) => (
+                    <label key={m.id} className={`cuerpo-fuerte inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-campo border px-3 ${metodoPago === m.id ? "border-carbon bg-fondo" : "border-linea"}`}>
+                      <input type="radio" name="forma-pago" className="size-4" checked={metodoPago === m.id} onChange={() => setMetodoPago(m.id)} />
+                      {m.nombre}
+                    </label>
+                  ))}
+                </div>
+                <p className="meta text-texto-suave" aria-live="polite">
+                  {metodoPago === "tarjeta"
+                    ? "Al enviar el pedido, el cliente recibe también un enlace seguro para pagar con tarjeta."
+                    : metodoPago === "efectivo_en_tienda"
+                      ? "El cliente paga en efectivo al recoger. El pago se registra y se confirma cuando llegue."
+                      : metodoPago
+                        ? "El resumen lleva las cuentas bancarias; el cliente manda la foto del comprobante por el chat."
+                        : "Pregúntele al cliente cómo quiere pagar. Hace falta para poder enviar el pedido."}
+                </p>
               </>
             )}
           </section>

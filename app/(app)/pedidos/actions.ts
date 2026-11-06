@@ -13,8 +13,10 @@ import { ESTADOS } from "@/lib/pedidos/estados";
 import { avanzarPedido, guardarGuia } from "@/lib/pedidos/gestion";
 import { vencerReservas } from "@/lib/pedidos/vencimiento";
 import { crearEnlaceDePago, tarjetaActiva } from "@/lib/pagos-tarjeta/cobros";
+import { cambiarFormaDePago } from "@/lib/pedidos/pedidos";
 import { obtenerAjustesPedidos } from "@/lib/pedidos/ajustes";
-import { METODOS } from "@/lib/pedidos/metodos";
+import { pasarela } from "@/lib/pagos-tarjeta";
+import { compatibleConEntrega, METODOS } from "@/lib/pedidos/metodos";
 import { db } from "@/lib/db";
 import { requireUsuario } from "@/lib/session";
 import { puedeVerMensaje, puedeVerPago, puedeVerPedido, redactarDuplicados } from "@/lib/visibilidad";
@@ -114,7 +116,7 @@ export async function listar(f: FiltrosPedidos): Promise<{ items: FilaPedido[]; 
   return listarPedidos(filtros.parse(f), u);
 }
 
-export type PedidoConPermisos = { pedido: DetallePedido; puedeVerificar: boolean; puedeCancelar: boolean; sinLimites: boolean; metodos: { id: string; nombre: string }[]; bancos: string[]; tarjeta: boolean };
+export type PedidoConPermisos = { pedido: DetallePedido; puedeVerificar: boolean; puedeCancelar: boolean; sinLimites: boolean; metodos: { id: string; nombre: string }[]; bancos: string[]; tarjeta: boolean; formasPago: { id: string; nombre: string }[] };
 
 export async function obtener(pedidoId: string): Promise<PedidoConPermisos | null> {
   const a = await actor();
@@ -130,6 +132,8 @@ export async function obtener(pedidoId: string): Promise<PedidoConPermisos | nul
     metodos: METODOS.filter((m) => aj.metodos.includes(m.id)).map((m) => ({ id: m.id, nombre: m.nombre })),
     bancos: [...new Set(cuentas.map((c) => c.banco))],
     tarjeta: await tarjetaActiva(),
+    // a qué formas de pago se puede cambiar: las activas (la tarjeta, solo con pasarela) que sirven para esa entrega
+    formasPago: METODOS.filter((m) => m.disponible && aj.metodos.includes(m.id) && (m.id !== "tarjeta" || !!pasarela()) && compatibleConEntrega(m.id, pedido.entrega)).map((m) => ({ id: m.id, nombre: m.nombre })),
   };
 }
 
@@ -150,4 +154,13 @@ export async function actualizarGuia(pedidoId: string, guia: string) {
   const a = await actor();
   if (!(await puedeVerPedido(a, id.parse(pedidoId)))) return NO_EXISTE;
   return guardarGuia(id.parse(pedidoId), z.string().max(100).parse(guia), a);
+}
+
+/** El cliente cambió de idea con el pedido ya enviado: se cambia la forma de pago y se le manda el resumen nuevo. */
+export async function cambiarFormaPago(pedidoId: string, metodo: string) {
+  const a = await actor();
+  if (!(await puedeVerPedido(a, id.parse(pedidoId)))) return NO_EXISTE;
+  const m = z.enum(["transferencia", "deposito", "efectivo_en_tienda", "tarjeta"]).safeParse(metodo);
+  if (!m.success) return fallo("Esa forma de pago no es válida.");
+  return cambiarFormaDePago(id.parse(pedidoId), m.data, a);
 }

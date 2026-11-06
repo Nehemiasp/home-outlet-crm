@@ -23,5 +23,10 @@ export const METODOS: readonly MetodoPago[] = [
   { id: "tarjeta", nombre: "Tarjeta de crédito o débito", requiereComprobante: false, disponible: true, porDefecto: false, nota: "Necesita una pasarela de pago conectada." },
 ];
 
+/** El efectivo en tienda solo sirve cuando el cliente recoge el pedido. */
+export const compatibleConEntrega = (id: TipoPago, entrega: "recoger" | "envio") => id !== "efectivo_en_tienda" || entrega === "recoger";
+/** Nombres cortos para la lista de pedidos. */
+export const NOMBRE_CORTO: Record<TipoPago, string> = { transferencia: "Transferencia", deposito: "Depósito", efectivo_en_tienda: "Efectivo", tarjeta: "Tarjeta" };
+
 export const nombreMetodo = (id: TipoPago) => METODOS.find((m) => m.id === id)?.nombre ?? id;
 export const metodosSeleccionables = (): TipoPago[] => METODOS.filter((m) => m.disponible).map((m) => m.id);

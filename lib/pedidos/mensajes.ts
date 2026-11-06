@@ -1,6 +1,6 @@
 import { formatQ } from "@/lib/utils";
 
-export type ClaveMensaje = "resumen" | "comprobante_recibido" | "pago_confirmado" | "pago_parcial" | "pago_rechazado" | "listo_para_recoger" | "enviado" | "vencido" | "por_vencer" | "enlace_tarjeta";
+export type ClaveMensaje = "resumen" | "comprobante_recibido" | "pago_confirmado" | "pago_parcial" | "pago_rechazado" | "listo_para_recoger" | "enviado" | "vencido" | "por_vencer" | "enlace_tarjeta" | "resumen_tarjeta" | "resumen_efectivo";
 export type VariablesMensaje = Partial<Record<"codigo" | "total" | "saldo" | "cuentas" | "direccion" | "horario" | "guia" | "horas" | "motivo" | "enlace", string>>;
 
 /** Textos de fábrica de lo que se le manda al cliente. Cada uno se puede editar y apagar en Ajustes → Pagos y envíos → Mensajes. */
@@ -10,6 +10,12 @@ export const MENSAJES: Record<ClaveMensaje, { titulo: string; texto: string; act
     texto: "Puede pagar por transferencia o depósito a:\n{cuentas}\n\nEnvíe una foto del comprobante por este chat indicando el número de pedido.\nApartamos sus productos por {horas}.",
     activo: true,
   },
+  resumen_tarjeta: {
+    titulo: "Resumen del pedido pagando con tarjeta (texto al pie)",
+    texto: "Puede pagar con tarjeta de crédito o débito en este enlace seguro:\n{enlace}\nApartamos sus productos por {horas}.",
+    activo: true,
+  },
+  resumen_efectivo: { titulo: "Resumen del pedido pagando en efectivo (texto al pie)", texto: "Pagará en efectivo al recoger su pedido en la tienda.\nApartamos sus productos por {horas}.", activo: true },
   comprobante_recibido: { titulo: "Comprobante recibido", texto: "Recibimos su comprobante del pedido {codigo}. Lo estamos verificando y le avisamos en cuanto esté confirmado.", activo: true },
   pago_confirmado: { titulo: "Pago confirmado", texto: "Confirmamos su pago del pedido {codigo}. ¡Gracias por su compra! Ya estamos preparando su pedido.", activo: true },
   pago_parcial: { titulo: "Pago parcial confirmado", texto: "Confirmamos un pago de su pedido {codigo}. Todavía queda un saldo de {saldo}. Puede enviarnos el comprobante por este chat.", activo: true },

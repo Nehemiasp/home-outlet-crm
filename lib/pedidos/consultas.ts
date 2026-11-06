@@ -1,6 +1,6 @@
 import type { Channel } from "@/lib/canales/tipos";
 import { db } from "@/lib/db";
-import type { EstadoPedido, Prisma } from "@/generated/prisma/client";
+import type { EstadoPedido, Prisma, TipoPago } from "@/generated/prisma/client";
 import { filtroPedido, redactarDuplicados, type Actor, type DuplicadoVisible } from "@/lib/visibilidad";
 import { nombreMetodo } from "./metodos";
 import { buscarDuplicados } from "./pagos";
@@ -42,6 +42,8 @@ export type FilaPedido = {
   estado: EstadoPedido;
   pago: EstadoPagoVista;
   entrega: "recoger" | "envio";
+  /** La forma de pago elegida al crear el pedido (los pedidos anteriores no la tienen). */
+  metodoPago: TipoPago | null;
 };
 
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
@@ -76,13 +78,13 @@ export async function listarPedidos(f: FiltrosPedidos, u: Actor): Promise<{ item
   };
   const filas = await db.order.findMany({
     where, orderBy: { creada: "desc" }, take: f.limite + 1,
-    select: { id: true, codigo: true, contactoId: true, canal: true, creada: true, total: true, estado: true, entrega: true, contacto: { select: { nombre: true } }, pagos: { select: { monto: true, estado: true } } },
+    select: { id: true, codigo: true, contactoId: true, canal: true, creada: true, total: true, estado: true, entrega: true, metodoPago: true, contacto: { select: { nombre: true } }, pagos: { select: { monto: true, estado: true } } },
   });
   return {
     contadores: await contarVistas(u),
     hayMas: filas.length > f.limite,
     items: filas.slice(0, f.limite).map((o) => ({
-      id: o.id, codigo: o.codigo, cliente: o.contacto.nombre, contactoId: o.contactoId, canal: o.canal as Channel, fecha: o.creada.toISOString(), total: o.total, estado: o.estado, entrega: o.entrega,
+      id: o.id, codigo: o.codigo, cliente: o.contacto.nombre, contactoId: o.contactoId, canal: o.canal as Channel, fecha: o.creada.toISOString(), total: o.total, estado: o.estado, entrega: o.entrega, metodoPago: o.metodoPago,
       pago: estadoDePago(o.total, o.pagos),
     })),
   };
@@ -118,7 +120,9 @@ export type DetallePedido = {
     comprobanteUrl: string | null; motivoRechazo: string | null; registradoPor: string | null; verificadoPor: string | null; verificadoEn: string | null; duplicados: DuplicadoVisible[];
   }[];
   /** Enlaces de pago con tarjeta pedidos a la pasarela, del más nuevo al más viejo. */
-  cobrosTarjeta: { id: string; monto: number; estado: "creado" | "pagado" | "fallido"; creado: string }[];
+  cobrosTarjeta: { id: string; monto: number; estado: "creado" | "pagado" | "fallido" | "cancelado"; creado: string }[];
+  /** La forma de pago elegida al crear el pedido, o null en los pedidos anteriores. */
+  metodoPago: TipoPago | null;
   resumenPagos: { total: number; verificado: number; enRevision: number; saldo: number };
   pagoEstado: EstadoPagoVista;
   eventos: { id: string; de: EstadoPedido | null; a: EstadoPedido; quien: string; nota: string | null; fecha: string }[];
@@ -151,6 +155,7 @@ export async function cargarPedido(id: string, u: Actor): Promise<DetallePedido 
       comprobanteUrl: p.archivoUrl ?? p.mensaje?.archivoUrl ?? null, motivoRechazo: p.motivoRechazo, registradoPor: p.registradoPor?.nombre ?? null, verificadoPor: p.verificadoPor?.nombre ?? null, verificadoEn: p.verificadoEn?.toISOString() ?? null,
       duplicados: duplicados[i]!,
     })),
+    metodoPago: o.metodoPago,
     cobrosTarjeta: o.cobrosTarjeta.map((c) => ({ id: c.id, monto: c.monto, estado: c.estado, creado: c.creado.toISOString() })),
     resumenPagos: { total: o.total, verificado, enRevision, saldo: saldoDe(o.total, verificado) },
     pagoEstado: estadoDePago(o.total, o.pagos),
