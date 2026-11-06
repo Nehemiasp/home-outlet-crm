@@ -206,17 +206,43 @@ export const PanelLateral = (p: DialogoProps) => <Dialogo {...p} lado />;
 /* ── Menú desplegable ── */
 export type OpcionMenu = { texto: string; onElegir: () => void; peligro?: boolean };
 
+/**
+ * Menú de acciones. Va en posición fija, calculada al abrirse: dentro de una tabla o un panel con scroll, un menú
+ * «absolute» queda recortado y abre una barra de scroll. Se abre hacia arriba si abajo no cabe y se cierra al hacer scroll
+ * o cambiar el tamaño de la ventana (así nunca queda flotando lejos de su botón).
+ */
 export function MenuDesplegable({ etiqueta, opciones, variante = "secundario" }: { etiqueta: string; opciones: OpcionMenu[]; variante?: "secundario" | "fantasma" }) {
   const [abierto, setAbierto] = useState(false);
+  const [pos, setPos] = useState<{ top?: number; bottom?: number; right: number } | null>(null);
   const raiz = useRef<HTMLDivElement>(null);
   const items = useRef<(HTMLButtonElement | null)[]>([]);
+
+  const alternar = () => {
+    if (!abierto) {
+      const r = raiz.current?.getBoundingClientRect();
+      if (r) {
+        const alto = Math.min(opciones.length * 44 + 8, 320); // lo que mide el menú, con holgura
+        const abajo = window.innerHeight - r.bottom;
+        const derecha = Math.max(8, window.innerWidth - r.right);
+        setPos(abajo < alto + 8 && r.top > abajo ? { bottom: window.innerHeight - r.top + 4, right: derecha } : { top: r.bottom + 4, right: derecha });
+      }
+    }
+    setAbierto(!abierto);
+  };
 
   useEffect(() => {
     if (!abierto) return;
     items.current[0]?.focus();
     const fuera = (e: MouseEvent) => !raiz.current?.contains(e.target as Node) && setAbierto(false);
+    const mover = (e: Event) => !raiz.current?.contains(e.target as Node) && setAbierto(false); // el scroll del propio menú no lo cierra
     document.addEventListener("mousedown", fuera);
-    return () => document.removeEventListener("mousedown", fuera);
+    window.addEventListener("scroll", mover, true);
+    window.addEventListener("resize", mover);
+    return () => {
+      document.removeEventListener("mousedown", fuera);
+      window.removeEventListener("scroll", mover, true);
+      window.removeEventListener("resize", mover);
+    };
   }, [abierto]);
 
   const alTeclear = (e: React.KeyboardEvent, i: number) => {
@@ -233,12 +259,12 @@ export function MenuDesplegable({ etiqueta, opciones, variante = "secundario" }:
 
   return (
     <div ref={raiz} className="relative inline-block">
-      <Boton variante={variante} aria-haspopup="menu" aria-expanded={abierto} onClick={() => setAbierto(!abierto)}>
+      <Boton variante={variante} aria-haspopup="menu" aria-expanded={abierto} onClick={alternar}>
         {etiqueta}
         <ChevronDown className="size-4" aria-hidden />
       </Boton>
-      {abierto && (
-        <div role="menu" className="absolute right-0 z-20 mt-1 min-w-48 overflow-hidden rounded-tarjeta border border-linea bg-superficie py-1 shadow-menu">
+      {abierto && pos && (
+        <div role="menu" style={pos} className="fixed z-30 max-h-80 min-w-48 max-w-[calc(100vw-1rem)] overflow-y-auto rounded-tarjeta border border-linea bg-superficie py-1 shadow-menu">
           {opciones.map((o, i) => (
             <button
               key={o.texto}
