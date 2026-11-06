@@ -20,6 +20,7 @@ Después de cambiar `prisma/schema.prisma` y migrar, reinicie `npm run dev`: el 
 - `npm run seed` borra los datos de demostración y los vuelve a crear: el catálogo, 275 contactos, unas 1,200 conversaciones de 90 días con respuestas del asistente, pases a asesor y costos, unos 80 pedidos con sus pagos, las cuentas bancarias y zonas de envío de ejemplo, las preguntas frecuentes y los datos del negocio. **No borra a los usuarios**: si ya existen conservan su contraseña, y solo imprime la de los que crea. No corre en producción.
 - `npm test` corre las pruebas, una archivo a la vez porque comparten la base (necesitan la base encendida).
 - `npm run e2e` corre las pruebas de punta a punta en un navegador real (Edge o Chrome ya instalados); necesitan `npm run db` y `npm run dev` encendidos.
+- `npm run admin:crear -- --nombre "…" --correo …` crea el primer administrador de un sistema nuevo; `npm run demo:limpiar` borra los datos de demostración (primero solo muestra qué borraría).
 - `npm run respaldo` guarda la base y `uploads/` (necesita `pg_dump`); `npm run restaurar` los devuelve. Detalles en `ESTADO-ACTUAL.md`, sección 19.
 - `npm run ai:eval` corre los casos de `ai/eval/casos.json` contra el proveedor de IA configurado y guarda el resultado con fecha en `ai/eval/resultados/`.
 - Pantallas solo para admin: `/sistema` (guía de estilo), `/simulador` (escribir como cliente; no existe en producción), `/ajustes` y `/reportes`.

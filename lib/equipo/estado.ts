@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import type { EstadoAsesor, OrigenEstadoAsesor } from "@/generated/prisma/client";
 import { procesarCola } from "./asignacion";
 import { SIN_SENAL_MS, type Disponibilidad, type MotivoPausa } from "./tipos";
+import type { Rol } from "@/lib/permisos";
 
 type Cambio = {
   estado: EstadoAsesor;
@@ -58,7 +59,7 @@ export const alCerrarSesion = (usuarioId: string) => cambiarEstadoAsesor(usuario
  * Guarda la señal de cualquier usuario y, si un asesor estaba Desconectado, lo vuelve a poner Disponible
  * (la sesión sigue válida: abrió otra vez la app).
  */
-export async function registrarLatido(u: { id: string; rol: "admin" | "agente" }, ahora = new Date()) {
+export async function registrarLatido(u: { id: string; rol: Rol }, ahora = new Date()) {
   await db.user.update({ where: { id: u.id }, data: { ultimaSenal: ahora } });
   if (u.rol === "agente") await cambiarEstadoAsesor(u.id, { estado: "disponible", origen: "latido", ahora, soloSiEstaba: ["desconectado"] });
 }
@@ -95,5 +96,5 @@ export async function desconectarInactivos(o: { ahora?: Date; forzar?: boolean; 
   return n;
 }
 
-export const disponibilidadDe = (u: { rol: "admin" | "agente"; estadoAsesor: EstadoAsesor; estadoDesde: Date; motivoPausa: string | null }): Disponibilidad | null =>
+export const disponibilidadDe = (u: { rol: Rol; estadoAsesor: EstadoAsesor; estadoDesde: Date; motivoPausa: string | null }): Disponibilidad | null =>
   u.rol === "agente" ? { estado: u.estadoAsesor, desde: u.estadoDesde.toISOString(), motivo: u.motivoPausa } : null;

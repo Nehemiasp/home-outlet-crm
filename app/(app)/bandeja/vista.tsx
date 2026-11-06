@@ -15,7 +15,7 @@ import { useToast } from "@/components/ui/toast";
 import type { ConversacionDTO, ItemLinea, ProductoDTO } from "@/lib/bandeja-tipos";
 import { formatTelefono } from "@/lib/utils";
 import { AVISO_MS, msRestantes, textoRestante } from "@/lib/canales/ventana";
-import { puedeAsignar, puedeCerrar } from "@/lib/permisos";
+import { puedeAsignar, puedeCerrar, veTodo } from "@/lib/permisos";
 import { useActualizacion } from "@/lib/tiempo-real";
 import { alternarAsistente, asignar, cambiarEstado, devolverCola, enviarImagen, enviarPlantilla, enviarProducto, enviarTexto, guardarNota, obtener, plantillas as plantillasDelCanal, reintentar, sugerir } from "./actions";
 import { Ficha } from "./ficha";
@@ -116,7 +116,7 @@ export function Vista({ inicial }: { inicial: ConversacionDTO }) {
 
   const yo = c.yo;
   const opcionesAsignar: OpcionMenu[] =
-    yo.rol === "admin"
+    veTodo(yo)
       ? [
           ...c.usuarios.map((u) => ({ texto: u.id === yo.id ? `Asignar a ${u.nombre} (yo)` : `Asignar a ${u.nombre}`, onElegir: () => conAviso(asignar(c.id, u.id), `Asignada a ${u.nombre}`) })),
           ...(c.asignadaA ? [{ texto: "Quitar asignación", onElegir: () => conAviso(asignar(c.id, null), "Asignación quitada") }] : []),

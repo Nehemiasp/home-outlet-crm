@@ -1,0 +1,65 @@
+# Revisión automática en GitHub: se corre sola en cada subida de cambios y en cada solicitud de integración.
+# Parte de una base vacía (migraciones + semilla), como lo haría un servidor nuevo, así que también avisa si algo depende de
+# datos que solo existen en la computadora de quien programa.
+name: Revisión
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  pruebas:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: homeoutlet
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:ci@localhost:5432/homeoutlet
+      AUTH_SECRET: clave-solo-para-la-revision-automatica-0123456789
+      CHANNELS_ENABLED: simulado
+      PASARELA: simulada
+      E2E_PASARELA: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Base de datos (migraciones y datos de demostración)
+        run: |
+          npx prisma migrate deploy
+          npm run seed
+      - name: Tipos
+        run: npm run typecheck
+      - name: Pruebas
+        run: npm test
+      - name: Evaluación del asistente
+        run: npm run ai:eval
+      - name: Pruebas de punta a punta (navegador real)
+        run: |
+          npm run dev > dev.log 2>&1 &
+          for i in $(seq 1 60); do curl -fs http://localhost:3000/api/salud && break; sleep 2; done
+          npm run e2e
+      - name: Registro del servidor (si algo falló)
+        if: failure()
+        run: tail -n 80 dev.log || true
+
+  compilar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build

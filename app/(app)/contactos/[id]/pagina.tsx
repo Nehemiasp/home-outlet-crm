@@ -30,7 +30,7 @@ function canalMasUsado(conversaciones: { canal: Canal; fecha: string }[]) {
   return orden[0] ? { canal: orden[0][0], n: orden[0][1].n } : null;
 }
 
-export function PaginaContacto({ inicial, esAdmin }: { inicial: ContactoDetalle; esAdmin: boolean }) {
+export function PaginaContacto({ inicial, puedeUnir }: { inicial: ContactoDetalle; puedeUnir: boolean }) {
   const { datos, refrescar } = useActualizacion(`contacto-${inicial.id}`, () => obtenerContacto(inicial.id), 10_000);
   const c = datos ?? inicial;
   const [unir, setUnir] = useState(false);
@@ -45,7 +45,7 @@ export function PaginaContacto({ inicial, esAdmin }: { inicial: ContactoDetalle;
         Contactos
       </Link>
       <EncabezadoPagina titulo={c.nombre}>
-        {esAdmin && (
+        {puedeUnir && (
           <Boton variante="secundario" onClick={() => setUnir(true)}>
             Unir con otro contacto
           </Boton>
@@ -110,7 +110,7 @@ export function PaginaContacto({ inicial, esAdmin }: { inicial: ContactoDetalle;
         </div>
       </div>
 
-      {esAdmin && <ModalUnir abierto={unir} onCerrar={() => setUnir(false)} conservarInicial={{ id: c.id, nombre: c.nombre, telefono: c.telefono }} onUnido={refrescar} />}
+      {puedeUnir && <ModalUnir abierto={unir} onCerrar={() => setUnir(false)} conservarInicial={{ id: c.id, nombre: c.nombre, telefono: c.telefono }} onUnido={refrescar} />}
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 const secciones = [
+  ["primeros-pasos", "Primeros pasos"],
   ["usuarios", "Usuarios"],
   ["equipo", "Equipo"],
   ["respuestas", "Respuestas rápidas"],

@@ -14,6 +14,8 @@ const bueno = {
   ANTHROPIC_API_KEY: "k",
   TAREAS_SECRET: "un-secreto-de-mas-de-24-caracteres",
   PROXIES_CONFIABLES: "1",
+  UPLOADS_DIR: "/data/uploads",
+  RESPALDO_AUTOMATICO: "1",
   AUTH_TRUST_HOST: "true",
 };
 
@@ -46,6 +48,13 @@ describe("revisión del entorno de producción", () => {
     assert.match(r.errores[1]!, /Instagram.*INSTAGRAM_APP_SECRET.*INSTAGRAM_VERIFY_TOKEN/);
   });
 
+  it("la pasarela simulada no se acepta en producción", () => {
+    const r = revisarEntorno({ ...bueno, PASARELA: "simulada" });
+    assert.equal(r.errores.length, 1);
+    assert.match(r.errores[0]!, /PASARELA=simulada/);
+    assert.equal(revisarEntorno({ ...bueno, PASARELA: undefined }).errores.length, 0);
+  });
+
   it("Claude sin clave es un error; el asistente simulado solo avisa", () => {
     assert.equal(revisarEntorno({ ...bueno, ANTHROPIC_API_KEY: "" }).errores.length, 1);
     const r = revisarEntorno({ ...bueno, AI_PROVIDER: undefined, ANTHROPIC_API_KEY: undefined });
@@ -53,9 +62,15 @@ describe("revisión del entorno de producción", () => {
     assert.equal(r.avisos.length, 1);
   });
 
-  it("avisa de crons apagados, de la IP sin proxy declarado y del canal simulado", () => {
-    const r = revisarEntorno({ ...bueno, TAREAS_SECRET: "", PROXIES_CONFIABLES: undefined, AUTH_TRUST_HOST: undefined, CHANNELS_ENABLED: "simulado,whatsapp" });
+  it("avisa de la IP sin proxy, del canal simulado, de las fotos sin volumen y del respaldo apagado", () => {
+    const r = revisarEntorno({ ...bueno, PROXIES_CONFIABLES: undefined, AUTH_TRUST_HOST: undefined, CHANNELS_ENABLED: "simulado,whatsapp", UPLOADS_DIR: undefined, RESPALDO_AUTOMATICO: undefined });
     assert.equal(r.errores.length, 0);
-    assert.equal(r.avisos.length, 4);
+    assert.equal(r.avisos.length, 5);
+    assert.ok(r.avisos.some((a) => /UPLOADS_DIR/.test(a)) && r.avisos.some((a) => /RESPALDO_AUTOMATICO/.test(a)));
+  });
+
+  it("un TAREAS_SECRET vacío ya no es un aviso (las tareas corren dentro del servidor), pero uno corto sí", () => {
+    assert.equal(revisarEntorno({ ...bueno, TAREAS_SECRET: "" }).avisos.length, 0);
+    assert.equal(revisarEntorno({ ...bueno, TAREAS_SECRET: "corto" }).avisos.length, 1);
   });
 });

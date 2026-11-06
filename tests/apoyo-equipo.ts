@@ -1,12 +1,13 @@
 import { db } from "@/lib/db";
 import { olvidarAjustesEquipo } from "@/lib/equipo/ajustes";
 import type { EstadoAsesor } from "@/generated/prisma/client";
+import type { Rol } from "@/lib/permisos";
 
 /** Utilidades de las pruebas del equipo. No es una prueba: el nombre no termina en .test.ts. */
 
 export const PREFIJO = "PRUEBA-EQ";
 
-export const crearUsuario = (clave: string, rol: "admin" | "agente" = "agente", estado: EstadoAsesor = "disponible") =>
+export const crearUsuario = (clave: string, rol: Rol = "agente", estado: EstadoAsesor = "disponible") =>
   db.user.create({ data: { nombre: `${PREFIJO} ${clave}`, correo: `${clave}@prueba-eq.test`, passwordHash: "x", rol, estadoAsesor: estado, ultimaSenal: new Date() } });
 
 let guardados: { id: string; estadoAsesor: EstadoAsesor; estadoDesde: Date; motivoPausa: string | null; activo: boolean }[] = [];

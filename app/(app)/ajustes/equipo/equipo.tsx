@@ -71,7 +71,7 @@ export function Equipo({ inicial }: { inicial: AjustesEquipo }) {
         <p className="cuerpo text-texto-suave">
           {ajustes.modoAsignacion === "automatica"
             ? "Cuando el asistente pasa una conversación a un asesor, o llega un mensaje y el asistente está apagado, se asigna sola al asesor disponible con menos conversaciones abiertas (primero al asesor responsable del cliente, si está disponible)."
-            : "Nada se asigna solo: todo queda en «Sin asignar» y un administrador reparte."}
+            : "Nada se asigna solo: todo queda en «Sin asignar» y un administrador o un jefe de tienda reparte."}
         </p>
       </section>
 
@@ -80,7 +80,7 @@ export function Equipo({ inicial }: { inicial: AjustesEquipo }) {
         <Interruptor etiqueta="Los asesores ven solo sus conversaciones" activo={ajustes.asesoresVenSoloSuyas} disabled={guardando} onCambio={(v) => void guardar({ asesoresVenSoloSuyas: v })} />
         <p className="cuerpo text-texto-suave">
           {ajustes.asesoresVenSoloSuyas
-            ? "Cada asesor ve únicamente las conversaciones asignadas a él, y los contactos y pedidos ligados a ellas. Los administradores ven todo."
+            ? "Cada asesor ve únicamente las conversaciones asignadas a él, y los contactos y pedidos ligados a ellas. Los administradores y los jefes de tienda ven todo."
             : "Todos los asesores ven todas las conversaciones, contactos y pedidos."}
         </p>
       </section>

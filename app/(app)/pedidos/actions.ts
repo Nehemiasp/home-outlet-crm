@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { guardarImagenSubida } from "@/lib/almacenamiento";
-import { puedeCancelarPedido, puedeVerificarPagos } from "@/lib/permisos";
+import { puedeCancelarPedido, puedeVerificarPagos, veTodo } from "@/lib/permisos";
 import { previsualizarAviso } from "@/lib/pedidos/avisos";
 import { buscarDuplicados, registrarPago, rechazarPago, verificarPago, type ActorPagos } from "@/lib/pedidos/pagos";
 import type { DuplicadoVisible } from "@/lib/visibilidad";
@@ -12,6 +12,7 @@ import { cargarPedido, contarPorVerificar, listarPedidos, VISTAS, type Contadore
 import { ESTADOS } from "@/lib/pedidos/estados";
 import { avanzarPedido, guardarGuia } from "@/lib/pedidos/gestion";
 import { vencerReservas } from "@/lib/pedidos/vencimiento";
+import { crearEnlaceDePago, tarjetaActiva } from "@/lib/pagos-tarjeta/cobros";
 import { obtenerAjustesPedidos } from "@/lib/pedidos/ajustes";
 import { METODOS } from "@/lib/pedidos/metodos";
 import { db } from "@/lib/db";
@@ -113,7 +114,7 @@ export async function listar(f: FiltrosPedidos): Promise<{ items: FilaPedido[]; 
   return listarPedidos(filtros.parse(f), u);
 }
 
-export type PedidoConPermisos = { pedido: DetallePedido; puedeVerificar: boolean; puedeCancelar: boolean; esAdmin: boolean; metodos: { id: string; nombre: string }[]; bancos: string[] };
+export type PedidoConPermisos = { pedido: DetallePedido; puedeVerificar: boolean; puedeCancelar: boolean; sinLimites: boolean; metodos: { id: string; nombre: string }[]; bancos: string[]; tarjeta: boolean };
 
 export async function obtener(pedidoId: string): Promise<PedidoConPermisos | null> {
   const a = await actor();
@@ -125,10 +126,18 @@ export async function obtener(pedidoId: string): Promise<PedidoConPermisos | nul
     pedido,
     puedeVerificar: puedeVerificarPagos(a),
     puedeCancelar: puedeCancelarPedido(a, { creadoPorId: pedido.creadoPor?.id ?? null }, pedido.pagos.some((p) => p.estado === "verificado")),
-    esAdmin: a.rol === "admin",
+    sinLimites: veTodo(a),
     metodos: METODOS.filter((m) => aj.metodos.includes(m.id)).map((m) => ({ id: m.id, nombre: m.nombre })),
     bancos: [...new Set(cuentas.map((c) => c.banco))],
+    tarjeta: await tarjetaActiva(),
   };
+}
+
+/** Pide a la pasarela el cobro del saldo y le manda el enlace al cliente. Quien ve el pedido puede mandarlo. */
+export async function enviarEnlaceTarjeta(pedidoId: string) {
+  const a = await actor();
+  if (!(await puedeVerPedido(a, id.parse(pedidoId)))) return NO_EXISTE;
+  return crearEnlaceDePago(id.parse(pedidoId), a);
 }
 
 export async function avanzar(pedidoId: string, a: string, guia: string, sobrePedido: boolean) {

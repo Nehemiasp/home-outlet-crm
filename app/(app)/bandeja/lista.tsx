@@ -20,9 +20,9 @@ import { horaLista } from "./formato";
 const POR_PAGINA = 30;
 
 /**
- * `soloMias`: el asesor con la visibilidad limitada solo ve «Mías». `esAdmin`: el filtro «Asesor» es solo del administrador.
+ * `soloMias`: el asesor con la visibilidad limitada solo ve «Mías». `veTodo`: el filtro «Asesor» es solo del administrador.
  */
-export function ListaConversaciones({ idActivo, soloMias, esAdmin }: { idActivo?: string; soloMias: boolean; esAdmin: boolean }) {
+export function ListaConversaciones({ idActivo, soloMias, veTodo }: { idActivo?: string; soloMias: boolean; veTodo: boolean }) {
   const router = useRouter();
   const vista = useSearchParams().get("vista");
   const [tab, setTab] = useState<Filtros["tab"]>(soloMias ? "mias" : vista === "mias" || vista === "todas" || vista === "sin-asignar" ? vista : "sin-asignar");
@@ -34,7 +34,7 @@ export function ListaConversaciones({ idActivo, soloMias, esAdmin }: { idActivo?
   const [q, setQ] = useState("");
   const [limite, setLimite] = useState(POR_PAGINA);
   const lista = useRef<HTMLUListElement>(null);
-  const { datos: equipo } = useActualizacion("resumen-equipo", esAdmin ? obtenerPanelEquipo : async () => [], 15_000);
+  const { datos: equipo } = useActualizacion("resumen-equipo", veTodo ? obtenerPanelEquipo : async () => [], 15_000);
 
   // La búsqueda espera a que termine de escribir.
   useEffect(() => {
@@ -80,7 +80,7 @@ export function ListaConversaciones({ idActivo, soloMias, esAdmin }: { idActivo?
               setLimite(POR_PAGINA);
             }}
           >
-            {esAdmin && (
+            {veTodo && (
               <Selector
                 etiqueta="Asesor"
                 value={asesor}
@@ -118,7 +118,7 @@ export function ListaConversaciones({ idActivo, soloMias, esAdmin }: { idActivo?
           </BotonFiltros>
         </div>
       </div>
-      {esAdmin && equipo && equipo.length > 0 && (
+      {veTodo && equipo && equipo.length > 0 && (
         <ResumenEquipo
           filas={equipo}
           ahora={Date.now()}

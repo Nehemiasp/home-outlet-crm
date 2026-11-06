@@ -9,6 +9,7 @@ import { obtenerAjustesPedidos } from "@/lib/pedidos/ajustes";
 import { cambiarEstado } from "@/lib/pedidos/flujo";
 import { avanzarPedido } from "@/lib/pedidos/gestion";
 import { vencerReservas } from "@/lib/pedidos/vencimiento";
+import type { Rol } from "@/lib/permisos";
 
 // Necesita la base de datos (npm run db). Lo que crea lleva el prefijo PRUEBA-VN y se borra al final.
 
@@ -68,7 +69,7 @@ describe("vencimiento de reservas y avisos de estado (con base de datos)", () =>
 
   before(async () => {
     originales = await obtenerAjustesPedidos();
-    const u = (nombre: string, rol: "admin" | "agente") => db.user.create({ data: { nombre, correo: `prueba-vn-${rol}@homeoutlet.test`, passwordHash: "x", rol } });
+    const u = (nombre: string, rol: Rol) => db.user.create({ data: { nombre, correo: `prueba-vn-${rol}@homeoutlet.test`, passwordHash: "x", rol } });
     const [a, g] = await Promise.all([u("Admin VN", "admin"), u("Agente VN", "agente")]);
     admin = { id: a.id, nombre: a.nombre, rol: "admin" };
     agente = { id: g.id, nombre: g.nombre, rol: "agente" };

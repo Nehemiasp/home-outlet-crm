@@ -10,6 +10,7 @@ datasource db {
 enum Rol {
   admin
   agente
+  jefe_tienda // ve y gestiona todo lo operativo, pero no cambia ajustes, usuarios ni canales
 }
 
 /// Disponibilidad de un asesor (rol agente) para recibir conversaciones nuevas.
@@ -506,6 +507,7 @@ model Order {
   @@index([contactoId])
   @@index([conversacionId])
   @@index([estado, reservadoHasta])
+  cobrosTarjeta CobroTarjeta[]
 }
 
 // Nombre y precio se copian al hacer el pedido: un cambio posterior en el catálogo no altera pedidos ya hechos.
@@ -622,4 +624,29 @@ model IntentoTasa {
   creadoEn DateTime @default(now())
 
   @@index([clave, creadoEn])
+}
+
+enum EstadoCobro {
+  creado
+  pagado
+  fallido
+}
+
+/// Un cobro con tarjeta pedido a la pasarela de pagos: el cliente paga en la página del proveedor y un webhook firmado avisa.
+/// Cuando llega «pagado» se registra un Payment (tipo tarjeta) y se verifica solo; el cobro nunca suma por su cuenta.
+model CobroTarjeta {
+  id          String      @id @default(cuid())
+  pedidoId    String
+  pasarela    String // «simulada», «recurrente»…
+  externoId   String      @unique // el id del cobro en la pasarela
+  monto       Int // centavos
+  estado      EstadoCobro @default(creado)
+  url         String
+  creadoPorId String?
+  creado      DateTime    @default(now())
+  resueltoEn  DateTime?
+
+  pedido Order @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+
+  @@index([pedidoId])
 }

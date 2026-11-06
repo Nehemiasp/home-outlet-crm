@@ -7,6 +7,7 @@ import { agruparLineas, rellenar, textoResumen } from "@/lib/pedidos/mensajes";
 import { descartarBorrador, enviarAlCliente, guardarBorrador, previsualizar, type ActorPedidos } from "@/lib/pedidos/pedidos";
 import type { EntradaPedido } from "@/lib/pedidos/tipos";
 import { calcularTotales, dentroDelLimite, saldoDe } from "@/lib/pedidos/totales";
+import type { Rol } from "@/lib/permisos";
 
 // Necesita la base de datos (npm run db). Lo que crea lleva el prefijo PRUEBA-CR y se borra al final.
 
@@ -79,7 +80,7 @@ describe("crear y enviar pedidos (con base de datos)", () => {
 
   before(async () => {
     originales = await obtenerAjustesPedidos();
-    const u = (nombre: string, rol: "admin" | "agente") => db.user.create({ data: { nombre, correo: `prueba-cr-${rol}@homeoutlet.test`, passwordHash: "x", rol } });
+    const u = (nombre: string, rol: Rol) => db.user.create({ data: { nombre, correo: `prueba-cr-${rol}@homeoutlet.test`, passwordHash: "x", rol } });
     const [a, g] = await Promise.all([u("Admin PRUEBA-CR", "admin"), u("Agente PRUEBA-CR", "agente")]);
     admin = { id: a.id, nombre: a.nombre, rol: "admin" };
     agente = { id: g.id, nombre: g.nombre, rol: "agente" };

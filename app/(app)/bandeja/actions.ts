@@ -18,12 +18,14 @@ import { requireUsuario } from "@/lib/session";
 import { puedeVerConversacion, puedeVerMensaje } from "@/lib/visibilidad";
 import { listarAsesores } from "@/lib/equipo/asesores";
 import { devolverACola } from "@/lib/equipo/gestion";
+import type { Rol } from "@/lib/permisos";
+import { veTodo } from "@/lib/permisos";
 
 type Resultado = { ok: true } | { ok: false; error: string };
 const fallo = (error: string): { ok: false; error: string } => ({ ok: false, error });
 // Lo que la persona no puede ver responde igual que lo que no existe.
 const NO_EXISTE = fallo("La conversación no existe.");
-const ve = async (u: { id: string; rol: "admin" | "agente" }, conversacionId: string) => puedeVerConversacion(u, id.parse(conversacionId));
+const ve = async (u: { id: string; rol: Rol }, conversacionId: string) => puedeVerConversacion(u, id.parse(conversacionId));
 
 const filtros = z.object({
   tab: z.enum(["sin-asignar", "mias", "todas"]),
@@ -42,7 +44,7 @@ export async function listar(f: Filtros): Promise<{ items: ItemLista[]; hayMas: 
   const u = await requireUsuario();
   await vencerReservas(); // barata y limitada a una vez cada 30 s: así las reservas vencen aunque nadie abra Pedidos
   const r = await listarConversaciones(filtros.parse(f), u);
-  return { ...r, asesores: u.rol === "admin" ? await listarAsesores() : [] };
+  return { ...r, asesores: veTodo(u) ? await listarAsesores() : [] };
 }
 
 export async function obtener(conversacionId: string): Promise<ConversacionDTO | null> {

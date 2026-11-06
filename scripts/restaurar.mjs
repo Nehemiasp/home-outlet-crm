@@ -6,7 +6,7 @@
 // Necesita pg_restore (cliente de PostgreSQL; PG_RESTORE si no está en el PATH).
 import "dotenv/config";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync } from "node:fs";
+import { closeSync, existsSync, mkdirSync, openSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 const falla = (m) => {
@@ -32,7 +32,9 @@ const archivos = join(resolve(carpeta), "uploads.tar.gz");
 const aqui = valor("--uploads");
 if (aqui && existsSync(archivos)) {
   mkdirSync(aqui, { recursive: true });
-  const t = spawnSync("tar", ["-xzf", archivos, "-C", resolve(aqui), "--strip-components=1"], { stdio: "inherit" });
+  const entrada = openSync(archivos, "r"); // el archivo entra por la entrada estándar y el destino es la carpeta de trabajo: así no hay rutas con «C:\...» que confundan a tar
+  const t = spawnSync("tar", ["-xzf", "-", "--strip-components=1"], { stdio: [entrada, "inherit", "inherit"], cwd: resolve(aqui) });
+  closeSync(entrada);
   if (t.error || t.status !== 0) falla("La base se restauró, pero no se pudieron extraer los archivos subidos.");
 }
 console.log("Restauración lista.");

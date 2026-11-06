@@ -39,7 +39,7 @@ export async function guardarAjustesEquipo(entrada: z.input<typeof ajustesEquipo
 const usuario = z.object({
   nombre: z.string().trim().min(1, "Escriba el nombre.").max(80, "El nombre pasa de 80 caracteres."),
   correo: z.string().trim().toLowerCase().pipe(z.email("El correo no tiene un formato válido.")),
-  rol: z.enum(["admin", "agente"]),
+  rol: z.enum(["admin", "jefe_tienda", "agente"]),
 });
 
 export async function invitarUsuario(entrada: z.input<typeof usuario>): Promise<ConClave> {
@@ -53,7 +53,7 @@ export async function invitarUsuario(entrada: z.input<typeof usuario>): Promise<
 export async function cambiarRol(usuarioId: string, rol: string): Promise<Resultado> {
   const u = await admin();
   if (!u) return SOLO_ADMIN;
-  return ajustes.cambiarRol(id.parse(usuarioId), z.enum(["admin", "agente"]).parse(rol), u);
+  return ajustes.cambiarRol(id.parse(usuarioId), z.enum(["admin", "jefe_tienda", "agente"]).parse(rol), u);
 }
 
 export async function cambiarActivo(usuarioId: string, activo: boolean): Promise<Resultado> {

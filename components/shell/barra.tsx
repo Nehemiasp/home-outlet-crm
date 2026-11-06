@@ -9,28 +9,29 @@ import { salir } from "@/app/login/actions";
 import { Logo } from "@/components/brand/logo";
 import { ContadorNoLeidos } from "@/components/ui/etiquetas";
 import { AvisoAccionable } from "@/components/ui/estructura";
+import { puedeVerAjustes, puedeVerReportes, veTodo, type Rol } from "@/lib/permisos";
 import { useActualizacion } from "@/lib/tiempo-real";
 import { useLatido } from "./latido";
 import { cn } from "@/lib/utils";
 
-const accesos = [
+const accesos: { href: string; texto: string; icono: typeof Inbox; permiso?: (u: { rol: Rol }) => boolean }[] = [
   { href: "/bandeja", texto: "Bandeja", icono: Inbox },
   { href: "/pedidos", texto: "Pedidos", icono: ShoppingBag },
   { href: "/contactos", texto: "Contactos", icono: Users },
   { href: "/catalogo", texto: "Catálogo", icono: Package },
-  { href: "/reportes", texto: "Reportes", icono: BarChart3, soloAdmin: true },
-  { href: "/ajustes", texto: "Ajustes", icono: Settings, soloAdmin: true },
+  { href: "/reportes", texto: "Reportes", icono: BarChart3, permiso: puedeVerReportes },
+  { href: "/ajustes", texto: "Ajustes", icono: Settings, permiso: puedeVerAjustes },
 ];
 
 // La barra inferior del teléfono admite hasta 6 botones. Si no caben, quedan 5 a la vista y un «Más» con el resto.
 const MAX_MOVIL = 6;
 
-export function Navegacion({ nombre, esAdmin, porVerificar: verificarInicial, puedeVerificar, avisoPresupuesto }: { nombre: string; esAdmin: boolean; porVerificar: number; puedeVerificar: boolean; avisoPresupuesto?: { porcentaje: number; agotado: boolean } }) {
+export function Navegacion({ nombre, rol, porVerificar: verificarInicial, puedeVerificar, avisoPresupuesto }: { nombre: string; rol: Rol; porVerificar: number; puedeVerificar: boolean; avisoPresupuesto?: { porcentaje: number; agotado: boolean } }) {
   const ruta = usePathname();
   const { noLeidos, sinAsignar } = useLatido(); // el latido de la app trae también los contadores
   const { datos: porVerificarVivo } = useActualizacion("por-verificar", pagosPorVerificar, 10_000);
   const porVerificar = puedeVerificar ? (porVerificarVivo ?? verificarInicial) : 0;
-  const visibles = accesos.filter((a) => esAdmin || !a.soloAdmin);
+  const visibles = accesos.filter((a) => !a.permiso || a.permiso({ rol }));
   const activo = (href: string) => ruta === href || ruta.startsWith(href + "/");
 
   const cuenta = (href: string) => (href === "/bandeja" ? noLeidos : href === "/pedidos" ? porVerificar : 0);
@@ -83,7 +84,7 @@ export function Navegacion({ nombre, esAdmin, porVerificar: verificarInicial, pu
           </ul>
         </nav>
         <div className="flex flex-col gap-2 px-2 pb-2">
-          {esAdmin && !!sinAsignar && (
+          {veTodo({ rol }) && !!sinAsignar && (
             <AvisoAccionable
               tono="aviso"
               accion={

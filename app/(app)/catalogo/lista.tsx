@@ -15,7 +15,7 @@ import { listar } from "./actions";
 import { AjusteRapido } from "./ajuste-rapido";
 import { CeldaExistencia, columnaDeUbicacion, Existencias, FotoProducto } from "./existencias";
 
-export function Catalogo({ categorias, esAdmin }: { categorias: CategoriaDTO[]; esAdmin: boolean }) {
+export function Catalogo({ categorias, puedeGestionar }: { categorias: CategoriaDTO[]; puedeGestionar: boolean }) {
   const router = useRouter();
   const [busqueda, setBusqueda] = useState("");
   const [q, setQ] = useState("");
@@ -54,7 +54,7 @@ export function Catalogo({ categorias, esAdmin }: { categorias: CategoriaDTO[]; 
   const ubicaciones: Ubicacion[] = datos?.ubicaciones ?? [];
   const sinFiltros = !q && !categoriaId && estado === "todos";
 
-  const nombre = (p: FilaProducto) => (esAdmin ? <Link href={`/catalogo/${p.id}`} className={enlaceTabla}>{p.nombre}</Link> : <span className="cuerpo-fuerte">{p.nombre}</span>);
+  const nombre = (p: FilaProducto) => (puedeGestionar ? <Link href={`/catalogo/${p.id}`} className={enlaceTabla}>{p.nombre}</Link> : <span className="cuerpo-fuerte">{p.nombre}</span>);
   const foto = (p: FilaProducto, clase: string) => <FotoProducto url={p.imagen} className={clase} />;
 
   const columnas: Columna<FilaProducto>[] = [
@@ -94,7 +94,7 @@ export function Catalogo({ categorias, esAdmin }: { categorias: CategoriaDTO[]; 
   return (
     <div className="flex flex-col gap-4 p-6">
       <EncabezadoPagina titulo="Catálogo">
-        {esAdmin && (
+        {puedeGestionar && (
           <>
             <Link href="/catalogo/importar" className="cuerpo-fuerte inline-flex h-10 items-center justify-center gap-2 rounded-campo border border-linea bg-superficie px-4 hover:bg-fondo max-md:min-h-11">
               <Upload className="size-4" aria-hidden />
@@ -144,8 +144,8 @@ export function Catalogo({ categorias, esAdmin }: { categorias: CategoriaDTO[]; 
           <EstadoVacio
             icono={PackageSearch}
             titulo="Todavía no hay productos"
-            descripcion={esAdmin ? "Cree uno o importe una lista desde un archivo CSV." : "Un administrador puede cargar los productos."}
-            accion={esAdmin ? <Link href="/catalogo/importar" className="cuerpo-fuerte inline-flex h-10 items-center rounded-campo border border-linea bg-superficie px-4 hover:bg-fondo">Importar CSV</Link> : undefined}
+            descripcion={puedeGestionar ? "Cree uno o importe una lista desde un archivo CSV." : "Un administrador o un jefe de tienda puede cargar los productos."}
+            accion={puedeGestionar ? <Link href="/catalogo/importar" className="cuerpo-fuerte inline-flex h-10 items-center rounded-campo border border-linea bg-superficie px-4 hover:bg-fondo">Importar CSV</Link> : undefined}
           />
         ) : (
           <EstadoVacio icono={SearchX} titulo="No hay productos con estos filtros" descripcion="Cambie los filtros o borre la búsqueda." />
@@ -156,7 +156,7 @@ export function Catalogo({ categorias, esAdmin }: { categorias: CategoriaDTO[]; 
             {datos.total} {datos.total === 1 ? "producto" : "productos"}
           </p>
           {vista === "lista" ? (
-            <Tabla columnas={columnas} filas={datos.filas} idFila={(p) => p.id} alActivar={esAdmin ? (p) => router.push(`/catalogo/${p.id}`) : undefined} descripcion="Lista de productos" pagina={Math.min(pagina, datos.paginas)} totalPaginas={datos.paginas} onPagina={setPagina} />
+            <Tabla columnas={columnas} filas={datos.filas} idFila={(p) => p.id} alActivar={puedeGestionar ? (p) => router.push(`/catalogo/${p.id}`) : undefined} descripcion="Lista de productos" pagina={Math.min(pagina, datos.paginas)} totalPaginas={datos.paginas} onPagina={setPagina} />
           ) : (
             <>
               <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">

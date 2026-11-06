@@ -15,8 +15,10 @@ import { cambiarEstado } from "./flujo";
 import { MENSAJES, rellenar, textoHoras, textoResumen } from "./mensajes";
 import { calcularTotales, type Descuento } from "./totales";
 import type { DatosPanelPedido, EntradaPedido, ProductoPedido, ResultadoPedido, VistaPedido } from "./tipos";
+import type { Rol } from "@/lib/permisos";
+import { veTodo } from "@/lib/permisos";
 
-export type ActorPedidos = { id: string; nombre: string; rol: "admin" | "agente" };
+export type ActorPedidos = { id: string; nombre: string; rol: Rol };
 const fallo = (error: string): { ok: false; error: string } => ({ ok: false, error });
 const MAX_LINEAS = 40;
 const ABIERTOS = ["borrador", "pendiente_pago", "en_revision"] as const;
@@ -140,7 +142,7 @@ async function preparar(e: EntradaPedido, actor: ActorPedidos) {
   if (t.descuentoMonto > 0) {
     if (!motivo) return fallo("Escriba el motivo del descuento.");
     if (motivo.length > 200) return fallo("El motivo del descuento pasa de 200 caracteres.");
-    if (!puedeDescontar(actor, t.descuentoMonto, t.subtotal, aj.descuentoMaxAgente)) return fallo(`Un descuento de más de ${aj.descuentoMaxAgente} % lo autoriza un administrador.`);
+    if (!puedeDescontar(actor, t.descuentoMonto, t.subtotal, aj.descuentoMaxAgente)) return fallo(`Un descuento de más de ${aj.descuentoMaxAgente} % lo autoriza un administrador o un jefe de tienda.`);
   }
   if (e.notas.length > 500) return fallo("Las notas pasan de 500 caracteres.");
 
@@ -291,7 +293,7 @@ export async function enviarAlCliente(pedidoId: string, actor: ActorPedidos, o: 
   const pedido = await db.order.findUnique({ where: { id: pedidoId }, select: { estado: true, conversacionId: true, codigo: true } });
   if (!pedido?.conversacionId) return fallo("El pedido no existe o no tiene conversación.");
   if (pedido.estado !== "borrador") return fallo("Este pedido ya se envió.");
-  if (o.sobrePedido && !puedeSobrePedido(actor)) return fallo("Solo un administrador puede apartar «sobre pedido».");
+  if (o.sobrePedido && !puedeSobrePedido(actor)) return fallo("Solo un administrador o un jefe de tienda puede apartar «sobre pedido».");
   if (o.modo === "enviar" && !(await puedeEnviarPorCanal(pedido.conversacionId))) return fallo("Este canal no permite enviar mensajes ahora. Use «Copiar mensaje y marcar como enviado».");
 
   const r = await cambiarEstado({ pedidoId, a: "pendiente_pago", quien: { usuarioId: actor.id }, sobrePedido: o.sobrePedido, nota: o.modo === "copiado" ? "Resumen enviado fuera del sistema" : "Resumen enviado al cliente" });
@@ -323,7 +325,7 @@ export async function datosPanel(conversacionId: string, actor: ActorPedidos): P
     ok: true,
     datos: {
       contacto: { nombre: conv.contacto.nombre, telefono: conv.contacto.telefono ? formatTelefono(conv.contacto.telefono) : "", municipio: conv.contacto.municipio ?? "" },
-      esAdmin: actor.rol === "admin",
+      sinLimites: veTodo(actor),
       descuentoMaxAgente: aj.descuentoMaxAgente,
       inventario: aj.inventario,
       ubicaciones,

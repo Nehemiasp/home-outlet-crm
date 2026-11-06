@@ -13,6 +13,8 @@ import type { Prisma } from "@/generated/prisma/client";
 import type { Atencion, ContadoresLista, ConversacionDTO, Filtros, ItemLinea, ItemLista, ProductoDTO, TarjetaPedido, TonoSistema } from "@/lib/bandeja-tipos";
 import { agruparLineas } from "@/lib/pedidos/mensajes";
 import { modoDePrueba } from "@/lib/ia/proveedor";
+import type { Rol } from "@/lib/permisos";
+import { veTodo } from "@/lib/permisos";
 
 const NOMBRES_TIPO: Record<string, string> = {
   image: "Imagen", audio: "Audio", video: "Video", document: "Documento", location: "Ubicación", product: "Producto", unsupported: "Mensaje no compatible",
@@ -31,7 +33,7 @@ export async function listarConversaciones(f: Filtros, u: Actor): Promise<{ item
   const where: Prisma.ConversationWhereInput = {
     AND: [visible],
     ...(f.tab === "sin-asignar" ? { asignadaAId: null } : f.tab === "mias" ? { asignadaAId: usuarioId } : {}),
-    ...(u.rol === "admin" && f.asesor === "sin" ? { asignadaAId: null } : u.rol === "admin" && f.asesor !== "todos" ? { asignadaAId: f.asesor } : {}),
+    ...(veTodo(u) && f.asesor === "sin" ? { asignadaAId: null } : veTodo(u) && f.asesor !== "todos" ? { asignadaAId: f.asesor } : {}),
     ...(f.estado !== "todos" ? { estado: f.estado } : {}),
     ...(f.canal !== "todos" ? { canal: f.canal } : {}),
     ...(f.atencion === "asistente" ? { atendidaPor: "asistente" as const } : f.atencion === "esperando" ? { atendidaPor: "nadie" as const, esperandoAsesorDesde: { not: null }, estado: { not: "cerrada" as const } } : {}),
@@ -108,7 +110,7 @@ const textoActividad = (accion: string, d: DetalleActividad) => {
 };
 
 /** Carga todo lo que necesitan la conversación y el panel del contacto. Abrirla la marca como leída. */
-export async function cargarConversacion(id: string, yo: { id: string; rol: "admin" | "agente" }): Promise<ConversacionDTO | null> {
+export async function cargarConversacion(id: string, yo: { id: string; rol: Rol }): Promise<ConversacionDTO | null> {
   const visible = await filtroConversacion(yo);
   const conv = await db.conversation.findFirst({
     where: { id, ...visible },
@@ -131,7 +133,7 @@ export async function cargarConversacion(id: string, yo: { id: string; rol: "adm
       include: { mensajes: { orderBy: { fecha: "desc" }, take: 1, select: { texto: true, tipo: true, direccion: true } } },
     }),
     db.activityLog.findMany({ where: { entidad: "Conversation", entidadId: id, accion: { in: ["asignar", "estado", "asistente_paso", "asistente_devuelto", "asistente_pausado", "pedido"] } }, orderBy: { fecha: "desc" }, take: 50 }),
-    yo.rol === "admin" ? db.user.findMany({ where: { activo: true }, orderBy: { nombre: "asc" }, select: { id: true, nombre: true } }) : Promise.resolve([]),
+    veTodo(yo) ? db.user.findMany({ where: { activo: true }, orderBy: { nombre: "asc" }, select: { id: true, nombre: true } }) : Promise.resolve([]),
     db.tag.findMany({ orderBy: { nombre: "asc" } }),
     db.quickReply.findMany({ orderBy: { atajo: "asc" }, select: { atajo: true, texto: true } }),
     obtenerNegocio(),

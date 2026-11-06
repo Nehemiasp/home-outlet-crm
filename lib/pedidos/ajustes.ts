@@ -3,6 +3,7 @@ import { parsePrecio } from "@/lib/dinero";
 import { log } from "@/lib/ajustes";
 import type { ModoInventario, Prisma, TipoCuenta, TipoPago } from "@/generated/prisma/client";
 import { CLAVES_MENSAJE, MENSAJES, type ClaveMensaje } from "./mensajes";
+import { pasarela } from "@/lib/pagos-tarjeta";
 import { metodosSeleccionables } from "./metodos";
 import type { Zona } from "./envio";
 
@@ -42,6 +43,7 @@ export async function guardarAjustesPedidos(d: EntradaAjustesPedidos, actor: Act
   const permitidos = new Set<string>(metodosSeleccionables());
   if (d.metodos.some((m) => !permitidos.has(m))) return fallo("Alguno de los métodos de pago no está disponible todavía.");
   const metodos = d.metodos as TipoPago[];
+  if (metodos.includes("tarjeta") && !pasarela()) return fallo("Para activar la tarjeta hace falta conectar una pasarela de pago (ver la guía de despliegue).");
   if (metodos.length === 0) return fallo("Deje al menos un método de pago activo.");
 
   let envioGratisDesde: number | null = null;
@@ -136,7 +138,7 @@ export async function borrarZona(id: string, actor: Actor): Promise<Resultado> {
 }
 
 /* ── Mensajes al cliente ── */
-const VARIABLES = ["codigo", "total", "saldo", "cuentas", "direccion", "horario", "guia", "horas", "motivo"];
+const VARIABLES = ["codigo", "total", "saldo", "cuentas", "direccion", "horario", "guia", "horas", "motivo", "enlace"];
 
 /** Guarda los textos editados y qué avisos están encendidos. Una variable que no existe se rechaza para que no salga un {error} al cliente. */
 export async function guardarMensajes(d: Record<string, { activo: boolean; texto: string }>, actor: Actor): Promise<Resultado> {

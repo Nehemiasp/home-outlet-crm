@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
-import type { Rol } from "@/generated/prisma/client";
+import type { Rol } from "@/lib/permisos";
 
 /**
  * Usuario de la sesión, leído de la base en cada petición: así un usuario
@@ -19,5 +19,12 @@ export async function requireUsuario(rol?: Rol) {
   const u = await getUsuario();
   if (!u) redirect("/login");
   if (rol && u.rol !== rol) redirect("/bandeja");
+  return u;
+}
+
+/** Igual, pero por permiso (de `lib/permisos.ts`): sin él va a `destino`. */
+export async function requirePermiso(permiso: (u: { rol: Rol }) => boolean, destino = "/bandeja") {
+  const u = await requireUsuario();
+  if (!permiso(u)) redirect(destino);
   return u;
 }

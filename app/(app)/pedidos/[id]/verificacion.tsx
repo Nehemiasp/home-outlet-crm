@@ -167,7 +167,7 @@ export function Verificacion({
                 </div>
               </form>
             )}
-            {!decidible && pago.estado === "en_revision" && <p className="meta text-texto-suave">Solo un administrador o quien tenga el permiso de verificar pagos puede confirmarlo.</p>}
+            {!decidible && pago.estado === "en_revision" && <p className="meta text-texto-suave">Solo un administrador, un jefe de tienda o quien tenga el permiso de verificar pagos puede confirmarlo.</p>}
           </div>
         </div>
       )}

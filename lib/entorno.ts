@@ -31,11 +31,13 @@ export function revisarEntorno(env: Env): Revision {
     if (falta.length) errores.push(`${nombre} está activado pero faltan: ${falta.join(", ")}.`);
   }
 
+  if (env.PASARELA === "simulada") errores.push("PASARELA=simulada no existe en producción: conecte una pasarela real o quite la variable (el pago con tarjeta queda apagado).");
   if (env.AI_PROVIDER === "anthropic" && !lleno(env.ANTHROPIC_API_KEY)) errores.push("AI_PROVIDER=anthropic pero falta ANTHROPIC_API_KEY.");
   if (env.AI_PROVIDER !== "anthropic") avisos.push("El asistente corre con el proveedor simulado (AI_PROVIDER no es «anthropic»).");
 
-  if (!lleno(env.TAREAS_SECRET)) avisos.push("TAREAS_SECRET está vacío: las rutas de cron (vencer reservas y desconectar asesores) están apagadas.");
-  else if ((env.TAREAS_SECRET ?? "").length < 24) avisos.push("TAREAS_SECRET es corto: use 24 caracteres o más.");
+  if (lleno(env.TAREAS_SECRET) && (env.TAREAS_SECRET ?? "").length < 24) avisos.push("TAREAS_SECRET es corto: use 24 caracteres o más."); // el cron externo es opcional: el servidor programa sus tareas solo
+  if (!lleno(env.UPLOADS_DIR)) avisos.push("UPLOADS_DIR no está definido: las fotos y los comprobantes se guardan en el disco del contenedor y se pierden al reiniciar. Apúntelo a un volumen persistente.");
+  if (env.RESPALDO_AUTOMATICO !== "1") avisos.push("RESPALDO_AUTOMATICO no está activado: no se hará el respaldo diario de las 2:00. Necesita pg_dump y RESPALDOS_CARPETA en un volumen.");
   if (!(Number.parseInt(env.PROXIES_CONFIABLES ?? "0", 10) > 0)) avisos.push("PROXIES_CONFIABLES no está definido: el inicio de sesión se limita solo por correo, no por IP. Si hay un proxy delante, ponga cuántos (normalmente 1).");
   if (!lleno(env.AUTH_URL) && env.AUTH_TRUST_HOST !== "true") avisos.push("Detrás de un proxy, defina AUTH_URL (la dirección pública) o AUTH_TRUST_HOST=true, o el inicio de sesión falla.");
 

@@ -7,6 +7,8 @@ export async function register() {
   const { errores, avisos } = revisarEntorno(process.env);
   for (const a of avisos) console.warn(JSON.stringify({ nivel: "aviso", contexto: "entorno", mensaje: a }));
   if (errores.length) throw new Error(`Configuración de producción incorrecta:\n- ${errores.join("\n- ")}`);
+  const { iniciarProgramador } = await import("@/lib/programador");
+  iniciarProgramador(process.env); // desconectar asesores, vencer reservas y respaldo diario, sin un cron aparte
 }
 
 // Cada error del servidor (página, acción o ruta) queda en una línea JSON, sin el texto del error ni los datos del cliente.

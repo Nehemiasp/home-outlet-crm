@@ -10,7 +10,7 @@ const filtros = z.object({ desde: z.string().max(10), hasta: z.string().max(10),
 
 export async function obtenerReportes(f: z.input<typeof filtros>): Promise<{ ok: true; datos: Reportes } | { ok: false; error: string }> {
   const u = await requireUsuario();
-  if (!puedeVerReportes(u)) return { ok: false, error: "Solo un administrador puede ver los reportes." };
+  if (!puedeVerReportes(u)) return { ok: false, error: "Solo un administrador o un jefe de tienda puede ver los reportes." };
   const p = filtros.safeParse(f);
   if (!p.success) return { ok: false, error: "Revise los filtros." };
   const error = validarFiltros(p.data);

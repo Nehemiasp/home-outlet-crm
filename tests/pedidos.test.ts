@@ -37,9 +37,9 @@ describe("estados del pedido", () => {
 });
 
 describe("métodos de pago", () => {
-  test("la tarjeta se ve pero no se puede encender hasta la fase 3", () => {
-    assert.ok(METODOS.some((m) => m.id === "tarjeta" && !m.disponible));
-    assert.deepEqual(metodosSeleccionables(), ["transferencia", "deposito", "efectivo_en_tienda"]);
+  test("la tarjeta se puede encender solo si hay una pasarela (se valida al guardar los ajustes; ver tests/tarjeta.test.ts)", () => {
+    assert.ok(METODOS.some((m) => m.id === "tarjeta" && m.disponible && !m.porDefecto));
+    assert.deepEqual(metodosSeleccionables(), ["transferencia", "deposito", "efectivo_en_tienda", "tarjeta"]);
     assert.deepEqual(METODOS.filter((m) => m.porDefecto).map((m) => m.id), ["transferencia", "deposito"]);
   });
 });

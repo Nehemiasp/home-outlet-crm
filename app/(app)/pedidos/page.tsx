@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { VISTAS, contarVistas, type Vista } from "@/lib/pedidos/consultas";
-import { puedeVerificarPagos } from "@/lib/permisos";
+import { puedeVerificarPagos, veTodo } from "@/lib/permisos";
 import { listarAsesores } from "@/lib/equipo/asesores";
 import { requireUsuario } from "@/lib/session";
 import { ListaPedidos } from "./lista";
@@ -13,6 +13,6 @@ export default async function Pagina({ searchParams }: { searchParams: Promise<{
   // Sin vista en la dirección: «Por verificar» si hay pagos esperando; si no, todos.
   const pedida = (filtro === "por_verificar" ? "por-verificar" : vista) as Vista | undefined;
   const inicial: Vista = pedida && VISTAS.includes(pedida) ? pedida : (await contarVistas(usuario)).porVerificar > 0 ? "por-verificar" : "todos";
-  const asesores = usuario.rol === "admin" ? await listarAsesores() : [];
-  return <ListaPedidos vistaInicial={inicial} puedeVerificar={puedeVerificarPagos(usuario)} esAdmin={usuario.rol === "admin"} asesores={asesores} />;
+  const asesores = veTodo(usuario) ? await listarAsesores() : [];
+  return <ListaPedidos vistaInicial={inicial} puedeVerificar={puedeVerificarPagos(usuario)} veTodo={veTodo(usuario)} asesores={asesores} />;
 }

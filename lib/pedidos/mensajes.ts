@@ -1,7 +1,7 @@
 import { formatQ } from "@/lib/utils";
 
-export type ClaveMensaje = "resumen" | "comprobante_recibido" | "pago_confirmado" | "pago_parcial" | "pago_rechazado" | "listo_para_recoger" | "enviado" | "vencido" | "por_vencer";
-export type VariablesMensaje = Partial<Record<"codigo" | "total" | "saldo" | "cuentas" | "direccion" | "horario" | "guia" | "horas" | "motivo", string>>;
+export type ClaveMensaje = "resumen" | "comprobante_recibido" | "pago_confirmado" | "pago_parcial" | "pago_rechazado" | "listo_para_recoger" | "enviado" | "vencido" | "por_vencer" | "enlace_tarjeta";
+export type VariablesMensaje = Partial<Record<"codigo" | "total" | "saldo" | "cuentas" | "direccion" | "horario" | "guia" | "horas" | "motivo" | "enlace", string>>;
 
 /** Textos de fábrica de lo que se le manda al cliente. Cada uno se puede editar y apagar en Ajustes → Pagos y envíos → Mensajes. */
 export const MENSAJES: Record<ClaveMensaje, { titulo: string; texto: string; activo: boolean }> = {
@@ -17,6 +17,7 @@ export const MENSAJES: Record<ClaveMensaje, { titulo: string; texto: string; act
   listo_para_recoger: { titulo: "Listo para recoger", texto: "Su pedido {codigo} está listo para recoger en: {direccion}\nHorario: {horario}", activo: true },
   enviado: { titulo: "Pedido enviado", texto: "Su pedido {codigo} va en camino. {guia}", activo: true },
   vencido: { titulo: "Pedido vencido", texto: "Su pedido {codigo} venció porque no recibimos el pago a tiempo y liberamos los productos. Si todavía le interesa, escríbanos y lo revisamos.", activo: true },
+  enlace_tarjeta: { titulo: "Enlace de pago con tarjeta", texto: "Puede pagar el saldo de su pedido {codigo} ({saldo}) con tarjeta de crédito o débito en este enlace seguro:\n{enlace}", activo: true },
   por_vencer: { titulo: "Reserva por vencer (2 horas antes)", texto: "Le recordamos que su pedido {codigo} vence en 2 horas. Total: {total}\nPuede pagar a:\n{cuentas}", activo: false },
 };
 
@@ -24,7 +25,7 @@ export const CLAVES_MENSAJE = Object.keys(MENSAJES) as ClaveMensaje[];
 
 /** Reemplaza {variables}. Las que no se conocen se dejan tal cual para que se note el error. */
 export function rellenar(texto: string, v: VariablesMensaje) {
-  return texto.replace(/\{(codigo|total|saldo|cuentas|direccion|horario|guia|horas|motivo)\}/g, (_, k: keyof VariablesMensaje) => v[k] ?? "").replace(/[ \t]+\n/g, "\n").trim();
+  return texto.replace(/\{(codigo|total|saldo|cuentas|direccion|horario|guia|horas|motivo|enlace)\}/g, (_, k: keyof VariablesMensaje) => v[k] ?? "").replace(/[ \t]+\n/g, "\n").trim();
 }
 
 export const textoHoras = (h: number) => (h === 1 ? "1 hora" : `${h} horas`);

@@ -13,7 +13,7 @@ import { siguientes } from "@/lib/pedidos/estados";
 import type { ResultadoAviso } from "@/lib/pedidos/avisos";
 import { useActualizacion } from "@/lib/tiempo-real";
 import { formatQ, formatTelefono } from "@/lib/utils";
-import { actualizarGuia, avanzar, obtener, rechazar, verificar, type PedidoConPermisos } from "../actions";
+import { actualizarGuia, avanzar, enviarEnlaceTarjeta, obtener, rechazar, verificar, type PedidoConPermisos } from "../actions";
 import { EnlaceDuplicado } from "@/components/ui/pedidos";
 import { SubirComprobante } from "./subir-comprobante";
 import { EstadoPagoPill, Verificacion } from "./verificacion";
@@ -24,7 +24,7 @@ const soloFecha = (iso: string) => new Date(iso).toLocaleDateString("es-GT", { d
 export function Detalle({ inicial }: { inicial: PedidoConPermisos }) {
   const avisar = useToast();
   const { datos, refrescar } = useActualizacion(`pedido-${inicial.pedido.id}`, () => obtener(inicial.pedido.id), 6000);
-  const { pedido: p, puedeVerificar, puedeCancelar, esAdmin, metodos, bancos } = datos ?? inicial;
+  const { pedido: p, puedeVerificar, puedeCancelar, sinLimites, metodos, bancos, tarjeta } = datos ?? inicial;
 
   const [verPago, setVerPago] = useState<string | null>(null);
   const [subir, setSubir] = useState(false);
@@ -77,6 +77,15 @@ export function Detalle({ inicial }: { inicial: PedidoConPermisos }) {
     tras(r.aviso);
   };
 
+  const enviarEnlace = async () => {
+    setTrabajando(true);
+    const r = await enviarEnlaceTarjeta(p.id);
+    setTrabajando(false);
+    if (!r.ok) return avisar(r.error, "error");
+    avisar(r.reutilizado ? "Ya había un enlace abierto por este saldo; se volvió a enviar" : "Enlace de pago enviado al cliente");
+    tras(r.aviso);
+  };
+
   const sig = siguientes(p.estado, p.entrega);
   const puedeReactivar = p.estado === "vencido";
   const puedeCancelarAhora = puedeCancelar && sig.includes("cancelado");
@@ -100,6 +109,9 @@ export function Detalle({ inicial }: { inicial: PedidoConPermisos }) {
   const pagoSeleccionado = p.pagos.find((x) => x.id === verPago) ?? null;
   const acepta = p.estado === "pendiente_pago" || p.estado === "en_revision";
   const r = p.resumenPagos;
+  const puedeEnlace = tarjeta && p.estado === "pendiente_pago" && r.saldo > 0 && r.enRevision === 0; // se cobra el saldo, y sin comprobantes por revisar
+  const cobroAbierto = p.cobrosTarjeta.find((c) => c.estado === "creado");
+  const cobroFallido = !cobroAbierto && p.cobrosTarjeta[0]?.estado === "fallido";
   const imprimible = ["pagado", "preparando", "listo_para_recoger", "enviado", "entregado"].includes(p.estado);
 
   return (
@@ -220,17 +232,34 @@ export function Detalle({ inicial }: { inicial: PedidoConPermisos }) {
           <section aria-label="Pagos" className="flex flex-col gap-3 rounded-tarjeta border border-linea bg-superficie p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h2 className="titulo-panel">Pagos</h2>
-              {acepta && p.pagos.length > 0 && (
-                <Boton variante="secundario" tamano="sm" onClick={() => setSubir(true)}>
-                  Registrar comprobante
-                </Boton>
-              )}
+              <div className="flex flex-wrap items-center gap-2">
+                {puedeEnlace && (
+                  <Boton variante="secundario" tamano="sm" disabled={trabajando} onClick={enviarEnlace}>
+                    Enviar enlace de pago con tarjeta
+                  </Boton>
+                )}
+                {acepta && p.pagos.length > 0 && (
+                  <Boton variante="secundario" tamano="sm" onClick={() => setSubir(true)}>
+                    Registrar comprobante
+                  </Boton>
+                )}
+              </div>
             </div>
             <p className="cuerpo" aria-live="polite">
               Pagado <strong>{formatQ(r.verificado)}</strong> de <strong>{formatQ(r.total)}</strong>
               {r.saldo > 0 ? <> · Falta <strong>{formatQ(r.saldo)}</strong></> : null}
               {r.enRevision > 0 ? <span className="text-texto-suave"> · {formatQ(r.enRevision)} en revisión</span> : null}
             </p>
+            {cobroAbierto && (
+              <p className="meta text-texto-suave" aria-live="polite">
+                Enlace de pago con tarjeta de {formatQ(cobroAbierto.monto)} enviado, esperando el pago del cliente.
+              </p>
+            )}
+            {cobroFallido && (
+              <p className="meta text-texto-suave" aria-live="polite">
+                El último pago con tarjeta no se completó. Puede enviar otro enlace.
+              </p>
+            )}
             {p.pagos.length === 0 ? (
               <div className="flex flex-col items-center gap-3 rounded-tarjeta border border-dashed border-linea p-6 text-center">
                 <p className="cuerpo text-texto-suave">Todavía no se ha registrado ningún comprobante.</p>
@@ -384,7 +413,7 @@ export function Detalle({ inicial }: { inicial: PedidoConPermisos }) {
 
       <Modal abierto={reactivar} onCerrar={() => setReactivar(false)} titulo="Reactivar pedido">
         <p className="cuerpo mb-4">Se vuelven a apartar las existencias y empieza de nuevo el tiempo de reserva. Si ya no alcanzan, no se reactiva.</p>
-        {esAdmin && <Casilla etiqueta="Apartar «sobre pedido» aunque no alcance" checked={sobrePedido} onChange={(e) => setSobrePedido(e.target.checked)} />}
+        {sinLimites && <Casilla etiqueta="Apartar «sobre pedido» aunque no alcance" checked={sobrePedido} onChange={(e) => setSobrePedido(e.target.checked)} />}
         <div className="mt-4 flex justify-end gap-2">
           <Boton variante="secundario" onClick={() => setReactivar(false)}>
             Cancelar

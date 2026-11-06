@@ -6,12 +6,13 @@ import { cambiarEstadoAsesor } from "@/lib/equipo/estado";
 import { cambiarEstadoPorAdmin, devolverACola, panelEquipo, repartirConversaciones } from "@/lib/equipo/gestion";
 import { AUSENCIA_LARGA_MS } from "@/lib/equipo/tipos";
 import { aislar, conversacionEsperando, crearUsuario, limpiar, restaurar } from "./apoyo-equipo";
+import type { Rol } from "@/lib/permisos";
 
 // Necesita la base de datos (npm run db). Datos con el prefijo PRUEBA-EQ; los asesores de demostración quedan Desconectados mientras corre.
 
 describe("devolver, repartir y panel del equipo (con base de datos)", () => {
   let a: { id: string; nombre: string }, b: { id: string; nombre: string }, c: { id: string; nombre: string }, admin: { id: string; nombre: string };
-  const actor = (u: { id: string; nombre: string }, rol: "admin" | "agente" = "agente") => ({ ...u, rol });
+  const actor = (u: { id: string; nombre: string }, rol: Rol = "agente") => ({ ...u, rol });
   const conv = (id: string) => db.conversation.findUniqueOrThrow({ where: { id } });
   const textos = async (id: string) => (await db.activityLog.findMany({ where: { entidadId: id, accion: "asignar" }, orderBy: { fecha: "asc" } })).map((l) => l.detalle as { tipo: string; a?: string; por?: string; motivo?: string });
   const horasAtras = (min: number) => new Date(Date.now() - min * 60_000);

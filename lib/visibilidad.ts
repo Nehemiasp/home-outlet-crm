@@ -1,19 +1,20 @@
 import { db } from "@/lib/db";
 import { obtenerAjustesEquipo } from "@/lib/equipo/ajustes";
 import type { Prisma } from "@/generated/prisma/client";
+import type { Rol } from "@/lib/permisos";
 
 /**
  * Qué ve cada persona. Con «Los asesores ven solo sus conversaciones» activo, un asesor solo ve las conversaciones
- * asignadas a él y los contactos y pedidos ligados a ellas. Los administradores ven todo.
+ * asignadas a él y los contactos y pedidos ligados a ellas. Los administradores y los jefes de tienda ven todo.
  *
  * Esto se aplica en el servidor, en cada consulta y en cada acción que recibe un id: ocultar algo en la pantalla no basta.
  * Lo ajeno responde igual que lo que no existe (404 en las páginas, «no encontrada» en las acciones).
  */
-export type Actor = { id: string; rol: "admin" | "agente" };
+export type Actor = { id: string; rol: Rol };
 
-/** ¿Se le limita lo que ve? Solo a los asesores, y solo si el ajuste está activo. */
+/** ¿Se le limita lo que ve? Solo a los asesores (rol «agente»), y solo si el ajuste está activo. */
 export async function restringido(u: Actor): Promise<boolean> {
-  return u.rol !== "admin" && (await obtenerAjustesEquipo()).asesoresVenSoloSuyas;
+  return u.rol === "agente" && (await obtenerAjustesEquipo()).asesoresVenSoloSuyas;
 }
 
 export async function filtroConversacion(u: Actor): Promise<Prisma.ConversationWhereInput> {
@@ -25,7 +26,7 @@ export async function filtroContacto(u: Actor): Promise<Prisma.ContactWhereInput
   return (await restringido(u)) ? { OR: [{ conversaciones: { some: { asignadaAId: u.id } } }, { creadoPorId: u.id }] } : {};
 }
 
-/** Un pedido es visible si su conversación está asignada al asesor. Un pedido sin conversación es solo del administrador. */
+/** Un pedido es visible si su conversación está asignada al asesor. Un pedido sin conversación solo lo ven el administrador y el jefe de tienda. */
 export async function filtroPedido(u: Actor): Promise<Prisma.OrderWhereInput> {
   return (await restringido(u)) ? { conversacion: { asignadaAId: u.id } } : {};
 }

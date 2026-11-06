@@ -5,13 +5,14 @@ import { db } from "@/lib/db";
 import { alCerrarSesion, alIniciarSesion, activar, desconectarInactivos, pausar, registrarLatido } from "@/lib/equipo/estado";
 import { SIN_SENAL_MS } from "@/lib/equipo/tipos";
 import { aislar, restaurar } from "./apoyo-equipo";
+import type { Rol } from "@/lib/permisos";
 
 // Necesita la base de datos (npm run db). Crea usuarios con el prefijo PRUEBA-EQ y los borra al terminar.
 
 describe("estados del asesor (con base de datos)", () => {
   let a: string;
   let admin: string;
-  const crear = (correo: string, rol: "admin" | "agente") => db.user.create({ data: { nombre: `PRUEBA-EQ ${correo}`, correo: `${correo}@prueba-eq.test`, passwordHash: "x", rol } });
+  const crear = (correo: string, rol: Rol) => db.user.create({ data: { nombre: `PRUEBA-EQ ${correo}`, correo: `${correo}@prueba-eq.test`, passwordHash: "x", rol } });
   const estado = (id: string) => db.user.findUniqueOrThrow({ where: { id }, select: { estadoAsesor: true, motivoPausa: true, ultimaSenal: true } });
   const historial = (id: string) => db.historialEstadoAsesor.findMany({ where: { usuarioId: id }, orderBy: { inicio: "asc" } });
 

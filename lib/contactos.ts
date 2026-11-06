@@ -5,6 +5,7 @@ import { comprasDeContacto } from "@/lib/pedidos/compras";
 import { filtroContacto, filtroConversacion, filtroPedido, restringido, type Actor } from "@/lib/visibilidad";
 import type { Prisma } from "@/generated/prisma/client";
 import type { ContactoDetalle, ContactoMini, FilaContacto, FiltrosContactos } from "@/lib/contactos-tipos";
+import { veTodo } from "@/lib/permisos";
 
 export const POR_PAGINA = 20;
 
@@ -23,7 +24,7 @@ const coincide = (q: string): Prisma.ContactWhereInput => {
 };
 
 export async function listarContactos(f: FiltrosContactos, u: Actor): Promise<{ filas: FilaContacto[]; total: number; paginas: number }> {
-  const delAsesor: Prisma.ContactWhereInput = u.rol === "admin" ? (f.asesor === "sin" ? { asesorResponsableId: null } : f.asesor !== "todos" ? { asesorResponsableId: f.asesor } : {}) : {};
+  const delAsesor: Prisma.ContactWhereInput = veTodo(u) ? (f.asesor === "sin" ? { asesorResponsableId: null } : f.asesor !== "todos" ? { asesorResponsableId: f.asesor } : {}) : {};
   const todos = await db.contact.findMany({
     where: {
       AND: [await filtroContacto(u), delAsesor, coincide(f.q), f.etiquetaId ? { etiquetas: { some: { id: f.etiquetaId } } } : {}, f.canal !== "todos" ? { identidades: { some: { canal: f.canal } } } : {}],

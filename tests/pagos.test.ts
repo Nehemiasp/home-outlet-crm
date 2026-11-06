@@ -7,6 +7,7 @@ import { obtenerAjustesPedidos } from "@/lib/pedidos/ajustes";
 import { configMensajes, mezclarConfig, resumenPagos } from "@/lib/pedidos/avisos";
 import { cambiarEstado } from "@/lib/pedidos/flujo";
 import { buscarDuplicados, registrarPago, rechazarPago, verificarPago, type ActorPagos, type EntradaPago } from "@/lib/pedidos/pagos";
+import type { Rol } from "@/lib/permisos";
 
 // Necesita la base de datos (npm run db). Lo que crea lleva el prefijo PRUEBA-PG y se borra al final.
 
@@ -51,7 +52,7 @@ describe("comprobantes y verificación (con base de datos)", () => {
 
   before(async () => {
     originales = await obtenerAjustesPedidos();
-    const u = (nombre: string, rol: "admin" | "agente", extra = {}) => db.user.create({ data: { nombre, correo: `prueba-pg-${nombre.toLowerCase().replace(/\W/g, "")}@homeoutlet.test`, passwordHash: "x", rol, ...extra } });
+    const u = (nombre: string, rol: Rol, extra = {}) => db.user.create({ data: { nombre, correo: `prueba-pg-${nombre.toLowerCase().replace(/\W/g, "")}@homeoutlet.test`, passwordHash: "x", rol, ...extra } });
     const [a, g, v] = await Promise.all([u("Admin PG", "admin"), u("Agente PG", "agente"), u("Verificador PG", "agente", { puedeVerificarPagos: true })]);
     admin = { id: a.id, nombre: a.nombre, rol: "admin" };
     agente = { id: g.id, nombre: g.nombre, rol: "agente", puedeVerificarPagos: false };

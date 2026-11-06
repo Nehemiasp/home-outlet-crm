@@ -8,6 +8,7 @@ import { cambiarEstadoPorAdmin, panelEquipo, repartirConversaciones } from "@/li
 import { activar, desconectarInactivos, disponibilidadDe, pausar as pausarAsesor, registrarLatido } from "@/lib/equipo/estado";
 import { MOTIVOS_PAUSA, type FilaEquipo, type RespuestaLatido } from "@/lib/equipo/tipos";
 import { requireUsuario } from "@/lib/session";
+import { veTodo } from "@/lib/permisos";
 
 async function estadoActual(id: string) {
   const u = await db.user.findUniqueOrThrow({ where: { id } });
@@ -22,7 +23,7 @@ export async function latido(): Promise<RespuestaLatido> {
   const u = await requireUsuario();
   await registrarLatido(u);
   await desconectarInactivos();
-  return { noLeidos: await contarNoLeidos(u), sinAsignar: u.rol === "admin" ? await contarSinAsignar() : null, disponibilidad: await estadoActual(u.id), ahora: Date.now() };
+  return { noLeidos: await contarNoLeidos(u), sinAsignar: veTodo(u) ? await contarSinAsignar() : null, disponibilidad: await estadoActual(u.id), ahora: Date.now() };
 }
 
 type Resultado = { ok: true; disponibilidad: RespuestaLatido["disponibilidad"] } | { ok: false; error: string };
@@ -44,18 +45,18 @@ export async function activarme(): Promise<Resultado> {
   return { ok: true, disponibilidad: await estadoActual(u.id) };
 }
 
-/* ── Panel del equipo (solo administradores) ── */
-const soloAdmin = { ok: false, error: "Solo un administrador puede hacer esto." } as const;
+/* ── Panel del equipo (administrador y jefe de tienda) ── */
+const soloAdmin = { ok: false, error: "Solo un administrador o un jefe de tienda puede hacer esto." } as const;
 
 /** Cada asesor con su estado, desde hace cuánto, el motivo de la pausa y cuántas conversaciones abiertas tiene. */
 export async function obtenerPanelEquipo(): Promise<FilaEquipo[]> {
   const u = await requireUsuario();
-  return u.rol === "admin" ? panelEquipo() : [];
+  return veTodo(u) ? panelEquipo() : [];
 }
 
 export async function cambiarEstadoDeAsesor(asesorId: string, estado: string): Promise<{ ok: true } | { ok: false; error: string }> {
   const u = await requireUsuario();
-  if (u.rol !== "admin") return soloAdmin;
+  if (!veTodo(u)) return soloAdmin;
   const e = z.enum(["disponible", "en_pausa", "desconectado"]).safeParse(estado);
   if (!e.success) return { ok: false, error: "El estado no es válido." };
   return cambiarEstadoPorAdmin(z.string().min(1).max(40).parse(asesorId), e.data, u);
@@ -63,6 +64,6 @@ export async function cambiarEstadoDeAsesor(asesorId: string, estado: string): P
 
 export async function repartirDeAsesor(asesorId: string): Promise<{ ok: true; repartidas: number; sinAsesor: number } | { ok: false; error: string }> {
   const u = await requireUsuario();
-  if (u.rol !== "admin") return soloAdmin;
+  if (!veTodo(u)) return soloAdmin;
   return repartirConversaciones(z.string().min(1).max(40).parse(asesorId), u);
 }

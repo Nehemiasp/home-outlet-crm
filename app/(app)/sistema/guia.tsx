@@ -726,7 +726,7 @@ export function Guia() {
               </div>
             </div>
           </Bloque>
-          <Bloque titulo="Equipo (solo administradores) · estado de cada asesor; con más de 30 min en pausa o desconectado y conversaciones abiertas aparece «Repartir sus conversaciones»">
+          <Bloque titulo="Equipo (administrador y jefe de tienda) · estado de cada asesor; con más de 30 min en pausa o desconectado y conversaciones abiertas aparece «Repartir sus conversaciones»">
             <div className="flex flex-col gap-4">
               <TablaEquipo
                 ahora={Date.now()}

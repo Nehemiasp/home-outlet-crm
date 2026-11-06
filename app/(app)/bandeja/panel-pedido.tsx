@@ -192,7 +192,7 @@ export function PanelPedido({ abierto, onCerrar, conversacionId, puedeEnviar, on
   const sugeridos = datos?.sugeridos ?? [];
   const mostrados = busqueda.trim() ? resultados : sugeridos.length ? sugeridos : resultados;
   const ubicacionDeLinea = (l: Linea) => l.ubicacionId ?? datos?.ubicacionPorEntrega[entrega] ?? null;
-  const bloqueado = !vista || !!errorVista || lineas.length === 0 || (vista.sinExistencia && !(datos?.esAdmin && sobrePedido));
+  const bloqueado = !vista || !!errorVista || lineas.length === 0 || (vista.sinExistencia && !(datos?.sinLimites && sobrePedido));
 
   return (
     <PanelLateral abierto={abierto} onCerrar={onCerrar} titulo="Crear pedido">
@@ -362,7 +362,7 @@ export function PanelPedido({ abierto, onCerrar, conversacionId, puedeEnviar, on
               <CampoTexto etiqueta="Valor" inputMode="decimal" autoComplete="off" maxLength={12} value={descValor} onChange={(e) => setDescValor(e.target.value)} />
             </div>
             {descValor.trim() && <CampoTexto etiqueta="Motivo del descuento" autoComplete="off" maxLength={200} value={descMotivo} onChange={(e) => setDescMotivo(e.target.value)} />}
-            {!datos.esAdmin && <p className="meta text-texto-suave">{datos.descuentoMaxAgente > 0 ? `Usted puede dar hasta ${datos.descuentoMaxAgente} %. Más de eso lo autoriza un administrador.` : "Los descuentos los autoriza un administrador."}</p>}
+            {!datos.sinLimites && <p className="meta text-texto-suave">{datos.descuentoMaxAgente > 0 ? `Usted puede dar hasta ${datos.descuentoMaxAgente} %. Más de eso lo autoriza un administrador o un jefe de tienda.` : "Los descuentos los autoriza un administrador."}</p>}
           </section>
 
           <AreaTexto etiqueta="Notas del pedido" maxLength={500} ayuda="Solo las ve el equipo." value={notas} onChange={(e) => setNotas(e.target.value)} />
@@ -387,10 +387,10 @@ export function PanelPedido({ abierto, onCerrar, conversacionId, puedeEnviar, on
           </section>
 
           {vista?.sinExistencia &&
-            (datos.esAdmin ? (
+            (datos.sinLimites ? (
               <Casilla etiqueta="Apartar «sobre pedido» aunque no alcance la existencia" checked={sobrePedido} onChange={(e) => setSobrePedido(e.target.checked)} />
             ) : (
-              <p className="meta text-texto-suave">Para enviarlo sin existencia suficiente, un administrador debe apartarlo «sobre pedido».</p>
+              <p className="meta text-texto-suave">Para enviarlo sin existencia suficiente, un administrador o un jefe de tienda debe apartarlo «sobre pedido».</p>
             ))}
 
           {!puedeEnviar && (

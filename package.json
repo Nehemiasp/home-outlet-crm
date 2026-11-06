@@ -15,7 +15,9 @@
     "ai:eval": "tsx scripts/ai-eval.mts",
     "respaldo": "node scripts/respaldo.mjs",
     "restaurar": "node scripts/restaurar.mjs",
-    "e2e": "node --import tsx --test --test-concurrency=1 e2e/*.test.mts"
+    "e2e": "node --import tsx --test --test-concurrency=1 e2e/*.test.mts",
+    "admin:crear": "tsx scripts/crear-admin.mts",
+    "demo:limpiar": "tsx scripts/limpiar-demo.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.3.0",

@@ -1,0 +1,17 @@
+node_modules
+.next
+generated
+.git
+.github
+.env
+.env.*
+!.env.example
+.pgdata
+.pgdata-labs
+.labs-credenciales.txt
+uploads
+respaldos
+e2e
+*.pdf
+*.tsbuildinfo
+npm-debug.log*

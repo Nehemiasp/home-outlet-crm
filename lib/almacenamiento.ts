@@ -8,7 +8,8 @@ export interface StorageProvider {
   leer(nombre: string): Promise<Buffer | null>;
 }
 
-const CARPETA = path.join(process.cwd(), "uploads");
+// UPLOADS_DIR permite apuntar a un disco persistente (en producción, el volumen del servidor); por defecto, ./uploads.
+const CARPETA = process.env.UPLOADS_DIR ? path.resolve(process.env.UPLOADS_DIR) : path.join(process.cwd(), "uploads");
 
 export const almacenamientoLocal: StorageProvider = {
   async guardar(datos, ext) {

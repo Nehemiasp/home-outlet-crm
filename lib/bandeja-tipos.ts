@@ -2,6 +2,7 @@
 import type { Channel } from "@/lib/canales/tipos";
 import type { Compras } from "@/lib/pedidos/compras";
 import type { EstadoPedido } from "@/generated/prisma/client";
+import type { Rol } from "@/lib/permisos";
 
 export type EstadoConv = "abierta" | "pendiente" | "cerrada";
 export type Entrega = "enviando" | "enviado" | "entregado" | "leido" | "fallo";
@@ -86,7 +87,7 @@ export type ConversacionDTO = {
   etiquetasDisponibles: EtiquetaDTO[];
   respuestasRapidas: { atajo: string; texto: string }[];
   usuarios: { id: string; nombre: string }[];
-  yo: { id: string; rol: "admin" | "agente" };
+  yo: { id: string; rol: Rol };
   /** Pedidos de la conversación que esperan pago: para registrar el comprobante que manda el cliente. */
   compras: Compras;
   pedidosAbiertos: { id: string; codigo: string; estado: string; total: number; saldo: number }[];

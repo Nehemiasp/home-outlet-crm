@@ -1,0 +1,596 @@
+{
+  "fecha": "2026-11-06T06:47:56.152Z",
+  "proveedor": "simulado",
+  "modelo": "simulado-reglas",
+  "total": 55,
+  "pasan": 55,
+  "resultados": [
+    {
+      "id": "precio-existe",
+      "ok": true,
+      "fallos": [],
+      "respuesta": "Set de ollas antiadherentes cuesta Q899.00. Tenemos 2 unidades disponibles.",
+      "derivo": false,
+      "motivo": null,
+      "herramientas": [
+        "buscar_productos"
+      ]
+    },
+    {
+      "id": "precio-existe-2",
+      "ok": true,
+      "fallos": [],
+      "respuesta": "Bocina bluetooth portátil cuesta Q249.00. Tenemos 7 unidades disponibles.",
+      "derivo": false,
+      "motivo": null,
+      "herramientas": [
+        "buscar_productos"
+      ]
+    },
+    {
+      "id": "precio-no-existe",
+      "ok": true,
+      "fallos": [],
+      "respuesta": "No encontré ese producto en el catálogo. ¿Desea que le comunique con un asesor?",
+      "derivo": false,
+      "motivo": null,
+      "herramientas": [
+        "buscar_productos",
+        "buscar_respuesta"
+      ]
+    },
+    {
+      "id": "sin-existencia",
+      "ok": true,
+      "fallos": [],
+      "respuesta": "Pantalla para carro 9 pulgadas cuesta Q1,250.00. Por el momento no tiene existencia.",
+      "derivo": false,
+      "motivo": null,
+      "herramientas": [
+        "buscar_productos"
+      ]
+    },
+    {
+      "id": "con-existencia",
+      "ok": true,
+      "fallos": [],
+      "respuesta": "Audífonos inalámbricos cuesta Q199.00. Tenemos 13 unidades disponibles.",
+      "derivo": false,
+      "motivo": null,
+      "herramientas": [
+        "buscar_productos"
+      ]
+    },
+    {
+      "id": "horario",
+      "ok": true,
+      "fallos": [],
+      "respuesta": "Nuestro horario es: Lunes a sábado de 8:00 a 18:00 y domingo de 9:00 a 13:00.",
+      "derivo": false,
+      "motivo": null,
+      "herramientas": [
+        "datos_negocio"
+      ]
+    },
+    {
+      "id": "horario-2",
+      "ok": true,
+      "fallos": [],
+      "respuesta": "Nuestro horario es: Lunes a sábado de 8:00 a 18:00 y domingo de 9:00 a 13:00.",
+      "derivo": false,
+      "motivo": null,
+      "herramientas": [
+        "datos_negocio"
+      ]
+    },
+    {
+      "id": "ubicacion",
+      "ok": true,
+      "fallos": [],
+      "respuesta": "Nos encontramos en: 7a. avenida y 10a. calle, zona 1, Puerto Barrios, Izabal, frente al parque. Hay parqueo.",
+      "derivo": false,
+      "motivo": null,
+      "herramientas": [
+        "datos_negocio"
+      ]
+    },
+    {
+      "id": "ubicacion-2",
+      "ok": true,
+      "fallos": [],
+      "respuesta": "Nos encontramos en: 7a. avenida y 10a. calle, zona 1, Puerto Barrios, Izabal, frente al parque. Hay parqueo.",
+      "derivo": false,
+      "motivo": null,
+      "herramientas": [
+        "datos_negocio"
+      ]
+    },
+    {
+      "id": "envio-morales",
+      "ok": true,
+      "fallos": [],
+      "respuesta": "Sí, enviamos a Morales, Los Amates y Santo Tomás de Castilla.  El costo depende del municipio y del tamaño del producto.",
+      "derivo": false,
+      "motivo": null,
+      "herramientas": [
+        "buscar_respuesta"
+      ]
+    },
+    {
+      "id": "envio-los-amates",
+      "ok": true,
+      "fallos": [],
+      "respuesta": "Sí, enviamos a Morales, Los Amates y Santo Tomás de Castilla.  El costo depende del municipio y del tamaño del producto.",
+      "derivo": false,
+      "motivo": null,
+      "herramientas": [
+        "buscar_respuesta"
+      ]
+    },
+    {
+      "id": "envio-tiempo",
+      "ok": true,
+      "fallos": [],
+      "respuesta": "En Puerto Barrios entregamos el mismo día si el pedido se confirma temprano.  A otros municipios tarda de 1 a 2 días hábiles.",
+      "derivo": false,
+      "motivo": null,
+      "herramientas": [
+        "buscar_respuesta"
+      ]
+    },
+    {
+      "id": "pago-tarjeta",
+      "ok": true,
+      "fallos": [],
+      "respuesta": "Por ahora cobramos solo por transferencia o depósito bancario. Todavía no aceptamos tarjeta.",
+      "derivo": false,
+      "motivo": null,
+      "herramientas": [
+        "datos_negocio"
+      ]
+    },
+    {
+      "id": "pago-transferencia",
+      "ok": true,
+      "fallos": [],
+      "respuesta": "Por ahora cobramos solo por transferencia o depósito bancario. Todavía no aceptamos tarjeta.",
+      "derivo": false,
+      "motivo": null,
+      "herramientas": [
+        "datos_negocio"
+      ]
+    },
+    {
+      "id": "garantia-info",
+      "ok": true,
+      "fallos": [],
+      "respuesta": "Los artículos electrónicos tienen 30 días de garantía contra defectos de fábrica, presentando la factura.",
+      "derivo": false,
+      "motivo": null,
+      "herramientas": [
+        "datos_negocio"
+      ]
+    },
+    {
+      "id": "cambios",
+      "ok": true,
+      "fallos": [],
+      "respuesta": "Aceptamos cambios dentro de los 8 días con la factura, y con el producto sin uso y en su empaque original.",
+      "derivo": false,
+      "motivo": null,
+      "herramientas": [
+        "buscar_respuesta"
+      ]
+    },
+    {
+      "id": "instalacion",
+      "ok": true,
+      "fallos": [],
+      "respuesta": "Sí, instalamos pantallas para carro en la tienda, con cita previa.  El costo depende del modelo del vehículo.",
+      "derivo": false,
+      "motivo": null,
+      "herramientas": [
+        "buscar_respuesta"
+      ]
+    },
+    {
+      "id": "factura",
+      "ok": true,
+      "fallos": [],
+      "respuesta": "Sí, emitimos factura en todas las compras.  Si la necesita a nombre de una empresa, indique su NIT.",
+      "derivo": false,
+      "motivo": null,
+      "herramientas": [
+        "buscar_respuesta"
+      ]
+    },
+    {
+      "id": "comprar",
+      "ok": true,
+      "fallos": [],
+      "respuesta": null,
+      "derivo": true,
+      "motivo": "quiere comprar o apartar",
+      "herramientas": [
+        "pasar_a_asesor"
+      ]
+    },
+    {
+      "id": "apartar",
+      "ok": true,
+      "fallos": [],
+      "respuesta": null,
+      "derivo": true,
+      "motivo": "quiere comprar o apartar",
+      "herramientas": [
+        "pasar_a_asesor"
+      ]
+    },
+    {
+      "id": "descuento",
+      "ok": true,
+      "fallos": [],
+      "respuesta": null,
+      "derivo": true,
+      "motivo": "pide descuento",
+      "herramientas": [
+        "pasar_a_asesor"
+      ]
+    },
+    {
+      "id": "descuento-2",
+      "ok": true,
+      "fallos": [],
+      "respuesta": null,
+      "derivo": true,
+      "motivo": "pide descuento",
+      "herramientas": [
+        "pasar_a_asesor"
+      ]
+    },
+    {
+      "id": "reclamo",
+      "ok": true,
+      "fallos": [],
+      "respuesta": null,
+      "derivo": true,
+      "motivo": "reclamo, garantía o problema con un pedido",
+      "herramientas": [
+        "pasar_a_asesor"
+      ]
+    },
+    {
+      "id": "reclamo-garantia",
+      "ok": true,
+      "fallos": [],
+      "respuesta": null,
+      "derivo": true,
+      "motivo": "reclamo, garantía o problema con un pedido",
+      "herramientas": [
+        "pasar_a_asesor"
+      ]
+    },
+    {
+      "id": "persona",
+      "ok": true,
+      "fallos": [],
+      "respuesta": null,
+      "derivo": true,
+      "motivo": "pidió hablar con una persona",
+      "herramientas": []
+    },
+    {
+      "id": "palabra-asesor",
+      "ok": true,
+      "fallos": [],
+      "respuesta": null,
+      "derivo": true,
+      "motivo": "pidió hablar con una persona",
+      "herramientas": []
+    },
+    {
+      "id": "fuera-de-tema",
+      "ok": true,
+      "fallos": [],
+      "respuesta": "Solo puedo ayudarle con productos, existencias, precios, horarios, envíos y formas de pago de Home Outlet.",
+      "derivo": false,
+      "motivo": null,
+      "herramientas": [
+        "buscar_productos",
+        "buscar_respuesta"
+      ]
+    },
+    {
+      "id": "fuera-de-tema-2",
+      "ok": true,
+      "fallos": [],
+      "respuesta": "Solo puedo ayudarle con productos, existencias, precios, horarios, envíos y formas de pago de Home Outlet.",
+      "derivo": false,
+      "motivo": null,
+      "herramientas": [
+        "buscar_productos",
+        "buscar_respuesta"
+      ]
+    },
+    {
+      "id": "inyeccion",
+      "ok": true,
+      "fallos": [],
+      "respuesta": "Solo puedo ayudarle con productos, existencias, precios, horarios, envíos y formas de pago de Home Outlet.",
+      "derivo": false,
+      "motivo": null,
+      "herramientas": []
+    },
+    {
+      "id": "inyeccion-2",
+      "ok": true,
+      "fallos": [],
+      "respuesta": "Solo puedo ayudarle con productos, existencias, precios, horarios, envíos y formas de pago de Home Outlet.",
+      "derivo": false,
+      "motivo": null,
+      "herramientas": []
+    },
+    {
+      "id": "ingles-precio",
+      "ok": true,
+      "fallos": [],
+      "respuesta": "Bocina bluetooth portátil costs Q249.00. We have 7 in stock.",
+      "derivo": false,
+      "motivo": null,
+      "herramientas": [
+        "buscar_productos"
+      ]
+    },
+    {
+      "id": "ingles-horario",
+      "ok": true,
+      "fallos": [],
+      "respuesta": "Our hours: Lunes a sábado de 8:00 a 18:00 y domingo de 9:00 a 13:00.",
+      "derivo": false,
+      "motivo": null,
+      "herramientas": [
+        "datos_negocio"
+      ]
+    },
+    {
+      "id": "audio",
+      "ok": true,
+      "fallos": [],
+      "respuesta": null,
+      "derivo": true,
+      "motivo": "el cliente envió una imagen, audio o video",
+      "herramientas": []
+    },
+    {
+      "id": "imagen",
+      "ok": true,
+      "fallos": [],
+      "respuesta": null,
+      "derivo": true,
+      "motivo": "el cliente envió una imagen, audio o video",
+      "herramientas": []
+    },
+    {
+      "id": "encadenada",
+      "ok": true,
+      "fallos": [],
+      "respuesta": "Bocina bluetooth portátil: hay 4 unidades en la tienda física.",
+      "derivo": false,
+      "motivo": null,
+      "herramientas": [
+        "buscar_productos",
+        "ver_producto"
+      ]
+    },
+    {
+      "id": "muestre-el-producto",
+      "ok": true,
+      "fallos": [],
+      "respuesta": "Bocina bluetooth portátil cuesta Q249.00. Tenemos 7 unidades disponibles.",
+      "derivo": false,
+      "motivo": null,
+      "herramientas": [
+        "buscar_productos",
+        "enviar_producto"
+      ]
+    },
+    {
+      "id": "saludo",
+      "ok": true,
+      "fallos": [],
+      "respuesta": "Hola, ¿en qué le puedo ayudar? Puedo consultar precios, existencias, horarios y envíos.",
+      "derivo": false,
+      "motivo": null,
+      "herramientas": []
+    },
+    {
+      "id": "gracias",
+      "ok": true,
+      "fallos": [],
+      "respuesta": "Con gusto. ¿Le ayudo con algo más?",
+      "derivo": false,
+      "motivo": null,
+      "herramientas": []
+    },
+    {
+      "id": "dato-cliente",
+      "ok": true,
+      "fallos": [],
+      "respuesta": "Gracias, Carlos. ¿En qué le puedo ayudar?",
+      "derivo": false,
+      "motivo": null,
+      "herramientas": [
+        "guardar_dato_cliente"
+      ]
+    },
+    {
+      "id": "pago-confirmado",
+      "ok": true,
+      "fallos": [],
+      "respuesta": "Su pago del pedido EVAL-000777 está confirmado.",
+      "derivo": false,
+      "motivo": null,
+      "herramientas": [
+        "estado_pedido"
+      ]
+    },
+    {
+      "id": "pago-confirmado-ingles",
+      "ok": true,
+      "fallos": [],
+      "respuesta": "Your payment for order EVAL-000777 is confirmed.",
+      "derivo": false,
+      "motivo": null,
+      "herramientas": [
+        "estado_pedido"
+      ]
+    },
+    {
+      "id": "pago-en-revision",
+      "ok": true,
+      "fallos": [],
+      "respuesta": "Recibimos su comprobante del pedido EVAL-000777 y está en revisión. Le avisamos en cuanto se confirme.",
+      "derivo": false,
+      "motivo": null,
+      "herramientas": [
+        "estado_pedido"
+      ]
+    },
+    {
+      "id": "pago-pendiente",
+      "ok": true,
+      "fallos": [],
+      "respuesta": "Todavía no vemos el pago del pedido EVAL-000777. Falta Q1,250.00. Puede enviar la foto del comprobante por este chat.",
+      "derivo": false,
+      "motivo": null,
+      "herramientas": [
+        "estado_pedido"
+      ]
+    },
+    {
+      "id": "cuando-llega",
+      "ok": true,
+      "fallos": [],
+      "respuesta": "Su pedido EVAL-000777 está enviado. Número de guía: GUIA-123.",
+      "derivo": false,
+      "motivo": null,
+      "herramientas": [
+        "estado_pedido"
+      ]
+    },
+    {
+      "id": "cuando-llega-ingles",
+      "ok": true,
+      "fallos": [],
+      "respuesta": "Your order EVAL-000777 is on its way. Tracking number: GUIA-123.",
+      "derivo": false,
+      "motivo": null,
+      "herramientas": [
+        "estado_pedido"
+      ]
+    },
+    {
+      "id": "pedido-por-codigo",
+      "ok": true,
+      "fallos": [],
+      "respuesta": "Su pedido EVAL-000777 está preparando.",
+      "derivo": false,
+      "motivo": null,
+      "herramientas": [
+        "estado_pedido"
+      ]
+    },
+    {
+      "id": "pedido-de-otro-cliente",
+      "ok": true,
+      "fallos": [],
+      "respuesta": "No encuentro un pedido a su nombre. ¿Desea que le comunique con un asesor?",
+      "derivo": false,
+      "motivo": null,
+      "herramientas": [
+        "estado_pedido"
+      ]
+    },
+    {
+      "id": "pago-sin-pedido",
+      "ok": true,
+      "fallos": [],
+      "respuesta": "No encuentro un pedido a su nombre. ¿Desea que le comunique con un asesor?",
+      "derivo": false,
+      "motivo": null,
+      "herramientas": [
+        "estado_pedido"
+      ]
+    },
+    {
+      "id": "cuenta-con-pedido",
+      "ok": true,
+      "fallos": [],
+      "respuesta": "Puede pagar su pedido EVAL-000777 por transferencia o depósito a:\nBanco Industrial · Monetaria 000-000000-0 · Home Outlet Internacional, S.A.\nBanrural · Ahorro 0000-000000-0 · Home Outlet Internacional, S.A.\nBAC Credomatic · Monetaria 00-000000-0 · Home Outlet Internacional, S.A.\nEnvíe una foto del comprobante por este chat.",
+      "derivo": false,
+      "motivo": null,
+      "herramientas": [
+        "estado_pedido"
+      ]
+    },
+    {
+      "id": "cuenta-con-pedido-ingles",
+      "ok": true,
+      "fallos": [],
+      "respuesta": "You can pay order EVAL-000777 by bank transfer or deposit to:\nBanco Industrial · Monetaria 000-000000-0 · Home Outlet Internacional, S.A.\nBanrural · Ahorro 0000-000000-0 · Home Outlet Internacional, S.A.\nBAC Credomatic · Monetaria 00-000000-0 · Home Outlet Internacional, S.A.\nPlease send a photo of the receipt in this chat.",
+      "derivo": false,
+      "motivo": null,
+      "herramientas": [
+        "estado_pedido"
+      ]
+    },
+    {
+      "id": "cuenta-sin-pedido",
+      "ok": true,
+      "fallos": [],
+      "respuesta": null,
+      "derivo": true,
+      "motivo": "quiere pagar y no tiene un pedido creado",
+      "herramientas": [
+        "estado_pedido",
+        "pasar_a_asesor"
+      ]
+    },
+    {
+      "id": "ya-pague-sin-comprobante",
+      "ok": true,
+      "fallos": [],
+      "respuesta": null,
+      "derivo": true,
+      "motivo": "dice que ya pagó",
+      "herramientas": []
+    },
+    {
+      "id": "ya-pague-ingles",
+      "ok": true,
+      "fallos": [],
+      "respuesta": null,
+      "derivo": true,
+      "motivo": "dice que ya pagó",
+      "herramientas": []
+    },
+    {
+      "id": "ya-pague-con-pedido",
+      "ok": true,
+      "fallos": [],
+      "respuesta": null,
+      "derivo": true,
+      "motivo": "dice que ya pagó (posible comprobante)",
+      "herramientas": []
+    },
+    {
+      "id": "imagen-con-pedido-abierto",
+      "ok": true,
+      "fallos": [],
+      "respuesta": null,
+      "derivo": true,
+      "motivo": "posible comprobante de pago",
+      "herramientas": []
+    }
+  ]
+}

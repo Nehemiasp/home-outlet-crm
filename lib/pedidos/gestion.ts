@@ -6,6 +6,7 @@ import { avisarCliente, type ResultadoAviso } from "./avisos";
 import { ETIQUETA_ESTADO } from "./estados";
 import { cambiarEstado } from "./flujo";
 import { lineaDeSistema } from "./pedidos";
+import { veTodo } from "@/lib/permisos";
 
 type Actor = ActorPedido & { nombre: string };
 type Fallo = { ok: false; error: string };
@@ -21,8 +22,8 @@ export async function avanzarPedido(pedidoId: string, a: EstadoPedido, actor: Ac
   const p = await db.order.findUnique({ where: { id: pedidoId }, select: { estado: true, creadoPorId: true, codigo: true, conversacionId: true, pagos: { where: { estado: "verificado" }, select: { id: true } } } });
   if (!p) return fallo("El pedido no existe.");
   if (a === "pendiente_pago" && p.estado !== "vencido") return fallo("Solo se reactiva un pedido vencido.");
-  if (a === "cancelado" && !puedeCancelarPedido(actor, p, p.pagos.length > 0)) return fallo(actor.rol === "admin" ? "No se puede cancelar este pedido." : "Solo puede cancelar los pedidos que creó y que todavía no tienen un pago verificado.");
-  if (o.sobrePedido && !puedeSobrePedido(actor)) return fallo("Solo un administrador puede apartar «sobre pedido».");
+  if (a === "cancelado" && !puedeCancelarPedido(actor, p, p.pagos.length > 0)) return fallo(veTodo(actor) ? "No se puede cancelar este pedido." : "Solo puede cancelar los pedidos que creó y que todavía no tienen un pago verificado.");
+  if (o.sobrePedido && !puedeSobrePedido(actor)) return fallo("Solo un administrador o un jefe de tienda puede apartar «sobre pedido».");
   const guia = o.guia?.trim();
   if (guia && guia.length > 60) return fallo("La guía pasa de 60 caracteres.");
 

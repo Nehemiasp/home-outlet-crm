@@ -9,7 +9,7 @@ import { requireUsuario } from "@/lib/session";
 
 type Resultado = { ok: true } | { ok: false; error: string };
 const fallo = (error: string): { ok: false; error: string } => ({ ok: false, error });
-const SOLO_ADMIN = "Solo un administrador puede hacer esto.";
+const SOLO_ADMIN = "Solo un administrador o un jefe de tienda puede hacer esto.";
 const id = z.string().min(1).max(40);
 const MAX_CSV = 1024 * 1024;
 

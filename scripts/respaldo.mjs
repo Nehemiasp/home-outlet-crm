@@ -2,12 +2,13 @@
 //   npm run respaldo                  → respaldos/AAAA-MM-DD_HHMMSS/{base.dump, uploads.tar.gz}
 //   RESPALDOS_CONSERVAR=14            → cuántos respaldos guardar (los más viejos se borran)
 //   RESPALDOS_CARPETA=/ruta/al/disco  → dónde guardarlos (por defecto ./respaldos; en producción, un disco que no sea el del servidor)
+//   UPLOADS_DIR=/ruta/a/uploads       → dónde están los archivos subidos (por defecto ./uploads)
 //   PG_DUMP=/ruta/a/pg_dump           → si pg_dump no está en el PATH
 // Necesita pg_dump (viene con el cliente de PostgreSQL). Pensado para correr cada día desde un cron del hosting.
 import "dotenv/config";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { closeSync, existsSync, mkdirSync, openSync, readdirSync, rmSync, statSync } from "node:fs";
+import { basename, dirname, join, resolve } from "node:path";
 
 const falla = (m) => {
   console.error(`\n✖ ${m}\n`);
@@ -31,8 +32,12 @@ if (dump.error || dump.status !== 0) {
   falla(dump.error ? "No se encontró pg_dump. Instale el cliente de PostgreSQL o indique su ruta en PG_DUMP." : "pg_dump falló; no se guardó el respaldo.");
 }
 
-if (existsSync("uploads")) {
-  const tar = spawnSync("tar", ["-czf", join(carpeta, "uploads.tar.gz"), "uploads"], { stdio: "inherit" });
+const uploads = resolve(process.env.UPLOADS_DIR ?? "uploads");
+if (existsSync(uploads)) {
+  // El archivo va por la salida estándar y la carpeta por nombre, desde su carpeta madre: los distintos tar (el de Git para Windows, el de Windows, el de Linux) se llevan mal con «C:\...».
+  const salida = openSync(join(carpeta, "uploads.tar.gz"), "w");
+  const tar = spawnSync("tar", ["-czf", "-", basename(uploads)], { stdio: ["ignore", salida, "inherit"], cwd: dirname(uploads) });
+  closeSync(salida);
   if (tar.error || tar.status !== 0) falla("No se pudo comprimir uploads/ (¿está tar disponible?). El respaldo de la base sí se guardó.");
 }
 

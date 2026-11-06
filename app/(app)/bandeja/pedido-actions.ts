@@ -5,6 +5,7 @@ import * as pedidos from "@/lib/pedidos/pedidos";
 import type { DatosPanelPedido, EntradaPedido, ProductoPedido, ResultadoPedido, VistaPedido } from "@/lib/pedidos/tipos";
 import { requireUsuario } from "@/lib/session";
 import { puedeVerConversacion, puedeVerPedido } from "@/lib/visibilidad";
+import type { Rol } from "@/lib/permisos";
 
 const id = z.string().min(1).max(40);
 const entrada = z.object({
@@ -27,7 +28,7 @@ async function actor() {
 const invalido = { ok: false, error: "Revise los datos del pedido." } as const;
 const noExiste = { ok: false, error: "La conversación no existe." } as const;
 /** La conversación (y el borrador, si lo hay) tienen que ser de quien los pide. */
-async function ve(u: { id: string; rol: "admin" | "agente" }, conversacionId: string, pedidoId?: string | null) {
+async function ve(u: { id: string; rol: Rol }, conversacionId: string, pedidoId?: string | null) {
   return (await puedeVerConversacion(u, conversacionId)) && (!pedidoId || (await puedeVerPedido(u, pedidoId)));
 }
 

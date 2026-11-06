@@ -29,7 +29,7 @@ const VACIO: Record<Vista, { titulo: string; descripcion: string }> = {
   todos: { titulo: "Todavía no hay pedidos", descripcion: "Cree uno desde una conversación con el botón «Crear pedido»." },
 };
 
-export function ListaPedidos({ vistaInicial, puedeVerificar, esAdmin, asesores }: { vistaInicial: Vista; puedeVerificar: boolean; esAdmin: boolean; asesores: { id: string; nombre: string }[] }) {
+export function ListaPedidos({ vistaInicial, puedeVerificar, veTodo, asesores }: { vistaInicial: Vista; puedeVerificar: boolean; veTodo: boolean; asesores: { id: string; nombre: string }[] }) {
   const router = useRouter();
   const avisar = useToast();
   const [vista, setVista] = useState<Vista>(vistaInicial);
@@ -109,7 +109,7 @@ export function ListaPedidos({ vistaInicial, puedeVerificar, esAdmin, asesores }
             }}
           >
             <Selector etiqueta="Canal" value={canal} onCambio={cambiar((v: string) => setCanal(v as FiltrosPedidos["canal"]))} opciones={[{ valor: "todos", texto: "Todos" }, ...CANALES.map(opcionCanal)]} />
-            {esAdmin && (
+            {veTodo && (
               <Selector etiqueta="Asesor" value={asesor} onCambio={cambiar(setAsesor)} opciones={[{ valor: "todos", texto: "Todos" }, { valor: "sin", texto: "Sin asesor" }, ...asesores.map((a) => ({ valor: a.id, texto: a.nombre }))]} />
             )}
             <Selector

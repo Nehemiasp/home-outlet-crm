@@ -20,7 +20,7 @@ type Datos = {
 };
 
 /** Métodos de pago, reglas de los pedidos, inventario y envío gratis: se guardan juntos. */
-export function AjustesDePedidos({ inicial, ubicaciones }: { inicial: Datos; ubicaciones: { id: string; nombre: string }[] }) {
+export function AjustesDePedidos({ inicial, ubicaciones, tarjetaConectada }: { inicial: Datos; ubicaciones: { id: string; nombre: string }[]; tarjetaConectada: boolean }) {
   const router = useRouter();
   const avisar = useToast();
   const [d, setD] = useState(inicial);
@@ -57,8 +57,8 @@ export function AjustesDePedidos({ inicial, ubicaciones }: { inicial: Datos; ubi
         <ul className="flex flex-col divide-y divide-linea">
           {METODOS.map((m) => (
             <li key={m.id} className="flex flex-wrap items-center justify-between gap-2 py-1">
-              <Interruptor etiqueta={m.nombre} activo={d.metodos.includes(m.id)} disabled={!m.disponible} onCambio={(a) => alternar(m.id, a)} />
-              {m.nota && <span className="meta text-texto-suave">{m.nota}</span>}
+              <Interruptor etiqueta={m.nombre} activo={d.metodos.includes(m.id)} disabled={!m.disponible || (m.id === "tarjeta" && !tarjetaConectada && !d.metodos.includes("tarjeta"))} onCambio={(a) => alternar(m.id, a)} />
+              {m.nota && !(m.id === "tarjeta" && tarjetaConectada) && <span className="meta text-texto-suave">{m.nota}</span>}
             </li>
           ))}
         </ul>
@@ -69,7 +69,7 @@ export function AjustesDePedidos({ inicial, ubicaciones }: { inicial: Datos; ubi
         <div className="grid gap-4 sm:grid-cols-3">
           <CampoTexto etiqueta="Prefijo del código" autoComplete="off" maxLength={6} ayuda="Por ejemplo HO-000123. Los pedidos ya creados no cambian." value={d.prefijo} onChange={(e) => setD({ ...d, prefijo: e.target.value })} />
           <CampoTexto etiqueta="Horas de reserva sin pago" inputMode="numeric" maxLength={3} ayuda="Pasado ese tiempo el pedido vence y libera las unidades." value={d.horasReserva} onChange={(e) => setD({ ...d, horasReserva: e.target.value.replace(/\D/g, "") })} />
-          <CampoTexto etiqueta="Descuento máximo del agente (%)" inputMode="numeric" maxLength={3} ayuda="Más que eso lo autoriza un administrador. 0 = sin descuentos." value={d.descuentoMaxAgente} onChange={(e) => setD({ ...d, descuentoMaxAgente: e.target.value.replace(/\D/g, "") })} />
+          <CampoTexto etiqueta="Descuento máximo del agente (%)" inputMode="numeric" maxLength={3} ayuda="Más que eso lo autoriza un administrador o un jefe de tienda (ellos no tienen tope). 0 = sin descuentos." value={d.descuentoMaxAgente} onChange={(e) => setD({ ...d, descuentoMaxAgente: e.target.value.replace(/\D/g, "") })} />
         </div>
       </section>
 

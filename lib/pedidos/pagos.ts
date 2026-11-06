@@ -93,6 +93,15 @@ export async function registrarPago(e: EntradaPago, actor: ActorPagos): Promise<
 /** Confirma un pago. Si lo verificado cubre el total, el pedido pasa a «pagado» y se descuentan las existencias. */
 export async function verificarPago(pagoId: string, actor: ActorPagos): Promise<{ ok: true; cubierto: boolean; saldo: number; aviso: ResultadoAviso } | Fallo> {
   if (!puedeVerificarPagos(actor)) return fallo("No tiene permiso para verificar pagos.");
+  return confirmarPago(pagoId, actor);
+}
+
+/**
+ * La confirmación en sí, sin revisar permisos (quien llama ya lo hizo). `"sistema"` es la pasarela de tarjeta: el pago lo
+ * confirmó el banco, no una persona, y queda sin «verificado por».
+ */
+export async function confirmarPago(pagoId: string, quien: ActorPagos | "sistema"): Promise<{ ok: true; cubierto: boolean; saldo: number; aviso: ResultadoAviso } | Fallo> {
+  const persona = quien === "sistema" ? null : quien;
   const pago = await db.payment.findUnique({ where: { id: pagoId }, include: { pedido: { select: { id: true, estado: true, codigo: true, conversacionId: true } } } });
   if (!pago) return fallo("El pago no existe.");
   if (pago.estado !== "en_revision") return fallo("Este pago ya se revisó.");
@@ -100,14 +109,14 @@ export async function verificarPago(pagoId: string, actor: ActorPagos): Promise<
   if (o.estado !== "en_revision" && o.estado !== "pendiente_pago") return fallo(`El pedido está ${o.estado.replace("_", " ")} y ya no acepta pagos.`);
 
   // Solo la primera persona que confirma lo logra; si dos lo intentan a la vez, la otra recibe el aviso.
-  const marcado = await db.payment.updateMany({ where: { id: pagoId, estado: "en_revision" }, data: { estado: "verificado", verificadoPorId: actor.id, verificadoEn: new Date() } });
+  const marcado = await db.payment.updateMany({ where: { id: pagoId, estado: "en_revision" }, data: { estado: "verificado", verificadoPorId: persona?.id ?? null, verificadoEn: new Date() } });
   if (marcado.count === 0) return fallo("Este pago ya se revisó.");
 
   const r = await resumenPagos(o.id);
   const cubierto = r.saldo === 0;
   let estado: string = o.estado;
   if (cubierto) {
-    const c = await cambiarEstado({ pedidoId: o.id, a: "pagado", quien: { usuarioId: actor.id }, nota: "Pago confirmado" });
+    const c = await cambiarEstado({ pedidoId: o.id, a: "pagado", quien: persona ? { usuarioId: persona.id } : "sistema", nota: persona ? "Pago confirmado" : "Pago con tarjeta confirmado por la pasarela" });
     if (!c.ok) {
       await db.payment.update({ where: { id: pagoId }, data: { estado: "en_revision", verificadoPorId: null, verificadoEn: null } });
       return fallo(c.error);
@@ -115,12 +124,14 @@ export async function verificarPago(pagoId: string, actor: ActorPagos): Promise<
     estado = "pagado";
   } else if (o.estado === "en_revision" && !(await db.payment.count({ where: { pedidoId: o.id, estado: "en_revision" } }))) {
     // Pago parcial y no queda nada por revisar: vuelve a esperar el resto.
-    await cambiarEstado({ pedidoId: o.id, a: "pendiente_pago", quien: { usuarioId: actor.id }, nota: `Pago parcial confirmado. Falta ${formatQ(r.saldo)}` });
+    await cambiarEstado({ pedidoId: o.id, a: "pendiente_pago", quien: persona ? { usuarioId: persona.id } : "sistema", nota: `Pago parcial confirmado. Falta ${formatQ(r.saldo)}` });
     estado = "pendiente_pago";
   }
-  await log(actor, "verificar_pago", "Payment", pagoId, { pedido: o.codigo, monto: pago.monto, estado });
-  if (o.conversacionId) await lineaDeSistema(actor, o.conversacionId, `${actor.nombre} confirmó un pago de ${formatQ(pago.monto)} del pedido ${o.codigo}${cubierto ? "" : ` · falta ${formatQ(r.saldo)}`}`);
-  const aviso = await avisarCliente(o.id, cubierto ? "pago_confirmado" : "pago_parcial", { usuarioId: actor.id });
+  if (persona) await log(persona, "verificar_pago", "Payment", pagoId, { pedido: o.codigo, monto: pago.monto, estado });
+  else await db.activityLog.create({ data: { accion: "verificar_pago", entidad: "Payment", entidadId: pagoId, detalle: { pedido: o.codigo, monto: pago.monto, estado, por: "Pasarela de tarjeta" } } });
+  const resto = cubierto ? "" : ` · falta ${formatQ(r.saldo)}`;
+  if (o.conversacionId) await lineaDeSistema(persona, o.conversacionId, persona ? `${persona.nombre} confirmó un pago de ${formatQ(pago.monto)} del pedido ${o.codigo}${resto}` : `La pasarela confirmó un pago con tarjeta de ${formatQ(pago.monto)} del pedido ${o.codigo}${resto}`);
+  const aviso = await avisarCliente(o.id, cubierto ? "pago_confirmado" : "pago_parcial", { usuarioId: persona?.id });
   return { ok: true, cubierto, saldo: r.saldo, aviso };
 }
 

@@ -3,6 +3,8 @@
 //
 //   1. npm run db y npm run dev (la aplicación en http://localhost:3000, o la dirección de E2E_URL)
 //   2. npm run e2e
+// E2E_CAPTURAS=<carpeta> guarda capturas de la página de pago y del detalle del pedido.
+// El pago con tarjeta solo se prueba si la aplicación corre con PASARELA=simulada y se define E2E_PASARELA=1 al correr las pruebas.
 //
 // No usa los datos de demostración ni las contraseñas de nadie: crea su propio usuario, producto, ubicación y cuenta
 // (todo con el prefijo PRUEBA-E2E), y al terminar lo borra y deja los ajustes de pedidos como estaban.
@@ -45,7 +47,7 @@ describe("flujos críticos (navegador real)", { timeout: 240_000 }, () => {
     const producto = await db.product.create({ data: { sku: "PRUEBA-E2E-1", nombre: "PRUEBA-E2E Licuadora", precio: 10_000 } });
     await db.stock.create({ data: { productoId: producto.id, ubicacionId, cantidad: 5 } });
     await db.bankAccount.create({ data: { banco: "PRUEBA-E2E Banco", tipo: "monetaria", numero: "000-000000-0", titular: "Home Outlet" } });
-    await db.ajustesPedidos.update({ where: { id: "pedidos" }, data: { inventario: "separado", ubicacionRecogerId: ubicacionId, ubicacionEnvioId: ubicacionId, prefijo: "E2E-", siguienteNumero: 1, horasReserva: 24, descuentoMaxAgente: 0, envioGratisDesde: null, metodos: ["transferencia", "deposito"] } });
+    await db.ajustesPedidos.update({ where: { id: "pedidos" }, data: { inventario: "separado", ubicacionRecogerId: ubicacionId, ubicacionEnvioId: ubicacionId, prefijo: "E2E-", siguienteNumero: 1, horasReserva: 24, descuentoMaxAgente: 0, envioGratisDesde: null, metodos: ["transferencia", "deposito", "tarjeta"] } });
 
     navegador = await chromium.launch({ executablePath: ejecutable, headless: true });
     contexto = await navegador.newContext({ viewport: { width: 1440, height: 900 }, locale: "es-GT", timezoneId: "America/Guatemala" });
@@ -70,7 +72,7 @@ describe("flujos críticos (navegador real)", { timeout: 240_000 }, () => {
   });
 
   const entrar = async (p: Page, clave = CLAVE) => {
-    await p.goto(`${URL_BASE}/login`);
+    await p.goto(`${URL_BASE}/login`, { waitUntil: "networkidle" }); // con el servidor recién iniciado, enviar antes de que cargue el JavaScript recarga la página en vez de entrar
     await p.getByLabel("Correo").fill(CORREO);
     await p.getByLabel("Contraseña").fill(clave);
     await p.getByRole("button", { name: "Entrar" }).click();
@@ -142,5 +144,43 @@ describe("flujos críticos (navegador real)", { timeout: 240_000 }, () => {
     assert.equal(await estado(), "pagado");
     const despues = await existencia();
     assert.deepEqual({ cantidad: despues.cantidad, apartado: despues.apartado }, { cantidad: 4, apartado: 0 }, "pagar descuenta la unidad y libera lo apartado");
+  });
+
+  it("pago con tarjeta con la pasarela simulada: enlace, pago del cliente y pedido pagado", { skip: !process.env.E2E_PASARELA && "defina E2E_PASARELA=1 y arranque la aplicación con PASARELA=simulada" }, async () => {
+    await agente.goto(`${URL_BASE}/bandeja`);
+    await agente.getByRole("tab", { name: "Todas" }).click();
+    await agente.getByRole("button", { name: new RegExp(`^${NOMBRE_CLIENTE}`) }).first().click();
+    await agente.getByRole("button", { name: "Crear pedido" }).click();
+    const panel = agente.getByRole("dialog", { name: "Crear pedido" });
+    await panel.getByLabel("Buscar en el catálogo").fill("PRUEBA-E2E");
+    await panel.getByRole("button", { name: "Agregar PRUEBA-E2E Licuadora" }).click();
+    await panel.getByRole("button", { name: "Enviar al cliente" }).click();
+    await agente.getByText(/Pedido E2E-000002/).first().waitFor({ timeout: 15_000 });
+    const pedido = await db.order.findFirstOrThrow({ where: { codigo: "E2E-000002" } });
+    await agente.goto(`${URL_BASE}/pedidos/${pedido.id}`); // directo: en la conversación hay un «Ver pedido» por cada pedido y el orden de los enlaces no es lo que se prueba aquí
+    await agente.getByRole("heading", { name: "E2E-000002" }).waitFor();
+    await agente.getByRole("button", { name: "Enviar enlace de pago con tarjeta" }).click();
+    await agente.getByText(/esperando el pago del cliente/).waitFor({ timeout: 15_000 });
+
+    const cobro = await db.cobroTarjeta.findFirstOrThrow({ where: { pedidoId: pedido.id } });
+    assert.equal(cobro.estado, "creado");
+    // el cliente abre el enlace y paga en la página de la pasarela (aquí simulada)
+    await cliente.goto(`${URL_BASE}/pagar/${cobro.externoId}`, { waitUntil: "networkidle" });
+    await cliente.getByText("no se cobra nada").waitFor();
+    if (process.env.E2E_CAPTURAS) {
+      await cliente.screenshot({ path: `${process.env.E2E_CAPTURAS}/pagar.png` }); // para revisar el diseño a ojo
+      await agente.screenshot({ path: `${process.env.E2E_CAPTURAS}/pedido-con-enlace.png` });
+    }
+    await cliente.getByRole("button", { name: "Pagar con la tarjeta de prueba" }).click();
+    await cliente.getByText(/Pago realizado/).waitFor({ timeout: 15_000 });
+
+    const estado = async () => (await db.order.findUniqueOrThrow({ where: { id: pedido.id } })).estado;
+    for (let i = 0; i < 30 && (await estado()) !== "pagado"; i++) await new Promise((f) => setTimeout(f, 500));
+    assert.equal(await estado(), "pagado");
+    const pago = await db.payment.findFirstOrThrow({ where: { pedidoId: pedido.id } });
+    assert.deepEqual({ tipo: pago.tipo, estado: pago.estado, monto: pago.monto }, { tipo: "tarjeta", estado: "verificado", monto: 10_000 });
+    const producto = await db.product.findUniqueOrThrow({ where: { sku: "PRUEBA-E2E-1" } });
+    const s = await db.stock.findUniqueOrThrow({ where: { productoId_ubicacionId: { productoId: producto.id, ubicacionId } } });
+    assert.deepEqual({ cantidad: s.cantidad, apartado: s.apartado }, { cantidad: 3, apartado: 0 });
   });
 });

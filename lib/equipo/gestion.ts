@@ -3,6 +3,7 @@ import type { EstadoAsesor } from "@/generated/prisma/client";
 import { asignarConversacion } from "./asignacion";
 import { cambiarEstadoAsesor } from "./estado";
 import { AUSENCIA_LARGA_MS, type FilaEquipo } from "./tipos";
+import type { Rol } from "@/lib/permisos";
 
 type Resultado<T = object> = ({ ok: true } & T) | { ok: false; error: string };
 const fallo = (error: string): { ok: false; error: string } => ({ ok: false, error });
@@ -11,7 +12,7 @@ const fallo = (error: string): { ok: false; error: string } => ({ ok: false, err
  * El asesor devuelve una conversación suya a la cola, con un motivo opcional. Deja de ser suya, queda esperando asesor
  * y se vuelve a repartir según las reglas de asignación, sin volver a caer en él.
  */
-export async function devolverACola(conversacionId: string, actor: { id: string; nombre: string; rol: "admin" | "agente" }, motivo?: string): Promise<Resultado<{ asignadaA: string | null }>> {
+export async function devolverACola(conversacionId: string, actor: { id: string; nombre: string; rol: Rol }, motivo?: string): Promise<Resultado<{ asignadaA: string | null }>> {
   if (actor.rol !== "agente") return fallo("Solo un asesor puede devolver sus conversaciones a la cola.");
   const limpio = motivo?.trim().slice(0, 200) || undefined;
   const hecho = await db.$transaction(async (tx) => {

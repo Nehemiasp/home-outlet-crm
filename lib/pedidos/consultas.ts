@@ -5,6 +5,7 @@ import { filtroPedido, redactarDuplicados, type Actor, type DuplicadoVisible } f
 import { nombreMetodo } from "./metodos";
 import { buscarDuplicados } from "./pagos";
 import { estadoDePago, saldoDe, type EstadoPagoVista } from "./totales";
+import { veTodo } from "@/lib/permisos";
 
 /** Las pestañas de la lista de pedidos. Cada una agrupa estados. */
 export const VISTAS = ["por-verificar", "pendientes", "en-proceso", "entregados", "todos"] as const;
@@ -64,7 +65,7 @@ export async function listarPedidos(f: FiltrosPedidos, u: Actor): Promise<{ item
   const creada = { ...(FECHA.test(f.desde) ? { gte: inicioDia(f.desde) } : {}), ...(FECHA.test(f.hasta) ? { lte: finDia(f.hasta) } : {}) };
   const where: Prisma.OrderWhereInput = {
     AND: [visible],
-    ...(u.rol === "admin" && f.asesor === "sin" ? { conversacion: { asignadaAId: null } } : u.rol === "admin" && f.asesor !== "todos" ? { conversacion: { asignadaAId: f.asesor } } : {}),
+    ...(veTodo(u) && f.asesor === "sin" ? { conversacion: { asignadaAId: null } } : veTodo(u) && f.asesor !== "todos" ? { conversacion: { asignadaAId: f.asesor } } : {}),
     ...(ESTADOS_DE_VISTA[f.vista] ? { estado: { in: [...ESTADOS_DE_VISTA[f.vista]!] } } : {}),
     ...(f.canal !== "todos" ? { canal: f.canal } : {}),
     ...(f.entrega !== "todas" ? { entrega: f.entrega } : {}),
@@ -116,6 +117,8 @@ export type DetallePedido = {
     id: string; tipo: string; metodo: string; banco: string | null; referencia: string | null; monto: number; fechaPago: string; estado: "en_revision" | "verificado" | "rechazado";
     comprobanteUrl: string | null; motivoRechazo: string | null; registradoPor: string | null; verificadoPor: string | null; verificadoEn: string | null; duplicados: DuplicadoVisible[];
   }[];
+  /** Enlaces de pago con tarjeta pedidos a la pasarela, del más nuevo al más viejo. */
+  cobrosTarjeta: { id: string; monto: number; estado: "creado" | "pagado" | "fallido"; creado: string }[];
   resumenPagos: { total: number; verificado: number; enRevision: number; saldo: number };
   pagoEstado: EstadoPagoVista;
   eventos: { id: string; de: EstadoPedido | null; a: EstadoPedido; quien: string; nota: string | null; fecha: string }[];
@@ -130,6 +133,7 @@ export async function cargarPedido(id: string, u: Actor): Promise<DetallePedido 
       lineas: { orderBy: [{ nombre: "asc" }, { id: "asc" }], include: { ubicacion: { select: { nombre: true } }, producto: { select: { imagenes: true } } } },
       pagos: { orderBy: { creado: "asc" }, include: { mensaje: { select: { archivoUrl: true } }, registradoPor: { select: { nombre: true } }, verificadoPor: { select: { nombre: true } } } },
       eventos: { orderBy: { fecha: "asc" }, include: { usuario: { select: { nombre: true } } } },
+      cobrosTarjeta: { orderBy: { creado: "desc" }, select: { id: true, monto: true, estado: true, creado: true } },
     },
   });
   if (!o) return null;
@@ -147,6 +151,7 @@ export async function cargarPedido(id: string, u: Actor): Promise<DetallePedido 
       comprobanteUrl: p.archivoUrl ?? p.mensaje?.archivoUrl ?? null, motivoRechazo: p.motivoRechazo, registradoPor: p.registradoPor?.nombre ?? null, verificadoPor: p.verificadoPor?.nombre ?? null, verificadoEn: p.verificadoEn?.toISOString() ?? null,
       duplicados: duplicados[i]!,
     })),
+    cobrosTarjeta: o.cobrosTarjeta.map((c) => ({ id: c.id, monto: c.monto, estado: c.estado, creado: c.creado.toISOString() })),
     resumenPagos: { total: o.total, verificado, enRevision, saldo: saldoDe(o.total, verificado) },
     pagoEstado: estadoDePago(o.total, o.pagos),
     eventos: o.eventos.map((e) => ({ id: e.id, de: e.deEstado, a: e.aEstado, quien: e.usuario?.nombre ?? (e.origen === "asistente" ? "Asistente" : "Sistema"), nota: e.nota, fecha: e.fecha.toISOString() })),

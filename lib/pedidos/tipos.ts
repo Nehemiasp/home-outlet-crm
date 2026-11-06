@@ -43,7 +43,7 @@ export type AbiertoPedido = { id: string; codigo: string; estado: EstadoPedido; 
 
 export type DatosPanelPedido = {
   contacto: { nombre: string; telefono: string; municipio: string };
-  esAdmin: boolean;
+  sinLimites: boolean;
   descuentoMaxAgente: number;
   inventario: "separado" | "compartido";
   ubicaciones: { id: string; nombre: string }[];

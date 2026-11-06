@@ -58,7 +58,7 @@ const columnas: Columna<FilaContacto>[] = [
   { clave: "ultimo", titulo: "Último contacto", ordenable: true, render: (c) => (c.ultimoContacto ? horaLista(c.ultimoContacto) : <span className="text-texto-suave">Sin mensajes</span>) },
 ];
 
-export function ListaContactos({ etiquetas, asesores, esAdmin }: { etiquetas: { id: string; nombre: string }[]; asesores: { id: string; nombre: string }[]; esAdmin: boolean }) {
+export function ListaContactos({ etiquetas, asesores, veTodo }: { etiquetas: { id: string; nombre: string }[]; asesores: { id: string; nombre: string }[]; veTodo: boolean }) {
   const router = useRouter();
   const [busqueda, setBusqueda] = useState("");
   const [q, setQ] = useState("");
@@ -90,7 +90,7 @@ export function ListaContactos({ etiquetas, asesores, esAdmin }: { etiquetas: { 
   return (
     <div className="flex flex-col gap-4 p-6">
       <EncabezadoPagina titulo="Contactos">
-        {esAdmin && (
+        {veTodo && (
           <Boton variante="secundario" onClick={() => setUnir(true)}>
             Unir contactos
           </Boton>
@@ -101,7 +101,7 @@ export function ListaContactos({ etiquetas, asesores, esAdmin }: { etiquetas: { 
         </Boton>
       </EncabezadoPagina>
 
-      <div className={`grid gap-3 ${esAdmin ? "md:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))]" : "md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]"}`}>
+      <div className={`grid gap-3 ${veTodo ? "md:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))]" : "md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]"}`}>
         <div className="flex flex-col gap-1">
           <span className="cuerpo-fuerte">Buscar</span>
           <Buscador valor={busqueda} onCambio={alFiltrar(setBusqueda)} etiqueta="Buscar contactos" placeholder="Nombre, teléfono o correo" />
@@ -118,7 +118,7 @@ export function ListaContactos({ etiquetas, asesores, esAdmin }: { etiquetas: { 
           onCambio={alFiltrar((v: string) => setCanal(v as FiltrosContactos["canal"]))}
           opciones={[{ valor: "todos", texto: "Todos" }, ...CANALES.map(opcionCanal)]}
         />
-        {esAdmin && (
+        {veTodo && (
           <Selector
             etiqueta="Asesor responsable"
             value={asesor}
@@ -162,7 +162,7 @@ export function ListaContactos({ etiquetas, asesores, esAdmin }: { etiquetas: { 
       )}
 
       <ModalCrear abierto={crear} onCerrar={() => setCrear(false)} />
-      {esAdmin && <ModalUnir abierto={unir} onCerrar={() => setUnir(false)} onUnido={refrescar} />}
+      {veTodo && <ModalUnir abierto={unir} onCerrar={() => setUnir(false)} onUnido={refrescar} />}
     </div>
   );
 }
