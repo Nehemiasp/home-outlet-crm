@@ -78,7 +78,7 @@ async function imagenParaEnviar(url: string): Promise<{ id: string } | { link: s
 }
 
 /** Tarjeta de producto en texto: nombre, precio y existencia. */
-async function leyendaDeProducto(productId: string) {
+export async function leyendaDeProducto(productId: string) {
   const { db } = await import("@/lib/db"); // se carga al usarlo para que las pruebas de firma no necesiten la base
   const p = await db.product.findUnique({ where: { id: productId }, include: { stock: true } });
   if (!p) throw new Error("El producto ya no existe.");
@@ -208,6 +208,7 @@ export const adaptadorWhatsApp: ChannelAdapter = {
   channel: "whatsapp",
   send: enviar,
   listTemplates: plantillas,
+  verifySubscription: verificarSuscripcion,
   canSendFreeForm: (conversacion) => ventanaAbierta(conversacion.lastInboundAt),
   parseWebhook: async (req) => interpretarEntrada(await req.json()),
   async verifyWebhook(req) {

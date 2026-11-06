@@ -1,4 +1,4 @@
-# Home Outlet CRM — Estado actual (fases 1, 2 y 2.5, con el pulido de interfaz y el equipo de asesores)
+# Home Outlet CRM — Estado actual (fases 1, 2 y 2.5, pulido de interfaz, equipo de asesores y preparación para producción)
 
 Documento para dar contexto a otra IA que planifica las siguientes fases. Describe **lo que existe hoy**, cómo está construido, las decisiones tomadas y lo que está pendiente. Todo lo que se ve es **contenido de demostración**: es un proyecto privado para presentar a un cliente, todavía no está publicado.
 
@@ -16,22 +16,23 @@ CRM para **Home Outlet S.A.** (Guatemala): una bandeja única donde llegan los m
 |---|---|---|
 | 1 | Sistema de diseño, base de datos, login y roles, interfaz de canales + simulador, bandeja, contactos, catálogo y CSV, ajustes y permisos, pruebas | **Terminada y aprobada** |
 | 2 | Asistente con IA, ayudas para el agente, ajustes del asistente, evaluación, reportes | **Terminada y aprobada** |
-| 2.5 | **Pedidos y pagos por transferencia o depósito**: crear pedido desde la conversación, comprobantes y verificación, entrega, avisos al cliente, reportes de ventas | **Programada y probada (etapas 1 a 7). Pendiente de revisión.** |
-| UI | **Pulido de interfaz** (`HOME-OUTLET-CRM-UI-PULIDO.md`): paleta de estados, canales, componentes nuevos, bandeja, pedidos, contactos, catálogo y reportes rehechos sin tocar lógica ni esquema | **Hecho (etapas 1 a 6). Pendiente de visto bueno final.** |
-| Equipo | **Asignación automática, visibilidad por asesor y disponibilidad según la sesión** (sección 8b), en 5 etapas | **Hecho y revisado con dos sesiones a la vez. Pendiente de visto bueno final.** |
-| 3 | Pago con tarjeta (pasarela), conectar canales reales (WhatsApp primero), publicar en un servidor | Pendiente |
+| 2.5 | **Pedidos y pagos por transferencia o depósito**: crear pedido desde la conversación, comprobantes y verificación, entrega, avisos al cliente, reportes de ventas | **Terminada y aprobada** (los datos reales del negocio siguen pendientes, ver 17) |
+| UI | **Pulido de interfaz** (`HOME-OUTLET-CRM-UI-PULIDO.md`): paleta de estados, canales, componentes nuevos, bandeja, pedidos, contactos, catálogo y reportes rehechos sin tocar lógica ni esquema | **Hecho y aprobado** |
+| Equipo | **Asignación automática, visibilidad por asesor y disponibilidad según la sesión** (sección 8b), en 5 etapas | **Hecho y aprobado** (revisado con dos sesiones a la vez) |
+| Producción | **Preparación para producción sin credenciales** (sección 19): estado compartido en la base, seguridad de despliegue, respaldos, salud y errores, pruebas de punta a punta, Claude probado contra una API simulada, adaptadores de Facebook e Instagram | **Hecho. Pendiente de visto bueno.** |
+| 3 | Pago con tarjeta (pasarela), conectar canales reales (WhatsApp oficial, Facebook, Instagram), publicar en un servidor | Pendiente (necesita credenciales y decisiones del cliente) |
 
 ## 3. Pila técnica
 
 - **Next.js 16** (App Router, componentes de servidor + *server actions*, `after()` para trabajo posterior a la respuesta), **React 19**, **TypeScript estricto** (`noUncheckedIndexedAccess`).
 - **Tailwind v4** con tokens en variables CSS (`@theme inline`, utilidades `@utility` para estilos de texto).
 - **Prisma 7** con `@prisma/adapter-pg`, cliente generado en `generated/prisma`. **PostgreSQL** (en desarrollo, `embedded-postgres` con `npm run db`, puerto 5433).
-- **Auth.js (next-auth v5 beta)** con credenciales y JWT, `bcryptjs`, límite de intentos de login **en memoria** (sirve para un solo servidor).
+- **Auth.js (next-auth v5 beta)** con credenciales y JWT, `bcryptjs`, límite de intentos de login **en la base** (tabla `IntentoTasa`; vale con varios servidores).
 - **Zod 4** para validar entradas, `@anthropic-ai/sdk`, `lucide-react`. Sin librerías de gráficas ni de componentes: todo es propio.
 - Archivos subidos (fotos de productos, imágenes de la bandeja y comprobantes) en la carpeta `uploads/`, servidos por `/api/archivos/[nombre]` (`lib/almacenamiento.ts` es el único punto a cambiar para usar un servicio de archivos).
 - Actualización «en vivo» por **consultas periódicas** (hook `useActualizacion`, `lib/tiempo-real.ts`): la lista y la conversación cada 4 s, pedidos cada 6–10 s. No hay WebSockets.
 
-Comandos (`package.json`): `dev`, `build`, `db`, `db:migrar`, `seed`, `test` (en serie, comparten base), `ai:eval`, `typecheck`.
+Comandos (`package.json`): `dev`, `build`, `db`, `db:migrar`, `seed`, `test` (en serie, comparten base), `e2e` (navegador real, ver sección 19), `ai:eval`, `typecheck`, `respaldo`, `restaurar`.
 
 ## 4. Pantallas y rutas
 
@@ -51,7 +52,8 @@ Todo bajo `app/(app)/`, protegido por sesión.
 | `/ajustes/equipo` | **admin** | Modo de asignación, visibilidad por asesor y **tabla del equipo** (estado, desde cuándo, abiertas, cambiar estado, «Repartir sus conversaciones») |
 | `/simulador` | **admin**, no existe en producción | Escribir como cliente por cualquier canal, mandar imágenes y un **comprobante de ejemplo** |
 | `/sistema` | **admin** | Guía de estilo del sistema de diseño + guía del asistente y de las gráficas |
-| `/api/webhooks/[canal]` | externo | Entrada de mensajes de canales (idempotente, verifica firma) |
+| `/api/webhooks/[canal]` | externo | Entrada de mensajes de canales (idempotente, verifica firma; pasadas 30 firmas inválidas en 15 min desde una IP confiable responde 429) |
+| `GET /api/salud` | hosting | Dice si el servicio responde y llega a la base (`{ok:true}` o 503). Pública y sin datos |
 | `POST /api/tareas/vencer-reservas` | cron externo | Vence reservas sin pago. Exige `Authorization: Bearer <TAREAS_SECRET>`; sin la variable la ruta no existe |
 | `POST /api/tareas/desconectar-asesores` | cron externo (cada minuto) | Pasa a Desconectado a quien lleva 5 min sin señal. Mismo secreto |
 
@@ -81,7 +83,8 @@ Migraciones aplicadas incluyen backfills y las restricciones de pedidos (`pedido
 - **Interfaz `ChannelAdapter`** común: enviar mensaje, normalizar entrante, verificar webhook, estado de entrega.
 - **Simulado:** completo, solo fuera de producción; acepta texto, imagen y tarjetas de producto. En `/simulador` el «teléfono del cliente» muestra las tarjetas igual que la bandeja y puede **mandar imágenes**. Escribir `/fallar` fuerza un envío fallido para probar reintentos.
 - **WhatsApp:** adaptador **terminado y probado con Meta simulado** (`tests/whatsapp.test.ts`, 9 pruebas), **envío real probado** (5 nov 2026: Meta aceptó un texto al celular del dueño con el número de prueba) y **recepción probada de punta a punta** con un túnel temporal (5 nov 2026: llegó un mensaje del celular del dueño, el asistente respondió con el flujo normal y los estados «enviado» y «entregado» se actualizaron). Gotcha: además del webhook hay que suscribir la app a la cuenta de WhatsApp (`POST /<WABA>/subscribed_apps`); sin eso Meta no entrega nada. El túnel de pruebas (localhost.run por `ssh`) es temporal: para producción hace falta una dirección pública fija. Envía texto, imagen y tarjeta de producto (imagen con pie de foto: nombre, precio, existencia); las imágenes del sistema se suben a WhatsApp (`POST /media`) y se mandan por id (no necesitan dirección pública). Recibe texto e imágenes (se descargan y guardan) y estados de entrega; el resto llega como `unsupported`. Falta, para usarlo: las 4 variables `WHATSAPP_*` en `.env`, `CHANNELS_ENABLED=simulado,whatsapp`, y el webhook público (`/api/webhooks/whatsapp`) configurado en Meta. **Plantillas aprobadas** (mensajes fuera de las 24 h): construidas y **probadas con Meta real** (5 nov 2026, con la ventana forzada a 30 h: la ventana lista las plantillas aprobadas de la cuenta, se llenan las variables y llegó al celular). `listTemplates` del adaptador pide `GET /<WABA>/message_templates` (necesita `WHATSAPP_BUSINESS_ACCOUNT_ID`, opcional); `OutboundMessage.type = "template"`; la acción `enviarPlantilla` arma el texto en el servidor con la plantilla que devuelve el canal; `components/ui/plantillas.tsx` (`ModalPlantillas`, en `/sistema`); el mensaje se guarda como texto ya armado. Solo se ofrecen las plantillas llenables (cuerpo con variables numeradas, encabezado de texto, botones sin variables); no carruseles, medios ni autenticación. Un envío fallido de plantilla no se puede «reintentar» desde la burbuja (se reenviaría como texto libre y la ventana lo rechaza): se vuelve a enviar con el botón de plantillas. El canal simulado tiene dos plantillas de ejemplo. La cuenta de Meta for Developers y la app «Home Outlet» ya existen con el número de prueba gratuito de Meta.
-- **Instagram, Facebook, TikTok:** existen como valores del enum y aparecen en datos de demostración, **pero no tienen adaptador**. Ahí solo se escriben notas. Un pedido en esos canales se envía con **«Copiar mensaje y marcar como enviado»**: aparta igual y deja una línea del sistema «Resumen enviado fuera del sistema».
+- **Facebook e Instagram** (`meta-mensajeria.ts`, un solo archivo para los dos): adaptador **terminado y probado solo contra una simulación de la API de Meta** (`tests/meta-mensajeria.test.ts`, 27 pruebas, siguiendo la documentación oficial): **no se ha probado con Meta real** (falta la cuenta). Envía texto (si pasa del límite del canal —1000 bytes en Instagram, 2000 en Facebook— se parte en varios mensajes por líneas), imagen y tarjeta de producto (foto y luego texto; no hay pie de foto). Las fotos del sistema se suben a Facebook (API de adjuntos) y se mandan por id; **Instagram solo acepta imágenes por dirección pública (https)**, así que sin una dirección pública sale solo el texto. Recibe texto e imágenes; el resto llega como `unsupported`. Estados: Facebook avisa «entregado» por mensaje e Instagram «leído» por mensaje. No hay plantillas (fuera de las 24 h no se envía). Variables: `FACEBOOK_PAGE_TOKEN/PAGE_ID/APP_SECRET/VERIFY_TOKEN` e `INSTAGRAM_TOKEN/ACCOUNT_ID/APP_SECRET/VERIFY_TOKEN` (ver `.env.example`) y agregarlos a `CHANNELS_ENABLED`; sin todas sus variables el canal aparece como pendiente. El GET de verificación del webhook lo resuelve cada adaptador (`verifySubscription`).
+- **TikTok** existe como valor del enum y aparece en datos de demostración, **pero no tiene adaptador**. Ahí solo se escriben notas. Un pedido en esos canales se envía con **«Copiar mensaje y marcar como enviado»**: aparta igual y deja una línea del sistema «Resumen enviado fuera del sistema».
 - **Ventana de 24 horas** (`ventana.ts`): no se puede responder pasadas 24 h del último mensaje del cliente; con la ventana cerrada, el pedido también usa «copiar y marcar como enviado».
 - Webhook idempotente.
 - **Limitación conocida:** el sistema aún no consulta qué soporta cada canal antes de enviar una tarjeta. Al conectar canales reales cada adaptador deberá traducirla.
@@ -117,7 +120,7 @@ Migraciones aplicadas incluyen backfills y las restricciones de pedidos (`pedido
 
 **Proveedores (interfaz `AiProvider`):**
 - **Simulado** (por defecto, sin costo ni clave): reglas por palabras clave que llaman a **las mismas herramientas** que el real; español e inglés, captura nombre y municipio, «muéstreme el producto», y ahora «¿ya confirmaron mi pago?», «¿cuándo llega mi pedido?» y «¿a qué cuenta deposito?».
-- **Anthropic:** con uso de herramientas y *prompt caching*. **Nunca se ha probado contra la API real** (falta la clave). `AI_PROVIDER=anthropic` y `ANTHROPIC_API_KEY`; modelo por defecto `claude-haiku-5-5`.
+- **Anthropic:** con uso de herramientas y *prompt caching*. **Nunca se ha probado contra la API real** (falta la clave), pero sí contra un servidor local que imita `POST /v1/messages` con el SDK de verdad (`tests/anthropic.test.ts`, 13 pruebas): arma bien la petición (modelo, sistema con caché solo en la parte fija, herramientas sin `$schema`, ida y vuelta de `tool_use`/`tool_result`), lee texto, herramientas y uso con tokens de caché, y reacciona bien a errores, silencio (cancelación), herramientas inexistentes y bucles de herramientas (corta a las 4 vueltas). **Lo que falta con la clave:** el tono y el cumplimiento real de las reglas (correr `npm run ai:eval` con `AI_PROVIDER=anthropic`). `AI_PROVIDER=anthropic` y `ANTHROPIC_API_KEY`; modelo por defecto `claude-haiku-5-5`.
 
 **Herramientas (Zod, `herramientas.ts`):** `buscar_productos`, `ver_producto` (con inventario compartido da solo el total), `datos_negocio`, `buscar_respuesta`, `enviar_producto`, `guardar_dato_cliente`, `pasar_a_asesor` y **`estado_pedido(codigo?)`**: solo devuelve pedidos **del contacto de la conversación** (un código ajeno responde igual que uno que no existe) y solo incluye las cuentas bancarias mientras el pedido espera pago. La existencia que ve el asistente ya descuenta lo apartado.
 
@@ -153,9 +156,9 @@ Usuarios de desarrollo: `admin@homeoutlet.test` y `agente@homeoutlet.test` (las 
 
 ## 14. Calidad
 
-- **217 pruebas automáticas** (`tests/`: canales, adaptador de WhatsApp y plantillas con Meta simulado, bandeja, contactos, catálogo, csv, ajustes, asistente, reportes, de la fase 2.5 pedidos, creación y envío, pagos, vencimiento y permisos, y del equipo: estado y desconexión a los 5 min, reglas de reparto, visibilidad por cada ruta y acción, devolver/repartir y asignación simultánea sin duplicados), en serie sobre la base real. Las del equipo desactivan y desconectan a los asesores de demostración mientras corren (`tests/apoyo-equipo.ts`) y los restauran: nunca correrlas en paralelo con otras ni con la demo en uso (si se cortan a medias, volver a activar a los usuarios y correr `npm run seed`).
+- **275 pruebas automáticas** (`tests/`: canales, adaptador de WhatsApp y plantillas con Meta simulado, bandeja, contactos, catálogo, csv, ajustes, asistente, reportes, de la fase 2.5 pedidos, creación y envío, pagos, vencimiento y permisos, y del equipo: estado y desconexión a los 5 min, reglas de reparto, visibilidad por cada ruta y acción, devolver/repartir y asignación simultánea sin duplicados; y de producción: candados e intentos en la base, IP confiable, revisión del entorno, Claude contra una API simulada y Facebook/Instagram), más **5 de punta a punta** (`npm run e2e`), en serie sobre la base real. Las del equipo desactivan y desconectan a los asesores de demostración mientras corren (`tests/apoyo-equipo.ts`) y los restauran: nunca correrlas en paralelo con otras ni con la demo en uso (si se cortan a medias, volver a activar a los usuarios y correr `npm run seed`).
 - `tsc` limpio, build de producción correcto, evaluación del asistente 55/55, axe-core sin violaciones en las pantallas nuevas a 360, 768 y 1440 px.
-- **No verificado:** Claude real, reordenar fotos arrastrando con teclado, WhatsApp en vivo, el cron de vencimiento en un servidor.
+- **No verificado:** Claude real, Facebook e Instagram con Meta real, la restauración de un respaldo (no hay `pg_dump` en el equipo de desarrollo), reordenar fotos arrastrando con teclado, el cron de vencimiento en un servidor.
 
 ## 15. Sistema de diseño
 
@@ -187,28 +190,41 @@ Marca **Home Outlet**: naranja + carbón sobre fondo cálido; componentes propio
 
 ## 17. Pendiente y preguntas abiertas
 
-1. **Revisión de la fase 2.5** y datos reales que hoy son ficticios (`// FICTICIO`): bancos y cuentas, zonas y costos de envío, si aceptan efectivo al recoger, horas de reserva, quién verifica pagos, límite de descuento, **si el inventario es compartido o separado**.
+1. **Datos reales** que hoy son ficticios (`// FICTICIO`): bancos y cuentas, zonas y costos de envío, si aceptan efectivo al recoger, horas de reserva, quién verifica pagos, límite de descuento, **si el inventario es compartido o separado**.
 2. **Texto de «formas de pago» del negocio:** temporalmente dice «Por ahora cobramos solo por transferencia o depósito bancario. Todavía no aceptamos tarjeta.» (Ajustes → Datos del negocio). Confirmar con Home Outlet y cambiarlo cuando haya tarjeta.
 3. **Hosting:** recomendación Railway (servidor con proceso de larga vida, disco para `uploads/`, PostgreSQL, Cron Job para `POST /api/tareas/vencer-reservas`). Sin decidir.
-4. **Clave de Anthropic** y presupuesto: falta para probar Claude real.
+4. **Clave de Anthropic** y presupuesto: falta para probar Claude real (hoy solo está probado contra una API simulada; ver sección 10).
 5. **Contenido real:** **logo** (`public/brand/` está vacío; el sidebar sigue con el texto «HOME Outlet»), productos y fotos, horario, dirección, preguntas frecuentes y tono del negocio.
 5b. **Decisión de interfaz abierta:** los nombres de los tonos de etiqueta en Ajustes → Etiquetas («Naranja», «Aviso») ya no coinciden con el color del punto. (El anillo de foco ya se resolvió: ver sección 15.)
 6. **Fase 3:** pasarela de tarjeta (entra por `MetodoPago`), canales reales (cuenta de Meta Business verificada; Instagram/Facebook comparten API; TikTok por definir; cómo cada canal traduce la tarjeta de producto y el resumen del pedido) y publicación.
 
 ## 18. Antes de publicar (avisos técnicos)
 
-- `AUTH_SECRET` y la clave de la base distintos a los de desarrollo; definir `TAREAS_SECRET` y programar los crons de vencimiento de reservas y de desconexión de asesores (cada minuto).
-- El desconectar por inactividad, el caché de ajustes del equipo (3 s) y el límite de revisión (30 s) son por proceso: sirven para un solo servidor.
+- `AUTH_SECRET` y la clave de la base distintos a los de desarrollo (**el servidor se niega a arrancar en producción si no**, ver sección 19); definir `TAREAS_SECRET` y programar los crons de vencimiento de reservas y de desconexión de asesores (cada minuto).
+- Siguen siendo por proceso, y sirven con un solo servidor sin problema (con varios, cada uno tarda unos segundos en ver un cambio): el caché de ajustes del equipo (3 s) y el de plantillas de WhatsApp (60 s), y el de nombres de perfil de Facebook/Instagram (1 h). El límite de login, los límites de revisión (desconectar asesores, vencer reservas) y el bloqueo del asistente ya viven en la base (sección 19).
 - En desarrollo, para abrir dos sesiones a la vez usar `localhost` y `127.0.0.1` (cookies separadas); `127.0.0.1` está en `allowedDevOrigins`.
 - `uploads/` en un disco persistente, o cambiar `lib/almacenamiento.ts` por un servicio de archivos (los comprobantes de pago están ahí).
-- El límite de intentos de login está en memoria: sirve para un solo servidor. El throttle de `vencerReservas()` también es por proceso.
 - El asistente responde después de contestar al webhook, en el mismo proceso (`after`): sirve para servidor propio; sin procesos de larga vida habría que usar una cola.
 - El simulador y la semilla no existen en producción.
 - Después de cambiar el esquema y migrar, reiniciar `npm run dev` (el servidor conserva el cliente de Prisma anterior).
 - No correr `npm run build` mientras `npm run dev` está abierto: comparten la carpeta `.next`.
 - Al presentar la demo, usar ventana de incógnito: la extensión Bitdefender TrafficLight provoca un aviso rojo de hidratación en desarrollo (no es un error del proyecto).
 
-## 19. Estructura de carpetas
+## 19. Preparación para producción (sin credenciales)
+
+Hecho sin necesitar claves ni accesos del cliente, para que el paso de demo a funcional sea solo conectar y probar.
+
+- **Estado compartido en la base** (migración `estado_compartido`): `lib/candados.ts` (`tomarCandado`/`soltarCandado`, tabla `Candado`, atómico y con la hora de la base) reemplaza las variables en memoria de «como máximo cada 30 s» (desconectar asesores, vencer reservas) y el bloqueo que impide que el asistente conteste dos veces la misma conversación (vence solo a los 5 min si el proceso se cae). `lib/limite-intentos.ts` guarda los fallos en la tabla `IntentoTasa`. Con varios servidores, todos ven lo mismo.
+- **Error que ya existía y se corrigió:** entrar bien nunca limpiaba el contador de fallos (la redirección de `signIn` cortaba la línea que lo hacía). Ahora limpia los fallos del **correo** al entrar; los de la IP no se limpian, para que quien rocía contraseñas y tiene una cuenta propia no reinicie su límite.
+- **IP del cliente** (`lib/ip.ts`): `x-forwarded-for` solo es confiable detrás de un proxy propio. En producción solo se usa si `PROXIES_CONFIABLES=N` (cuántos proxies hay delante) y se toma la dirección del lado derecho, nunca la de la izquierda (la escribe el cliente). Sin eso, o en desarrollo, el login se limita solo por correo. El webhook cuenta las firmas inválidas por IP: pasadas 30 en 15 minutos responde 429.
+- **Cabeceras de seguridad** (`next.config.mjs`): `nosniff`, `X-Frame-Options: SAMEORIGIN`, política de referencia, permisos del navegador apagados (cámara, micrófono, ubicación, pagos), una CSP mínima sin `script-src` (Next necesita scripts en línea; cierra marcos ajenos, `base`, formularios a otros sitios y `object`), HSTS solo en producción y sin `X-Powered-By`.
+- **Revisión del entorno al arrancar** (`instrumentation.ts` + `lib/entorno.ts`): en producción **se niega a arrancar** con `AUTH_SECRET` ausente, corto o de ejemplo, con la clave de base `postgres:postgres` (salvo `PERMITIR_CLAVE_DE_DESARROLLO=1`, solo para probar la versión de producción en la propia computadora), con un canal activado a medias (WhatsApp, Facebook o Instagram) o con `AI_PROVIDER=anthropic` sin clave. Avisa de lo que queda apagado (cron, IP, asistente simulado, canal simulado, `AUTH_URL`/`AUTH_TRUST_HOST`).
+- **Errores y salud:** `lib/registro.ts` escribe una línea JSON por evento (nunca el texto del error ni datos del cliente: solo tipo y código) y `instrumentation.ts` registra cada error del servidor con su ruta; `GET /api/salud` para el hosting.
+- **Respaldos:** `npm run respaldo` guarda `base.dump` (`pg_dump`) y `uploads.tar.gz` con fecha en `respaldos/` (o `RESPALDOS_CARPETA`, mejor en otro disco) y conserva los últimos 14 (`RESPALDOS_CONSERVAR`). `npm run restaurar -- <carpeta> --a <URL> --confirmar` (y `--sobre-la-actual` si el destino es la base actual; `--uploads <carpeta>` para extraer los archivos). Necesitan el cliente de PostgreSQL (`pg_dump`/`pg_restore`, o `PG_DUMP`/`PG_RESTORE`). **No están probados de punta a punta** porque el equipo de desarrollo no tiene `pg_dump`: solo se comprobaron sus rechazos (sin cliente, sin `--confirmar`, destino igual a la base actual). Hay que hacer una restauración de prueba en una base vacía en cuanto exista el servidor.
+- **Pruebas de punta a punta** (`e2e/flujos.test.mts`, `npm run e2e`, con `playwright-core` y el Edge o Chrome ya instalados: no descarga navegador): contraseña incorrecta y correcta (y que limpia los fallos), un mensaje del cliente por el simulador con respuesta del asistente, crear y enviar un pedido (aparta 1 unidad), registrar el comprobante y verificar el pago (queda pagado, descuenta y libera lo apartado). Necesitan `npm run db` y `npm run dev`; crean su propio usuario, producto, ubicación y cuenta (prefijo `PRUEBA-E2E`) y al final los borran y devuelven los ajustes de pedidos como estaban. `E2E_URL` y `E2E_NAVEGADOR` cambian la dirección y el navegador.
+- **Lo que sigue sin poder hacerse sin credenciales:** conectar y probar con Meta real (WhatsApp oficial, Facebook, Instagram), Claude real, la pasarela de tarjeta, el servidor y su dominio.
+
+## 20. Estructura de carpetas
 
 | Carpeta | Contenido |
 |---|---|

@@ -1,17 +1,22 @@
 import { adaptadorSimulado } from "./simulado";
+import { adaptadorFacebook, adaptadorInstagram, metaFaltantes } from "./meta-mensajeria";
 import { adaptadorWhatsApp, whatsappFaltantes } from "./whatsapp";
 import { CANALES, type Channel, type ChannelAdapter } from "./tipos";
 
 export { CANALES };
 
-// TikTok, Instagram y Facebook llegan en la fase 3: agregar su archivo aquí.
+// TikTok llega en la fase 3: agregar su archivo aquí.
 const adaptadores: Record<Channel, ChannelAdapter | null> = {
   simulado: adaptadorSimulado,
   whatsapp: adaptadorWhatsApp,
   tiktok: null,
-  instagram: null,
-  facebook: null,
+  instagram: adaptadorInstagram,
+  facebook: adaptadorFacebook,
 };
+
+/** Variables de entorno que faltan para conectar el canal (vacío = listo). TikTok todavía no tiene adaptador. */
+const faltantes = (canal: Channel): string[] =>
+  canal === "whatsapp" ? [...whatsappFaltantes()] : canal === "facebook" || canal === "instagram" ? [...metaFaltantes(canal)] : canal === "simulado" ? [] : ["Se conecta en la fase 3"];
 
 /** CHANNELS_ENABLED=simulado,whatsapp */
 export function canalesHabilitados(valor = process.env.CHANNELS_ENABLED ?? "") {
@@ -21,7 +26,7 @@ export function canalesHabilitados(valor = process.env.CHANNELS_ENABLED ?? "") {
 /** El adaptador del canal, o null si no está habilitado o le faltan credenciales. */
 export function adaptador(canal: Channel): ChannelAdapter | null {
   if (!canalesHabilitados().has(canal)) return null;
-  if (canal === "whatsapp" && whatsappFaltantes().length) return null;
+  if (faltantes(canal).length) return null;
   return adaptadores[canal];
 }
 
@@ -30,6 +35,6 @@ export function estadoCanales() {
   return CANALES.map((canal) => ({
     canal,
     activo: adaptador(canal) !== null,
-    faltantes: canal === "whatsapp" ? whatsappFaltantes() : canal === "simulado" ? [] : ["Se conecta en la fase 3"],
+    faltantes: faltantes(canal),
   }));
 }

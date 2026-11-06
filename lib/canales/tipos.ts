@@ -42,6 +42,8 @@ export interface ChannelAdapter {
   canSendFreeForm(conversation: { lastInboundAt: Date | null }): boolean; // ventana de respuesta
   parseWebhook(req: Request): Promise<{ messages: InboundMessage[]; statuses: StatusUpdate[] }>;
   verifyWebhook(req: Request): Promise<boolean>;
+  /** Respuesta al GET con que Meta comprueba la dirección del webhook: el `hub.challenge`, o null si el token no coincide. */
+  verifySubscription?(url: URL): string | null;
   /** Plantillas aprobadas que se pueden enviar fuera de la ventana de 24 horas. Solo los canales que las tienen. */
   listTemplates?(): Promise<PlantillaCanal[]>;
 }

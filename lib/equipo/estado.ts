@@ -1,3 +1,4 @@
+import { tomarCandado } from "@/lib/candados";
 import { db } from "@/lib/db";
 import type { EstadoAsesor, OrigenEstadoAsesor } from "@/generated/prisma/client";
 import { procesarCola } from "./asignacion";
@@ -71,18 +72,16 @@ export async function activar(usuarioId: string, ahora = new Date()) {
 }
 
 const ENTRE_CORRIDAS_MS = 30_000;
-let ultimaCorrida = 0;
 
 /**
  * Pasa a Desconectado a los asesores que llevan 5 minutos sin latido (también si estaban en pausa).
  * Barata e idempotente: la llama el cron (POST /api/tareas/desconectar-asesores) y, de forma oportunista,
- * cada latido (como máximo cada 30 s en el mismo proceso, salvo que se pida `forzar`).
+ * cada latido (como máximo cada 30 s entre todos los procesos, candado en la base, salvo que se pida `forzar`).
  * Devuelve a cuántos desconectó.
  */
 export async function desconectarInactivos(o: { ahora?: Date; forzar?: boolean; /** Solo estos usuarios (para las pruebas). */ soloEstos?: string[] } = {}): Promise<number> {
   const ahora = o.ahora ?? new Date();
-  if (!o.forzar && Date.now() - ultimaCorrida < ENTRE_CORRIDAS_MS) return 0;
-  ultimaCorrida = Date.now();
+  if (!o.forzar && !(await tomarCandado("desconectar-asesores", ENTRE_CORRIDAS_MS))) return 0;
 
   const limite = new Date(ahora.getTime() - SIN_SENAL_MS);
   const candidatos = await db.user.findMany({

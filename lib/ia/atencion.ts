@@ -1,9 +1,11 @@
+import { soltarCandado, tomarCandado } from "@/lib/candados";
 import { obtenerNegocio } from "@/lib/ajustes";
 import { adaptador } from "@/lib/canales";
 import { db } from "@/lib/db";
 import { estaAbierto } from "@/lib/horario";
 import { asignarConversacion } from "@/lib/equipo/asignacion";
 import { enviarMensaje } from "@/lib/mensajeria";
+import { registrarError } from "@/lib/registro";
 import { DESCONTADOS } from "@/lib/pedidos/estados";
 import { ejecutarAsistente } from "./asistente";
 import { estadoPresupuesto, obtenerAjustesIa, type AjustesIa } from "./ajustes-ia";
@@ -67,15 +69,16 @@ async function derivarSinLlamar(conversacionId: string, motivo: string, proveedo
   await pasarAAsesor(conversacionId, motivo, { aiRunId: run.id });
 }
 
-const enCurso = new Set<string>();
+// Un solo proceso a la vez atiende una conversación (candado en la base). Si el proceso se cae, el candado vence a los 5 minutos.
+const CANDADO_MS = 5 * 60_000;
 
 /**
  * Se llama cada vez que entra un mensaje del cliente. Decide si responde el asistente y, si le toca, responde.
  * Nunca lanza: si algo falla, la conversación queda esperando a una persona.
  */
 export async function procesarMensajeEntrante(conversacionId: string) {
-  if (enCurso.has(conversacionId)) return;
-  enCurso.add(conversacionId);
+  const candado = `asistente:${conversacionId}`;
+  if (!(await tomarCandado(candado, CANDADO_MS))) return;
   try {
     for (let i = 0; i < 3; i++) {
       const ultimaId = await procesar(conversacionId);
@@ -83,14 +86,14 @@ export async function procesarMensajeEntrante(conversacionId: string) {
       if (!ultimaId || nuevo?.id === ultimaId) break; // si llegó otro mensaje mientras respondía, se atiende también
     }
   } catch (e) {
-    console.error(`asistente: ${e instanceof Error ? e.name : "error"}`); // nunca el contenido de los mensajes
+    registrarError("asistente", e); // nunca el contenido de los mensajes
     await db.conversation.updateMany({ where: { id: conversacionId, atendidaPor: "asistente" }, data: ESPERANDO }).catch(() => {});
   } finally {
-    enCurso.delete(conversacionId);
+    await soltarCandado(candado).catch(() => {});
   }
   // Si quedó para una persona (el asistente pasó la conversación, está apagado o falló) y nadie la tiene, se asigna.
   // Con modo Manual, o sin asesores disponibles, no hace nada: queda en «Sin asignar».
-  await asignarConversacion(conversacionId).catch((e) => console.error(`asignación: ${e instanceof Error ? e.name : "error"}`));
+  await asignarConversacion(conversacionId).catch((e) => registrarError("asignación", e));
 }
 
 /** Devuelve el id del mensaje del cliente que atendió, o null si el asistente no tenía que hacer nada. */

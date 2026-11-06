@@ -99,12 +99,16 @@ describe("herramientas", () => {
 });
 
 describe("atención en la conversación (con base de datos)", () => {
+  let bienvenidaOriginal = "";
   before(async () => {
     await aislar({ modoAsignacion: "manual" }); // aquí se prueba al asistente: nada debe asignarse solo a un asesor
     process.env.CHANNELS_ENABLED = "simulado";
-    await db.aiSettings.update({ where: { id: "ia" }, data: { encendido: true, modo: "siempre", canales: ["simulado", "whatsapp", "tiktok", "instagram", "facebook"], limiteRespuestas: 6 } });
+    bienvenidaOriginal = (await db.aiSettings.findUniqueOrThrow({ where: { id: "ia" } })).bienvenida;
+    // la prueba no puede depender del saludo que el negocio haya escrito en Ajustes: se usa uno conocido y al final se devuelve el suyo
+    await db.aiSettings.update({ where: { id: "ia" }, data: { encendido: true, modo: "siempre", canales: ["simulado", "whatsapp", "tiktok", "instagram", "facebook"], limiteRespuestas: 6, bienvenida: "Hola, soy el asistente virtual de Home Outlet. Puedo ayudarle con precios, existencias, horarios y envíos." } });
   });
   after(async () => {
+    await db.aiSettings.update({ where: { id: "ia" }, data: { bienvenida: bienvenidaOriginal } });
     await restaurar();
     const sobrantes = await db.contact.findMany({ where: { OR: [{ telefono: TEL }, { nombre: { startsWith: "PRUEBA-IA" } }] }, include: { conversaciones: true } });
     for (const v of sobrantes.flatMap((c) => c.conversaciones)) {

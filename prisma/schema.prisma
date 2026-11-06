@@ -607,3 +607,19 @@ model AjustesPedidos {
   ubicacionRecoger Location? @relation("UbicacionRecoger", fields: [ubicacionRecogerId], references: [id], onDelete: SetNull)
   ubicacionEnvio   Location? @relation("UbicacionEnvio", fields: [ubicacionEnvioId], references: [id], onDelete: SetNull)
 }
+
+/// Candados y marcas de tiempo compartidos entre procesos (reemplazan variables en memoria).
+/// Un candado vale hasta `hasta`; sirve para «como máximo cada N segundos» y para «solo uno a la vez».
+model Candado {
+  clave String   @id
+  hasta DateTime
+}
+
+/// Un intento fallido (inicio de sesión, firma de webhook inválida) para los límites de tasa.
+model IntentoTasa {
+  id       String   @id @default(cuid())
+  clave    String
+  creadoEn DateTime @default(now())
+
+  @@index([clave, creadoEn])
+}

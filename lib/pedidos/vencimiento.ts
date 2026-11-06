@@ -1,3 +1,4 @@
+import { tomarCandado } from "@/lib/candados";
 import { db } from "@/lib/db";
 import { avisarCliente, configMensajes } from "./avisos";
 import { cambiarEstado } from "./flujo";
@@ -5,18 +6,16 @@ import { lineaDeSistema } from "./pedidos";
 
 const AVISO_ANTES_MS = 2 * 3_600_000;
 const ENTRE_CORRIDAS_MS = 30_000;
-let ultima = 0;
 
 /**
  * Pasa a «vencido» los pedidos pendientes de pago cuya reserva ya terminó, libera sus unidades y le avisa al cliente.
  * Es barata e idempotente: se llama al abrir la lista o el detalle de pedidos y la bandeja, y desde el cron
  * (POST /api/tareas/vencer-reservas). Un pedido con un pago parcial ya verificado no vence: lo cancela una persona.
- * Devuelve cuántos venció. Dentro del mismo proceso corre como máximo cada 30 segundos, salvo que se pida `forzar`.
+ * Devuelve cuántos venció. Corre como máximo cada 30 segundos entre todos los procesos (candado en la base), salvo que se pida `forzar`.
  */
 export async function vencerReservas(o: { ahora?: Date; forzar?: boolean } = {}): Promise<number> {
   const ahora = o.ahora ?? new Date();
-  if (!o.forzar && Date.now() - ultima < ENTRE_CORRIDAS_MS) return 0;
-  ultima = Date.now();
+  if (!o.forzar && !(await tomarCandado("vencer-reservas", ENTRE_CORRIDAS_MS))) return 0;
 
   const vencidos = await db.order.findMany({
     where: { estado: "pendiente_pago", reservadoHasta: { lt: ahora }, pagos: { none: { estado: "verificado" } } },
