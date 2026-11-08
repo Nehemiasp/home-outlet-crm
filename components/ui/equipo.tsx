@@ -1,8 +1,8 @@
 "use client";
 
 import { ChevronDown, Users } from "lucide-react";
-import { useState } from "react";
-import { Boton } from "./form";
+import { useEffect, useState } from "react";
+import { Boton, Selector } from "./form";
 import { InsigniaDisponibilidad, minutosDesde } from "./disponibilidad";
 import { MenuDesplegable, Modal, Tabla } from "./estructura";
 import { cn } from "@/lib/utils";
@@ -98,6 +98,42 @@ export function ResumenEquipo({ filas, ahora, enlace }: { filas: FilaEquipo[]; a
         </div>
       )}
     </section>
+  );
+}
+
+/** Ventana para pasar una conversación a otra persona del equipo: se elige de una lista (en vez de una opción de menú por cada persona). */
+export function ModalAsignar({ abierto, ocupado, usuarios, actualId, yoId, onCerrar, onAsignar, onQuitar }: { abierto: boolean; ocupado?: boolean; usuarios: { id: string; nombre: string }[]; actualId: string | null; yoId: string; onCerrar: () => void; onAsignar: (usuarioId: string) => void; onQuitar?: () => void }) {
+  const [elegido, setElegido] = useState("");
+  useEffect(() => {
+    if (abierto) setElegido("");
+  }, [abierto]);
+  const opciones = usuarios.map((u) => ({ valor: u.id, texto: `${u.nombre}${u.id === yoId ? " (yo)" : ""}${u.id === actualId ? " · la atiende ahora" : ""}`, deshabilitada: u.id === actualId }));
+  return (
+    <Modal abierto={abierto} onCerrar={onCerrar} titulo="Asignar a otra persona">
+      <form
+        className="flex flex-col gap-4"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (elegido) onAsignar(elegido);
+        }}
+      >
+        <p className="cuerpo">La conversación pasará a la persona que elija y ella recibirá el aviso.</p>
+        <Selector etiqueta="Pasar a" placeholder="Elegir persona…" opciones={opciones} value={elegido} onCambio={setElegido} />
+        <div className="flex flex-wrap justify-end gap-2">
+          {onQuitar && (
+            <Boton variante="fantasma" onClick={onQuitar} className="mr-auto">
+              Quitar asignación
+            </Boton>
+          )}
+          <Boton variante="secundario" onClick={onCerrar}>
+            Cancelar
+          </Boton>
+          <Boton type="submit" disabled={!elegido} cargando={ocupado}>
+            Asignar
+          </Boton>
+        </div>
+      </form>
+    </Modal>
   );
 }
 

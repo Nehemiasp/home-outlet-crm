@@ -28,7 +28,7 @@ describe("forma de pago al crear el pedido (con base de datos)", () => {
     return p;
   };
   const entrada = (productoId: string, sobre: Partial<EntradaPedido> = {}): EntradaPedido => ({
-    pedidoId: null, conversacionId: conv, cliente: { nombre: "PRUEBA-FP cliente", telefono: "", municipio: "" },
+    pedidoId: null, conversacionId: conv, cliente: { nombre: "PRUEBA-FP cliente", telefono: "", departamento: "", municipio: "" },
     lineas: [{ productoId, cantidad: 2, ubicacionId: null }], entrega: "recoger", direccion: "", referencia: "", descuento: null, descuentoMotivo: "", notas: "", ...sobre,
   });
   /** Guarda un borrador con esa forma de pago y devuelve su id. */
@@ -52,7 +52,7 @@ describe("forma de pago al crear el pedido (con base de datos)", () => {
     ubicA = (await db.location.create({ data: { nombre: "PRUEBA-FP A" } })).id;
     await ajustar({ inventario: "separado", ubicacionRecogerId: ubicA, ubicacionEnvioId: ubicA, metodos: ["transferencia", "deposito", "efectivo_en_tienda", "tarjeta"], mensajes: Prisma.JsonNull, horasReserva: 24 });
     await db.bankAccount.create({ data: { banco: "PRUEBA-FP Banco", tipo: "monetaria", numero: "123-456789-0", titular: "Home Outlet" } });
-    await db.shippingZone.create({ data: { nombre: "PRUEBA-FP Zona", municipios: ["PRUEBA-FP Ciudad"], costo: 2_500, tiempo: "1 día" } });
+    await db.shippingZone.create({ data: { nombre: "PRUEBA-FP Zona", departamentos: ["Petén"], municipios: ["Flores"], costo: 2_500, tiempo: "1 día" } });
     contactoId = (await db.contact.create({ data: { nombre: "PRUEBA-FP cliente" } })).id;
     await db.channelIdentity.create({ data: { contactoId, canal: "simulado", externalContactId: "prueba-fp-sim" } });
     conv = (await db.conversation.create({ data: { contactoId, canal: "simulado", lastInboundAt: new Date(), atendidaPor: "asistente" } })).id;
@@ -114,7 +114,7 @@ describe("forma de pago al crear el pedido (con base de datos)", () => {
     assert.match(r.texto, /Pagará en efectivo al recoger/);
     assert.equal(r.texto.includes("PRUEBA-FP Banco") || r.texto.includes("/pagar/"), false);
     const p = await producto();
-    const envio = await guardarBorrador(entrada(p.id, { metodoPago: "efectivo_en_tienda", entrega: "envio", cliente: { nombre: "PRUEBA-FP cliente", telefono: "", municipio: "PRUEBA-FP Ciudad" }, direccion: "Calle 1" }), admin);
+    const envio = await guardarBorrador(entrada(p.id, { metodoPago: "efectivo_en_tienda", entrega: "envio", cliente: { nombre: "PRUEBA-FP cliente", telefono: "", departamento: "Petén", municipio: "Flores" }, direccion: "Calle 1" }), admin);
     assert.ok(!envio.ok && /efectivo en tienda/i.test(envio.error));
   });
 
@@ -137,6 +137,31 @@ describe("forma de pago al crear el pedido (con base de datos)", () => {
     assert.equal((await db.order.findUniqueOrThrow({ where: { id: b.id } })).estado, "borrador");
     const lista = await cobros(b.id);
     assert.ok(lista.every((c) => c.estado === "cancelado"), JSON.stringify(lista.map((c) => c.estado)));
+  });
+
+  test("la tarjeta del pedido dentro del chat cambia según la forma de pago (cuentas, enlace o efectivo)", async () => {
+    const { cargarConversacion } = await import("@/lib/bandeja");
+    const tarjetaDe = async (metodo: TipoPago) => {
+      const b = await borrador(metodo);
+      assert.ok((await enviar(b.id)).ok);
+      const codigo = (await db.order.findUniqueOrThrow({ where: { id: b.id } })).codigo;
+      const c = await cargarConversacion(conv, admin);
+      const item = c?.linea.find((i) => i.clase === "mensaje" && i.pedido?.codigo === codigo);
+      assert.ok(item && item.clase === "mensaje" && item.pedido, `no se encontró la tarjeta de ${codigo}`);
+      return { pedido: item.pedido, b };
+    };
+
+    const banco = (await tarjetaDe("transferencia")).pedido;
+    assert.ok(banco.cuentas.length > 0 && banco.formaPago === "transferencia" && !banco.enlace);
+
+    const { pedido: tarjeta, b: bt } = await tarjetaDe("tarjeta");
+    assert.deepEqual(tarjeta.cuentas, [], "con tarjeta no se muestran las cuentas bancarias");
+    assert.equal(tarjeta.formaPago, "tarjeta");
+    assert.equal(tarjeta.enlace, (await cobros(bt.id))[0]!.url, "la tarjeta del chat trae el enlace de pago abierto");
+
+    const efectivo = (await tarjetaDe("efectivo_en_tienda")).pedido;
+    assert.deepEqual(efectivo.cuentas, []);
+    assert.deepEqual({ forma: efectivo.formaPago, enlace: efectivo.enlace }, { forma: "efectivo_en_tienda", enlace: null });
   });
 
   test("el panel ofrece las formas activas, y la tarjeta solo si hay pasarela", async () => {
@@ -210,7 +235,7 @@ describe("forma de pago al crear el pedido (con base de datos)", () => {
       const igual = await cambiarFormaDePago(b.id, "transferencia", admin);
       assert.ok(!igual.ok && /ya tiene esa forma/.test(igual.error));
       const p = await producto();
-      const g = await guardarBorrador(entrada(p.id, { metodoPago: "transferencia", entrega: "envio", cliente: { nombre: "PRUEBA-FP cliente", telefono: "", municipio: "PRUEBA-FP Ciudad" }, direccion: "Calle 1" }), admin);
+      const g = await guardarBorrador(entrada(p.id, { metodoPago: "transferencia", entrega: "envio", cliente: { nombre: "PRUEBA-FP cliente", telefono: "", departamento: "Petén", municipio: "Flores" }, direccion: "Calle 1" }), admin);
       assert.ok(g.ok);
       assert.ok((await enviar(g.ok ? g.pedidoId : "")).ok);
       const efectivoEnEnvio = await cambiarFormaDePago(g.ok ? g.pedidoId : "", "efectivo_en_tienda", admin);

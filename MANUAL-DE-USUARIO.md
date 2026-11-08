@@ -1,12 +1,12 @@
 # Home Outlet CRM — Manual de usuario
 
-Para el equipo de Home Outlet: agentes, jefe de tienda y administradores. Cada persona ve solo lo que su rol permite; en cada sección se indica quién puede hacer qué.
+Para el equipo de Home Outlet: agentes, jefe de tienda, bodega y administradores. Cada persona ve solo lo que su rol permite; en cada sección se indica quién puede hacer qué.
 
 ---
 
 ## 1. Qué es y cómo está organizado
 
-Es un sistema donde llegan en un solo lugar los mensajes de los clientes (WhatsApp, Facebook, Instagram), con sus datos, el catálogo, los pedidos y los pagos. Un **asistente con inteligencia artificial** atiende primero y pasa la conversación a una persona cuando hace falta.
+Es un sistema donde llegan en un solo lugar los mensajes de los clientes (WhatsApp, Facebook, Instagram y TikTok), con sus datos, el catálogo, los pedidos y los pagos. Un **asistente con inteligencia artificial** atiende primero y pasa la conversación a una persona cuando hace falta.
 
 El menú de la izquierda (en el teléfono, la barra de abajo) tiene:
 
@@ -52,6 +52,8 @@ Los números naranja junto a Bandeja y Pedidos son lo que está esperando: mensa
 
 El **jefe de tienda** está pensado para quien dirige la operación diaria: ve y resuelve todo, pero no cambia la configuración del sistema ni a las personas que lo usan.
 
+**Bodega** es para quien empaca y entrega: solo ve dos cosas. El **Catálogo** (para mirar productos y existencias; no puede editar ni ajustar) y el **Despacho** (los pedidos ya pagados, con productos, cantidades, ubicación y a dónde van). **No ve** precios, pagos, cuentas, conversaciones, contactos, reportes ni ajustes: si escribe esas direcciones, el sistema lo regresa al Despacho. Al entrar, empieza en el Despacho.
+
 ## 4. Bandeja: conversaciones
 
 ### La lista (izquierda)
@@ -67,7 +69,7 @@ Arriba de cada conversación hay un selector **Quién atiende: Asistente / Aseso
 - El asistente **nunca crea pedidos ni confirma pagos**: eso siempre lo hace una persona.
 
 ### Atender una conversación
-1. **Asignársela:** menú **Más → Asignarme esta conversación**. El sistema también reparte solo entre los agentes disponibles (el que tenga menos conversaciones abiertas).
+1. **Asignársela:** menú **Más → Asignarme esta conversación**. El sistema también reparte solo entre los agentes disponibles (el que tenga menos conversaciones abiertas). El jefe de tienda y el administrador ven **Más → Asignar a otra persona**: se abre una ventana con la lista del equipo para elegir a quién pasarla (y **Quitar asignación** si ya la tiene alguien).
 2. **Responder:** escriba abajo y **Enviar**. Con `/` aparecen las **respuestas rápidas** (por ejemplo `/horario`).
 3. **Notas internas:** solo las ve el equipo; no se mandan al cliente.
 4. **Imágenes** del cliente: se ven en la conversación (aquí también se registran comprobantes, ver sección 6).
@@ -80,11 +82,13 @@ Menú **Más**: **Marcar como pendiente / abierta** o **Cerrar conversación**.
 ### Devolver una conversación
 Si no puede atenderla, **Más → Devolver a la cola** (con un motivo opcional). Vuelve a «Sin asignar» y no le cae otra vez a usted.
 
-### La regla de las 24 horas (WhatsApp, Facebook, Instagram)
-Solo se puede escribir libremente durante **24 horas** desde el último mensaje del cliente. Pasado ese tiempo:
+### La regla de las 24 horas (WhatsApp, Facebook, Instagram) y de TikTok
+Solo se puede escribir libremente durante **24 horas** desde el último mensaje del cliente (en **TikTok, 48 horas**). Pasado ese tiempo:
 - En **WhatsApp** aparece el aviso con el botón **Enviar plantilla**: se elige una plantilla aprobada y se llenan sus datos.
-- En **Facebook e Instagram** no se puede enviar nada hasta que el cliente escriba.
+- En **Facebook, Instagram y TikTok** no se puede enviar nada hasta que el cliente escriba.
 - Cuando quedan menos de 3 horas, la bandeja lo avisa.
+
+**TikTok además tiene un tope de 10 mensajes seguidos** sin que el cliente vuelva a escribir. Cuando quedan 3 o menos, la bandeja avisa cuántos quedan; al llegar a 0 solo se pueden escribir notas internas hasta que el cliente escriba otra vez. Una tarjeta de producto, una imagen con texto o un texto muy largo cuentan por más de un mensaje, porque salen partidos. En TikTok el cliente siempre escribe primero: no se puede iniciar una conversación, y tampoco se pueden enviar videos ni notas de voz.
 
 ## 5. Su disponibilidad (agentes)
 
@@ -97,13 +101,24 @@ Si lleva **15 minutos en pausa** el sistema le avisa. Si hay muchas conversacion
 
 El jefe de tienda y el administrador **no tienen estado**: ven el resumen del equipo («Equipo · N de M disponibles») y pueden cambiar el estado de un agente o **Repartir sus conversaciones** (aparece cuando lleva más de 30 minutos en pausa o desconectado y tiene conversaciones abiertas).
 
+## 5b. Despacho (bodega)
+
+Es la pantalla de inicio de **bodega** (el administrador y el jefe de tienda también la ven). Muestra los pedidos **ya pagados**, del más antiguo al más nuevo, en tres pestañas: **Por preparar**, **Preparando** y **Listos y enviados**. Cada tarjeta trae el cliente, a dónde va (o «Recoger en tienda»), la dirección y los productos con su cantidad y la ubicación de donde salen. **No lleva precios ni pagos.**
+
+- **Hoja de bodega:** abre la hoja para imprimir y empacar (sin precios).
+- **Empezar a preparar:** el pedido pasa a «Preparando».
+- **Listo para recoger / Marcar como enviado:** pide confirmar porque **se le avisa al cliente por el chat**. Al enviar **hay que escribir el número de guía** (es obligatorio; si la entrega es propia, escriba por ejemplo «Entrega propia»).
+- **Marcar como entregado:** cierra el pedido.
+
+Bodega **no cancela** pedidos ni toca pagos. Si algo no cuadra (falta producto, el cliente cambió algo), avise al jefe de tienda. Cada paso queda registrado con el nombre de quien lo dio.
+
 ## 6. Pedidos y pagos
 
 ### Crear un pedido
 Desde la conversación: botón **Crear pedido** (se abre un panel).
-1. **Cliente:** nombre, teléfono y municipio (ya vienen de la ficha).
+1. **Cliente:** nombre y teléfono (ya vienen de la ficha).
 2. **Productos:** busque en el catálogo y **Agregar**. Cada producto muestra su precio y «Disponible N · Apartado N».
-3. **Entrega:** **Recoger en tienda** o **Envío** (elija la zona; el costo se calcula solo).
+3. **Entrega:** **Recoger en tienda** o **Envío**. Con envío se elige el **Departamento**, luego el **Municipio** (la lista cambia según el departamento; sirve para toda Guatemala) y se escribe la **Dirección** y una referencia. La zona y el costo del envío se calculan solos según el lugar. Si el cliente ya dijo su municipio, viene elegido.
 4. **Forma de pago**: pregúntele al cliente cómo quiere pagar y elíjalo (**Transferencia bancaria**, **Depósito bancario**, **Tarjeta de crédito o débito** o **Efectivo en la tienda**, según lo que el administrador haya activado). Es obligatorio para enviar el pedido; en un borrador puede quedar vacío. El efectivo solo aparece si el cliente recoge. Si hay una sola forma activa, ya viene elegida.
 5. **Descuento** (opcional): monto o porcentaje, con motivo. El agente tiene un límite; el jefe de tienda y el administrador no.
 6. **Notas del pedido**: solo las ve el equipo.
@@ -144,7 +159,7 @@ Mientras el pedido siga **pendiente de pago**, en el detalle use **Cambiar forma
 ### Estados de un pedido
 **Borrador → Pendiente de pago → Pago en revisión → Pagado → Preparando → Listo para recoger / Enviado → Entregado.** También **Cancelado** y **Vencido**.
 
-Dentro del pedido, el botón principal siempre es el siguiente paso: **Marcar como preparando**, **Marcar como listo para recoger** (avisa al cliente), **Marcar como enviado** (pide el número de **guía**, que se le manda al cliente) y **Marcar como entregado**.
+Dentro del pedido, el botón principal siempre es el siguiente paso: **Marcar como preparando**, **Marcar como listo para recoger** (avisa al cliente), **Marcar como enviado** (**exige** el número de **guía**, que se le manda al cliente; en una entrega propia escriba, por ejemplo, «Entrega propia») y **Marcar como entregado**.
 La hoja **Bodega** (imprimible, sin precios) sirve para empacar.
 
 ### Cancelar
@@ -162,6 +177,7 @@ Pestañas: **Por verificar**, **Pendientes de pago**, **En proceso**, **Entregad
 
 ## 8. Catálogo
 
+- **Bodega solo mira:** ve los productos y sus existencias, sin el botón «Ajustar» y sin crear, editar ni importar.
 - Todos ven los productos con su precio y existencias («En existencia», «Quedan N», «Agotado») y por ubicación, con «Disponible · Apartado».
 - **Jefe de tienda y administrador:** **Nuevo producto** (nombre, SKU, categoría, precio, descripción, fotos de hasta 5 MB en JPG, PNG o WebP) y edición de existencias por ubicación.
 - **Importar CSV** (jefe de tienda y administrador): archivo guardado desde Excel con las columnas `sku, nombre, categoria, precio, descripcion, existencia_tienda, existencia_linea`. Son obligatorias **sku, nombre y precio**. El sistema muestra una revisión antes de importar y marca las filas con errores.
@@ -188,7 +204,7 @@ Al entrar, si aún faltan cosas para trabajar con datos reales, se abre **Primer
 | **Asistente** | Encendido, mensaje de bienvenida, canales donde responde, tope mensual de gasto, **Preguntas frecuentes** y una zona para **probar** al asistente |
 | **Canales** | Qué canales están conectados y qué falta de cada uno |
 | **Datos del negocio** | Nombre, dirección, horario semanal, y los textos de formas de pago, envíos y garantía que usa el asistente |
-| **Pagos y envíos** | Métodos de pago activos (son las opciones que se pueden elegir al crear un pedido; la tarjeta solo se puede activar si hay una pasarela conectada), prefijo y horas de reserva, descuento máximo del agente, inventario separado o compartido, envío gratis, **cuentas bancarias**, **zonas de envío** y los **mensajes** que se mandan al cliente (se pueden editar y apagar) |
+| **Pagos y envíos** | Métodos de pago activos (son las opciones que se pueden elegir al crear un pedido; la tarjeta solo se puede activar si hay una pasarela conectada), prefijo y horas de reserva, descuento máximo del agente, inventario separado o compartido, envío gratis, **cuentas bancarias**, **zonas de envío** (cada una cubre departamentos enteros o solo algunos municipios; la que no marca ninguno vale para «el resto del país») y los **mensajes** que se mandan al cliente (se pueden editar y apagar) |
 
 **Importante al dar de baja a alguien:** *Desactivar* bloquea su entrada al instante y deja sin asignar sus conversaciones para que nadie quede esperando. Siempre debe quedar al menos un administrador activo.
 
@@ -196,7 +212,7 @@ Al entrar, si aún faltan cosas para trabajar con datos reales, se abre **Primer
 
 | Problema | Qué hacer |
 |---|---|
-| «No puedo escribir al cliente» | Pasaron más de 24 horas. En WhatsApp use **Enviar plantilla**; en Facebook o Instagram, espere a que escriba |
+| «No puedo escribir al cliente» | Pasaron más de 24 horas (48 en TikTok), o en TikTok ya mandó 10 mensajes seguidos. En WhatsApp use **Enviar plantilla**; en Facebook, Instagram o TikTok, espere a que el cliente escriba |
 | «Un mensaje salió con error» | Use **Reintentar** en su burbuja. Si es WhatsApp y pasaron las 24 horas, use la plantilla |
 | «No veo una conversación que otro agente atiende» | Es lo normal: los agentes ven solo lo suyo. Pídale al jefe de tienda o administrador que se la asigne |
 | «No me llegan conversaciones nuevas» | Revise que su estado sea **Disponible** (barra de arriba) y no **En pausa** |

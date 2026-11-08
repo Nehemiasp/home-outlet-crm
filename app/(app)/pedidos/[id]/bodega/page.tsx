@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { cargarPedido } from "@/lib/pedidos/consultas";
-import { requireUsuario } from "@/lib/session";
+import { cargarHoja } from "@/lib/pedidos/despacho";
+import { requireConBodega } from "@/lib/session";
 import { formatTelefono } from "@/lib/utils";
 import { BotonImprimir } from "./imprimir";
 
@@ -9,8 +9,8 @@ export const metadata: Metadata = { title: "Hoja de bodega · Home Outlet" };
 
 export default async function Bodega({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const u = await requireUsuario();
-  const p = await cargarPedido(id, u);
+  const u = await requireConBodega(); // también la abre bodega, pero solo con lo de despacho (sin precios ni pagos)
+  const p = await cargarHoja(id, u);
   if (!p) notFound();
   // Sin precios: es para quien empaca. Las líneas partidas por ubicación se ven cada una con su ubicación.
   return (
@@ -26,10 +26,11 @@ export default async function Bodega({ params }: { params: Promise<{ id: string 
       </header>
 
       <section aria-label="Cliente" className="cuerpo flex flex-col gap-1">
-        <p className="cuerpo-fuerte">{p.contacto.nombre}</p>
-        {p.contacto.telefono && <p>Teléfono: {formatTelefono(p.contacto.telefono)}</p>}
+        <p className="cuerpo-fuerte">{p.cliente}</p>
+        {p.telefono && <p>Teléfono: {formatTelefono(p.telefono)}</p>}
         {p.entrega === "envio" && (
           <>
+            {p.departamento && <p>Departamento: {p.departamento}</p>}
             <p>Municipio: {p.municipio}</p>
             {p.direccion && <p className="whitespace-pre-wrap">Dirección: {p.direccion}</p>}
             {p.guia && <p>Guía: {p.guia}</p>}

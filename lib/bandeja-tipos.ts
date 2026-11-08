@@ -48,6 +48,10 @@ export type TarjetaPedido = {
   envio: string;
   total: number;
   cuentas: { banco: string; tipo: "monetaria" | "ahorro"; numero: string; titular: string }[];
+  /** Cómo va a pagar el cliente. Con tarjeta o efectivo la tarjeta no lleva cuentas bancarias. Null en los pedidos anteriores. */
+  formaPago?: "transferencia" | "deposito" | "efectivo_en_tienda" | "tarjeta" | null;
+  /** El enlace de pago abierto (solo con tarjeta). */
+  enlace?: string | null;
 };
 
 /** Tono de un mensaje de sistema, para el ícono y el color. */
@@ -73,6 +77,8 @@ export type ConversacionDTO = {
   asignadaA: { id: string; nombre: string } | null;
   lastInboundAt: string | null;
   canalActivo: boolean;
+  /** Mensajes que aún se pueden mandar sin que el cliente escriba, si el canal tiene tope (TikTok); null si no. */
+  salientesRestantes: number | null;
   linea: ItemLinea[];
   contacto: {
     id: string;

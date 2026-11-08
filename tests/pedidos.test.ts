@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import { after, before, describe, test } from "node:test";
 import { db } from "@/lib/db";
 import { aplicarDatos, textoCuentas } from "@/lib/plantillas";
-import { borrarCuenta, borrarZona, guardarAjustesPedidos, guardarCuenta, guardarZona, listarCuentas, obtenerAjustesPedidos, separarMunicipios } from "@/lib/pedidos/ajustes";
-import { costoEnvio, zonaPara, type Zona } from "@/lib/pedidos/envio";
+import { borrarCuenta, borrarZona, guardarAjustesPedidos, guardarCuenta, guardarZona, listarCuentas, obtenerAjustesPedidos } from "@/lib/pedidos/ajustes";
+import { costoEnvio, describirZona, zonaPara, type Zona } from "@/lib/pedidos/envio";
 import { disponibleProducto, textoExistencia } from "@/lib/pedidos/existencias";
 import { cambiarEstado } from "@/lib/pedidos/flujo";
 import { ESTADOS, siguientes, transicionValida } from "@/lib/pedidos/estados";
@@ -45,16 +45,42 @@ describe("métodos de pago", () => {
 });
 
 describe("zonas de envío", () => {
-  const zona = (nombre: string, municipios: string[], costo: number, activa = true): Zona => ({ id: nombre, nombre, municipios, costo, tiempo: "1 día", activa });
-  const zonas = [zona("Morales", ["Morales"], 3500), zona("Barrios", ["Puerto Barrios", "Santo Tomás de Castilla"], 1500), zona("Resto", [], 4500), zona("Cerrada", ["Livingston"], 100, false)];
+  const zona = (nombre: string, municipios: string[], costo: number, activa = true, departamentos: string[] = []): Zona => ({ id: nombre, nombre, departamentos, municipios, costo, tiempo: "1 día", activa });
+  const zonas = [
+    zona("Morales", ["Morales"], 3500, true, ["Izabal"]),
+    zona("Barrios", ["Puerto Barrios", "Livingston"], 1500, true, ["Izabal"]),
+    zona("San José de Escuintla", ["San José"], 2200, true, ["Escuintla"]),
+    zona("Izabal", [], 4000, true, ["Izabal"]),
+    zona("Capital", [], 3000, true, ["Guatemala"]),
+    zona("Resto", [], 4500),
+    zona("Cerrada", ["Los Amates"], 100, false, ["Izabal"]),
+  ];
 
   test("encuentra la zona sin importar mayúsculas ni tildes y cae en «resto del país»", () => {
-    assert.equal(zonaPara(zonas, "MORALES")?.nombre, "Morales");
-    assert.equal(zonaPara(zonas, "santo tomas de castilla")?.nombre, "Barrios");
-    assert.equal(zonaPara(zonas, "Los Amates")?.nombre, "Resto");
-    assert.equal(zonaPara(zonas, "Livingston")?.nombre, "Resto"); // la zona desactivada no cuenta
-    assert.equal(zonaPara(zonas, null)?.nombre, "Resto");
-    assert.equal(zonaPara(zonas.filter((z) => z.nombre !== "Resto"), "Los Amates"), null);
+    assert.equal(zonaPara(zonas, "izabal", "MORALES")?.nombre, "Morales");
+    assert.equal(zonaPara(zonas, "Izabal", "livingston")?.nombre, "Barrios");
+    assert.equal(zonaPara(zonas, "Zacapa", "Zacapa")?.nombre, "Resto");
+    assert.equal(zonaPara(zonas, null, null)?.nombre, "Resto");
+    assert.equal(zonaPara(zonas.filter((z) => z.nombre !== "Resto"), "Zacapa", "Zacapa"), null);
+  });
+
+  test("de lo preciso a lo general: municipio, luego departamento entero, luego el resto del país", () => {
+    assert.equal(zonaPara(zonas, "Izabal", "El Estor")?.nombre, "Izabal"); // sin zona propia: la de todo el departamento
+    assert.equal(zonaPara(zonas, "Izabal", "Los Amates")?.nombre, "Izabal"); // la zona desactivada no cuenta
+    assert.equal(zonaPara(zonas, "Guatemala", "Mixco")?.nombre, "Capital");
+    assert.equal(zonaPara(zonas, "Guatemala", "San José Pinula")?.nombre, "Capital");
+  });
+
+  test("un municipio con el mismo nombre en otro departamento no se confunde", () => {
+    assert.equal(zonaPara(zonas, "Escuintla", "San José")?.nombre, "San José de Escuintla");
+    assert.equal(zonaPara(zonas, "Petén", "San José")?.nombre, "Resto"); // «San José» de Petén no es el de Escuintla
+  });
+
+  test("describe lo que cubre una zona", () => {
+    assert.equal(describirZona(zonas[0]!), "Morales (Izabal)");
+    assert.equal(describirZona(zonas[3]!), "Todo Izabal");
+    assert.equal(describirZona(zona("x", [], 1, true, ["Izabal", "Zacapa", "Petén"])), "Todo Izabal, Zacapa y Petén");
+    assert.equal(describirZona(zonas[5]!), "Resto del país");
   });
 
   test("envío gratis a partir del monto, solo si está encendido", () => {
@@ -63,9 +89,6 @@ describe("zonas de envío", () => {
     assert.equal(costoEnvio({ costo: 3500 }, 1_000_000, null), 3500);
   });
 
-  test("separa los municipios por coma o por línea sin repetir", () => {
-    assert.deepEqual(separarMunicipios("Morales, Los Amates\nMorales ,  "), ["Morales", "Los Amates"]);
-  });
 });
 
 describe("{cuentas} en las respuestas rápidas", () => {
@@ -271,12 +294,15 @@ describe("pedidos (con base de datos)", () => {
     assert.equal((await borrarCuenta(c.id, actor)).ok, true);
     assert.equal(await db.bankAccount.count({ where: { id: c.id } }), 0);
 
-    const zona = { nombre: "PRUEBA-PED Zona", municipios: "Morales, Los Amates", costo: "35.00", tiempo: "1 a 2 días", activa: true };
+    const zona = { nombre: "PRUEBA-PED Zona", departamentos: ["izabal"], municipios: ["morales", "Los Amates", "MORALES"], costo: "35.00", tiempo: "1 a 2 días", activa: true };
     assert.equal((await guardarZona(null, { ...zona, costo: "gratis" }, actor)).ok, false);
     assert.equal((await guardarZona(null, { ...zona, tiempo: "" }, actor)).ok, false);
     assert.equal((await guardarZona(null, { ...zona, costo: "0" }, actor)).ok, true);
     const z = await db.shippingZone.findFirstOrThrow({ where: { nombre: zona.nombre } });
-    assert.deepEqual([z.costo, z.municipios], [0, ["Morales", "Los Amates"]]);
+    assert.deepEqual([z.costo, z.departamentos, z.municipios], [0, ["Izabal"], ["Morales", "Los Amates"]]); // con el nombre oficial y sin repetir
+    assert.equal((await guardarZona(null, { ...zona, municipios: ["Flores"] }, actor)).ok, false); // Flores no es de Izabal
+    assert.equal((await guardarZona(null, { ...zona, departamentos: [], municipios: ["Morales"] }, actor)).ok, false); // sin departamento no se sabe cuál
+    assert.equal((await guardarZona(null, { ...zona, departamentos: ["Atlántida"], municipios: [] }, actor)).ok, false);
     assert.equal((await borrarZona(z.id, actor)).ok, true);
   });
 });

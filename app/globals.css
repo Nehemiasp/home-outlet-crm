@@ -185,6 +185,15 @@
   }
 }
 
+/* Campos de texto (inputs, áreas de texto y selectores) con foco: un solo trazo, el naranja (borde + 1 px). Fuera de las capas para ganarle al borde gris de las utilidades. */
+input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"]):focus-visible,
+textarea:focus-visible,
+[role="combobox"]:focus-visible {
+  outline: none;
+  border-color: var(--naranja);
+  box-shadow: 0 0 0 1px var(--naranja);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

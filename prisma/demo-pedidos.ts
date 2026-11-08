@@ -22,7 +22,7 @@ function azar(semilla: number) {
 }
 
 type Destino = "entregado" | "vencido" | "cancelado" | "pendiente_pago" | "en_revision" | "preparando" | "rechazo_y_entregado" | "duplicado";
-type Plan = { conv: { id: string; contactoId: string; canal: Canal; municipio: string | null }; creada: Date; destino: Destino };
+type Plan = { conv: { id: string; contactoId: string; canal: Canal }; creada: Date; destino: Destino };
 
 export async function sembrarPedidosDemo(db: PrismaClient, equipo: { id: string; nombre: string }[]) {
   if (await db.order.count()) return;
@@ -37,15 +37,16 @@ export async function sembrarPedidosDemo(db: PrismaClient, equipo: { id: string;
     db.shippingZone.findMany({ where: { activa: true } }),
     db.bankAccount.findMany({ where: { activa: true } }),
     db.product.findMany({ where: { activo: true }, include: { stock: true } }),
-    db.conversation.findMany({ where: { creada: { gte: new Date(ahora - 90 * DIA) } }, orderBy: { creada: "asc" }, select: { id: true, contactoId: true, canal: true, motivo: true, creada: true, contacto: { select: { municipio: true } } } }),
+    db.conversation.findMany({ where: { creada: { gte: new Date(ahora - 90 * DIA) } }, orderBy: { creada: "asc" }, select: { id: true, contactoId: true, canal: true, motivo: true, creada: true } }),
   ]);
-  const zonas = zonaFilas.map((z) => ({ id: z.id, nombre: z.nombre, municipios: z.municipios, costo: z.costo, tiempo: z.tiempo, activa: z.activa }));
+  const zonas = zonaFilas.map((z) => ({ id: z.id, nombre: z.nombre, departamentos: z.departamentos, municipios: z.municipios, costo: z.costo, tiempo: z.tiempo, activa: z.activa }));
   const bancos = [...new Set([...cuentas.map((c) => c.banco), "Banco G&T"])];
-  const municipios = ["Puerto Barrios", "Santo Tomás de Castilla", "Morales", "Morales", "Los Amates", "Livingston", "Río Dulce"];
+  // Lugares de entrega de la demostración: sobre todo Izabal, con algo del resto del país.
+  const lugares = [["Izabal", "Puerto Barrios"], ["Izabal", "Puerto Barrios"], ["Izabal", "Morales"], ["Izabal", "Morales"], ["Izabal", "Los Amates"], ["Izabal", "Livingston"], ["Guatemala", "Mixco"], ["Guatemala", "Villa Nueva"], ["Zacapa", "Zacapa"], ["Petén", "Flores"]] as const;
 
   /* ── Quién tiene pedido ── */
   const planes: Plan[] = [];
-  const d = (c: (typeof convs)[number]) => ({ id: c.id, contactoId: c.contactoId, canal: c.canal, municipio: c.contacto.municipio });
+  const d = (c: (typeof convs)[number]) => ({ id: c.id, contactoId: c.contactoId, canal: c.canal });
   const recientes = convs.filter((c) => c.creada.getTime() > ahora - 2 * DIA).slice(-7);
   const destinosHoy: Destino[] = ["pendiente_pago", "pendiente_pago", "en_revision", "en_revision", "en_revision", "duplicado", "pendiente_pago"];
   recientes.forEach((c, i) => planes.push({ conv: d(c), creada: new Date(Math.max(c.creada.getTime() + 20 * MIN, ahora - entre(1, 5) * HORA)), destino: destinosHoy[i % destinosHoy.length]! }));
@@ -96,8 +97,10 @@ export async function sembrarPedidosDemo(db: PrismaClient, equipo: { id: string;
     if (lineas.length === 0) continue;
 
     const subtotal = lineas.reduce((t, l) => t + l.precio * l.cantidad, 0);
-    const municipio = entrega === "envio" ? (plan.conv.municipio ?? elegir(municipios)) : (plan.conv.municipio ?? null);
-    const zona = entrega === "envio" ? zonaPara(zonas, municipio) : null;
+    const lugar = entrega === "envio" ? elegir(lugares) : null;
+    const departamento = lugar?.[0] ?? null;
+    const municipio = lugar?.[1] ?? null;
+    const zona = lugar ? zonaPara(zonas, departamento, municipio) : null;
     const descuento = r() < 0.08 ? { tipo: "porcentaje" as const, porcentaje: 5 } : null;
     const t = calcularTotales(lineas, descuento, zona ? costoEnvio(zona, subtotal, aj.envioGratisDesde) : 0);
 
@@ -193,7 +196,7 @@ export async function sembrarPedidosDemo(db: PrismaClient, equipo: { id: string;
     await db.order.create({
       data: {
         codigo: codigoDe(numero++), contactoId: plan.conv.contactoId, conversacionId: plan.conv.id, canal: plan.conv.canal, estado, entrega,
-        direccion: entrega === "envio" ? "Barrio El Centro, casa azul frente al parque" : null, municipio, zona: zona?.nombre ?? null, guia,
+        direccion: entrega === "envio" ? "Barrio El Centro, casa azul frente al parque" : null, departamento, municipio, zona: zona?.nombre ?? null, guia,
         subtotal: t.subtotal, descuentoMonto: t.descuentoMonto, descuentoMotivo: t.descuentoMonto > 0 ? "Cliente frecuente" : null, costoEnvio: t.costoEnvio, total: t.total,
         creadoPorId: creador.id, reservadoHasta, creada: plan.creada,
         lineas: { create: lineas },

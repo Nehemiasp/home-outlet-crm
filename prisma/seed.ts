@@ -92,7 +92,7 @@ async function main() {
 
   // Los usuarios no se borran: así conservan su contraseña. Solo se crean los que falten.
   const claves: string[] = [];
-  const asegurarUsuario = async (nombre: string, correo: string, rol: "admin" | "agente") => {
+  const asegurarUsuario = async (nombre: string, correo: string, rol: "admin" | "agente" | "bodega") => {
     const existente = await db.user.findUnique({ where: { correo } });
     if (existente) return existente;
     const c = clave();
@@ -101,6 +101,7 @@ async function main() {
   };
   const admin = await asegurarUsuario("Admin de prueba", "admin@homeoutlet.test", "admin");
   const agente = await asegurarUsuario("Agente de prueba", "agente@homeoutlet.test", "agente");
+  await asegurarUsuario("Bodega de prueba", "bodega@homeoutlet.test", "bodega"); // solo catálogo y despacho
 
   // Tres asesores más para probar el reparto: uno Disponible, uno En pausa (hace 12 min, almuerzo) y uno Desconectado.
   const carlos = await asegurarUsuario("Carlos Pérez", "carlos@homeoutlet.test", "agente");

@@ -6,15 +6,16 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { EstadoVacio } from "@/components/ui/estados";
 import { Insignia } from "@/components/ui/etiquetas";
-import { Boton, AreaTexto, Casilla, CampoTexto } from "@/components/ui/form";
+import { Boton, Casilla, CampoTexto, GrupoCasillas } from "@/components/ui/form";
 import { Modal } from "@/components/ui/estructura";
 import { useToast } from "@/components/ui/toast";
-import type { Zona } from "@/lib/pedidos/envio";
+import { DEPARTAMENTOS, municipiosDe } from "@/lib/guatemala";
+import { describirZona, type Zona } from "@/lib/pedidos/envio";
 import { formatQ } from "@/lib/utils";
 import { borrarZonaEnvio, guardarZonaEnvio } from "../actions";
 
-const NUEVA = { nombre: "", municipios: "", costo: "", tiempo: "", activa: true };
-const aForm = (z: Zona) => ({ nombre: z.nombre, municipios: z.municipios.join(", "), costo: (z.costo / 100).toFixed(2), tiempo: z.tiempo, activa: z.activa });
+const NUEVA = { nombre: "", departamentos: [] as string[], municipios: [] as string[], costo: "", tiempo: "", activa: true };
+const aForm = (z: Zona) => ({ nombre: z.nombre, departamentos: z.departamentos, municipios: z.municipios, costo: (z.costo / 100).toFixed(2), tiempo: z.tiempo, activa: z.activa });
 
 export function Zonas({ filas, recoger }: { filas: Zona[]; recoger: { direccion: string | null; horario: string | null } }) {
   const router = useRouter();
@@ -55,7 +56,7 @@ export function Zonas({ filas, recoger }: { filas: Zona[]; recoger: { direccion:
         <div className="min-w-0 flex-1 basis-64">
           <h2 id="t-envios" className="titulo-panel">Envíos</h2>
           <p className="cuerpo max-w-xl text-texto-suave">
-            El costo se calcula solo según el municipio del cliente. Una zona sin municipios sirve para «el resto del país».
+            El costo se calcula solo según el departamento y el municipio de entrega. Una zona puede cubrir departamentos enteros o solo algunos municipios; la que no marca ninguno sirve para «el resto del país».
           </p>
         </div>
         <Boton onClick={() => abrir("nueva")}>
@@ -88,7 +89,7 @@ export function Zonas({ filas, recoger }: { filas: Zona[]; recoger: { direccion:
                   {!z.activa && <Insignia>Desactivada</Insignia>}
                 </p>
                 <p className="cuerpo text-texto-suave">
-                  {z.municipios.length ? z.municipios.join(", ") : "Resto del país"} · {z.tiempo}
+                  {describirZona(z)} · {z.tiempo}
                 </p>
               </div>
               <div className="flex gap-2">
@@ -107,7 +108,22 @@ export function Zonas({ filas, recoger }: { filas: Zona[]; recoger: { direccion:
       <Modal abierto={editando !== null} onCerrar={() => setEditando(null)} titulo={editando === "nueva" ? "Nueva zona de envío" : "Editar zona de envío"}>
         <form onSubmit={guardar} className="flex flex-col gap-4">
           <CampoTexto etiqueta="Nombre de la zona" autoComplete="off" maxLength={60} value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} />
-          <AreaTexto etiqueta="Municipios" maxLength={1000} ayuda="Separados por coma. Déjelo vacío para «resto del país»." value={form.municipios} onChange={(e) => setForm({ ...form, municipios: e.target.value })} />
+          <GrupoCasillas
+            etiqueta="Departamentos"
+            ayuda="Marque los que cubre esta zona. Sin ninguno, la zona es «el resto del país»."
+            opciones={DEPARTAMENTOS.map((d) => ({ valor: d, texto: d }))}
+            valores={form.departamentos}
+            onCambio={(departamentos) => setForm({ ...form, departamentos, municipios: form.municipios.filter((m) => departamentos.some((d) => municipiosDe(d).includes(m))) })}
+          />
+          {form.departamentos.length > 0 && (
+            <GrupoCasillas
+              etiqueta="Solo algunos municipios (opcional)"
+              ayuda="Si no marca ninguno, la zona cubre todos los municipios de esos departamentos."
+              opciones={form.departamentos.flatMap((d) => municipiosDe(d).map((m) => ({ valor: m, texto: form.departamentos.length > 1 ? `${m} (${d})` : m })))}
+              valores={form.municipios}
+              onCambio={(municipios) => setForm({ ...form, municipios })}
+            />
+          )}
           <div className="grid gap-4 sm:grid-cols-2">
             <CampoTexto etiqueta="Costo (Q)" inputMode="decimal" autoComplete="off" maxLength={12} value={form.costo} onChange={(e) => setForm({ ...form, costo: e.target.value })} />
             <CampoTexto etiqueta="Tiempo estimado" autoComplete="off" maxLength={60} ayuda="Por ejemplo: 1 a 2 días." value={form.tiempo} onChange={(e) => setForm({ ...form, tiempo: e.target.value })} />

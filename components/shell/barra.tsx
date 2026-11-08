@@ -1,6 +1,6 @@
 "use client";
 
-import { BarChart3, Inbox, LogOut, MoreHorizontal, Package, Settings, ShoppingBag, Users } from "lucide-react";
+import { BarChart3, Inbox, LogOut, MoreHorizontal, Package, Settings, ShoppingBag, Truck, Users } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -9,15 +9,19 @@ import { salir } from "@/app/login/actions";
 import { Logo } from "@/components/brand/logo";
 import { ContadorNoLeidos } from "@/components/ui/etiquetas";
 import { AvisoAccionable } from "@/components/ui/estructura";
-import { puedeVerAjustes, puedeVerReportes, veTodo, type Rol } from "@/lib/permisos";
+import { esBodega, puedeDespachar, puedeVerAjustes, puedeVerReportes, veTodo, type Rol } from "@/lib/permisos";
 import { useActualizacion } from "@/lib/tiempo-real";
 import { useLatido } from "./latido";
 import { cn } from "@/lib/utils";
 
+// Bodega solo ve el despacho y el catálogo.
+const sinBodega = (u: { rol: Rol }) => !esBodega(u);
+
 const accesos: { href: string; texto: string; icono: typeof Inbox; permiso?: (u: { rol: Rol }) => boolean }[] = [
-  { href: "/bandeja", texto: "Bandeja", icono: Inbox },
-  { href: "/pedidos", texto: "Pedidos", icono: ShoppingBag },
-  { href: "/contactos", texto: "Contactos", icono: Users },
+  { href: "/despacho", texto: "Despacho", icono: Truck, permiso: puedeDespachar },
+  { href: "/bandeja", texto: "Bandeja", icono: Inbox, permiso: sinBodega },
+  { href: "/pedidos", texto: "Pedidos", icono: ShoppingBag, permiso: sinBodega },
+  { href: "/contactos", texto: "Contactos", icono: Users, permiso: sinBodega },
   { href: "/catalogo", texto: "Catálogo", icono: Package },
   { href: "/reportes", texto: "Reportes", icono: BarChart3, permiso: puedeVerReportes },
   { href: "/ajustes", texto: "Ajustes", icono: Settings, permiso: puedeVerAjustes },
@@ -29,7 +33,7 @@ const MAX_MOVIL = 6;
 export function Navegacion({ nombre, rol, porVerificar: verificarInicial, puedeVerificar, avisoPresupuesto }: { nombre: string; rol: Rol; porVerificar: number; puedeVerificar: boolean; avisoPresupuesto?: { porcentaje: number; agotado: boolean } }) {
   const ruta = usePathname();
   const { noLeidos, sinAsignar } = useLatido(); // el latido de la app trae también los contadores
-  const { datos: porVerificarVivo } = useActualizacion("por-verificar", pagosPorVerificar, 10_000);
+  const { datos: porVerificarVivo } = useActualizacion("por-verificar", puedeVerificar ? pagosPorVerificar : async () => 0, 10_000);
   const porVerificar = puedeVerificar ? (porVerificarVivo ?? verificarInicial) : 0;
   const visibles = accesos.filter((a) => !a.permiso || a.permiso({ rol }));
   const activo = (href: string) => ruta === href || ruta.startsWith(href + "/");

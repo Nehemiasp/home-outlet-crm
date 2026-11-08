@@ -11,6 +11,7 @@ import type { TipoPago } from "@/generated/prisma/client";
 import { ETIQUETA_ESTADO } from "@/lib/pedidos/estados";
 import { compatibleConEntrega } from "@/lib/pedidos/metodos";
 import type { DatosPanelPedido, EntradaPedido, ProductoPedido, VistaPedido } from "@/lib/pedidos/tipos";
+import { DEPARTAMENTOS, municipiosDe } from "@/lib/guatemala";
 import { formatQ } from "@/lib/utils";
 import { abrirPanelPedido, buscarProductosPedido, cargarBorradorPedido, enviarPedido, guardarBorradorPedido, previsualizarPedido } from "./pedido-actions";
 
@@ -30,7 +31,7 @@ export function PanelPedido({ abierto, onCerrar, conversacionId, puedeEnviar, on
   const [textoCopiable, setTextoCopiable] = useState("");
 
   const [pedidoId, setPedidoId] = useState<string | null>(null);
-  const [cliente, setCliente] = useState({ nombre: "", telefono: "", municipio: "" });
+  const [cliente, setCliente] = useState({ nombre: "", telefono: "", departamento: "", municipio: "" });
   const [lineas, setLineas] = useState<Linea[]>([]);
   const [entrega, setEntrega] = useState<"recoger" | "envio">("recoger");
   const [metodoPago, setMetodoPago] = useState<TipoPago | null>(null);
@@ -253,10 +254,7 @@ export function PanelPedido({ abierto, onCerrar, conversacionId, puedeEnviar, on
           <section aria-label="Cliente" className="flex flex-col gap-3">
             <h3 className="cuerpo-fuerte">Cliente</h3>
             <CampoTexto etiqueta="Nombre" autoComplete="off" maxLength={80} value={cliente.nombre} onChange={(e) => setCliente({ ...cliente, nombre: e.target.value })} />
-            <div className="grid gap-3 sm:grid-cols-2">
-              <CampoTexto etiqueta="Teléfono" autoComplete="off" inputMode="tel" maxLength={20} value={cliente.telefono} onChange={(e) => setCliente({ ...cliente, telefono: e.target.value })} />
-              <CampoTexto etiqueta="Municipio" autoComplete="off" maxLength={60} value={cliente.municipio} onChange={(e) => setCliente({ ...cliente, municipio: e.target.value })} />
-            </div>
+            <CampoTexto etiqueta="Teléfono" autoComplete="off" inputMode="tel" maxLength={20} value={cliente.telefono} onChange={(e) => setCliente({ ...cliente, telefono: e.target.value })} />
           </section>
 
           <section aria-label="Productos" className="flex flex-col gap-3">
@@ -351,6 +349,23 @@ export function PanelPedido({ abierto, onCerrar, conversacionId, puedeEnviar, on
             </div>
             {entrega === "envio" && (
               <>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Selector
+                    etiqueta="Departamento"
+                    placeholder="Elegir departamento…"
+                    value={cliente.departamento}
+                    onCambio={(v) => setCliente({ ...cliente, departamento: v, municipio: "" })}
+                    opciones={DEPARTAMENTOS.map((d) => ({ valor: d, texto: d }))}
+                  />
+                  <Selector
+                    etiqueta="Municipio"
+                    placeholder={cliente.departamento ? "Elegir municipio…" : "Elija primero el departamento"}
+                    disabled={!cliente.departamento}
+                    value={cliente.municipio}
+                    onCambio={(v) => setCliente({ ...cliente, municipio: v })}
+                    opciones={municipiosDe(cliente.departamento).map((m) => ({ valor: m, texto: m }))}
+                  />
+                </div>
                 <AreaTexto etiqueta="Dirección de entrega" maxLength={300} value={direccion} onChange={(e) => setDireccion(e.target.value)} />
                 <CampoTexto etiqueta="Referencia" autoComplete="off" maxLength={200} ayuda="Por ejemplo: casa azul frente a la iglesia." value={referencia} onChange={(e) => setReferencia(e.target.value)} />
                 {vista?.zona && (

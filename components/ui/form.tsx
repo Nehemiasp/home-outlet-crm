@@ -1,7 +1,7 @@
 "use client";
 
 import { AlertCircle, Check, ChevronDown, Loader2, Search, X, type LucideIcon } from "lucide-react";
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Tooltip } from "./tooltip";
 
@@ -209,6 +209,10 @@ export function Selector({
   const [interno, setInterno] = useState(defaultValue);
   const [abierto, setAbierto] = useState(false);
   const [activo, setActivo] = useState(-1);
+  // La lista va con posición fija (calculada desde el campo) para que no la recorte una ventana ni un panel con desplazamiento.
+  const [pos, setPos] = useState<{ top?: number; bottom?: number; left: number; width: number; maxHeight: number } | null>(null);
+  const caja = useRef<HTMLDivElement>(null);
+  const lista = useRef<HTMLUListElement>(null);
 
   const valor = value ?? interno;
   const elegida = opciones.find((o) => o.valor === valor);
@@ -219,6 +223,13 @@ export function Selector({
     return desde;
   };
   const abrir = () => {
+    const r = caja.current?.getBoundingClientRect();
+    if (r) {
+      const abajo = window.innerHeight - r.bottom - 12;
+      const arriba = r.top - 12;
+      const haciaArriba = abajo < 200 && arriba > abajo; // casi no cabe hacia abajo: se abre hacia arriba
+      setPos({ left: r.left, width: r.width, maxHeight: Math.max(120, Math.min(288, haciaArriba ? arriba : abajo)), ...(haciaArriba ? { bottom: window.innerHeight - r.top + 4 } : { top: r.bottom + 4 }) });
+    }
     const i = opciones.findIndex((o) => o.valor === valor);
     setActivo(i >= 0 ? i : mover(-1, 1));
     setAbierto(true);
@@ -230,6 +241,18 @@ export function Selector({
     onCambio?.(o.valor);
     setAbierto(false);
   };
+
+  // Si la página o la ventana se desplaza (no la propia lista) o cambia de tamaño, se cierra: la lista ya no estaría pegada al campo.
+  useEffect(() => {
+    if (!abierto) return;
+    const cerrar = (e: Event) => !lista.current?.contains(e.target as Node) && setAbierto(false);
+    window.addEventListener("scroll", cerrar, true);
+    window.addEventListener("resize", cerrar);
+    return () => {
+      window.removeEventListener("scroll", cerrar, true);
+      window.removeEventListener("resize", cerrar);
+    };
+  }, [abierto]);
 
   const alTeclear = (e: React.KeyboardEvent) => {
     if (disabled) return;
@@ -271,7 +294,7 @@ export function Selector({
 
   return (
     <Envoltura id={cid} etiqueta={etiqueta} etiquetaOculta={etiquetaOculta} ayuda={ayuda} error={error}>
-      <div className="relative">
+      <div ref={caja} className="relative">
         <button
           id={cid}
           type="button"
@@ -295,13 +318,15 @@ export function Selector({
           <ChevronDown className={cn("size-4 shrink-0 text-texto-suave transition-transform duration-150", abierto && "rotate-180")} aria-hidden />
         </button>
         {name && <input type="hidden" name={name} value={valor} />}
-        {abierto && (
+        {abierto && pos && (
           <ul
+            ref={lista}
             id={`${cid}-lista`}
             role="listbox"
             aria-label={etiqueta}
             onMouseDown={(e) => e.preventDefault()}
-            className="absolute z-20 mt-1 max-h-72 w-full overflow-y-auto rounded-tarjeta border border-linea bg-superficie py-1 shadow-menu"
+            style={pos}
+            className="fixed z-50 overflow-y-auto rounded-tarjeta border border-linea bg-superficie py-1 shadow-menu"
           >
             {opciones.map((o, i) => (
               <li
@@ -340,6 +365,25 @@ export function Casilla({ etiqueta, className, ...props }: { etiqueta: string } 
       <input type="checkbox" className="size-5 cursor-pointer disabled:cursor-not-allowed" {...props} />
       {etiqueta}
     </label>
+  );
+}
+
+/* ── Grupo de casillas: varias opciones de una lista larga (con desplazamiento), por ejemplo los departamentos de una zona ── */
+export function GrupoCasillas({ etiqueta, ayuda, opciones, valores, onCambio, vacio = "No hay opciones.", className }: { etiqueta: string; ayuda?: string; opciones: { valor: string; texto: string }[]; valores: string[]; onCambio: (valores: string[]) => void; vacio?: string; className?: string }) {
+  return (
+    <fieldset className={cn("flex min-w-0 flex-col gap-1", className)}>
+      <legend className="cuerpo-fuerte mb-1">{etiqueta}</legend>
+      {ayuda && <p className="meta text-texto-suave">{ayuda}</p>}
+      {opciones.length === 0 ? (
+        <p className="meta rounded-campo bg-fondo p-3 text-texto-suave">{vacio}</p>
+      ) : (
+        <div className="grid max-h-48 gap-x-3 overflow-y-auto rounded-campo border border-linea p-2 sm:grid-cols-2">
+          {opciones.map((o) => (
+            <Casilla key={o.valor} etiqueta={o.texto} checked={valores.includes(o.valor)} onChange={(e) => onCambio(e.target.checked ? [...valores, o.valor] : valores.filter((v) => v !== o.valor))} />
+          ))}
+        </div>
+      )}
+    </fieldset>
   );
 }
 

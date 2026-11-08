@@ -41,7 +41,11 @@ export async function cambiarRol(id: string, rol: Rol, actor: Actor): Promise<Re
   if (!u) return fallo("El usuario ya no existe.");
   if (u.rol === rol) return { ok: true };
   if (dejaSinAdmin(await adminsActivos(), u.rol === "admin" && u.activo)) return fallo("Debe quedar al menos un administrador activo.");
-  await db.user.update({ where: { id }, data: { rol } });
+  // Bodega no atiende conversaciones ni verifica pagos: al pasar a ese rol suelta lo que tuviera asignado y pierde ese permiso.
+  await db.$transaction([
+    db.user.update({ where: { id }, data: { rol, ...(rol === "bodega" ? { puedeVerificarPagos: false } : {}) } }),
+    ...(rol === "bodega" ? [db.conversation.updateMany({ where: { asignadaAId: id }, data: { asignadaAId: null } })] : []),
+  ]);
   await log(actor, "cambiar_rol", "User", id, { correo: u.correo, de: u.rol, a: rol });
   return { ok: true };
 }
@@ -65,6 +69,7 @@ export async function cambiarActivo(id: string, activo: boolean, actor: Actor): 
 export async function cambiarPermisoPagos(id: string, puede: boolean, actor: Actor): Promise<Resultado> {
   const u = await db.user.findUnique({ where: { id } });
   if (!u) return fallo("El usuario ya no existe.");
+  if (u.rol === "bodega") return fallo("El rol de bodega no verifica pagos.");
   if (u.puedeVerificarPagos === puede) return { ok: true };
   await db.user.update({ where: { id }, data: { puedeVerificarPagos: puede } });
   await log(actor, "permiso_pagos", "User", id, { correo: u.correo, puede });

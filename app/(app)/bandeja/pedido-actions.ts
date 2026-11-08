@@ -11,7 +11,7 @@ const id = z.string().min(1).max(40);
 const entrada = z.object({
   pedidoId: id.nullable(),
   conversacionId: id,
-  cliente: z.object({ nombre: z.string().max(200), telefono: z.string().max(40), municipio: z.string().max(100) }),
+  cliente: z.object({ nombre: z.string().max(200), telefono: z.string().max(40), departamento: z.string().max(60), municipio: z.string().max(100) }),
   lineas: z.array(z.object({ productoId: id, cantidad: z.number(), ubicacionId: id.nullable() })).max(100),
   entrega: z.enum(["recoger", "envio"]),
   direccion: z.string().max(600),

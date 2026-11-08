@@ -66,7 +66,7 @@ describe("crear y enviar pedidos (con base de datos)", () => {
 
   const base = (sobre: Partial<EntradaPedido> = {}): EntradaPedido => ({
     pedidoId: null, conversacionId: convSim,
-    cliente: { nombre: "PRUEBA-CR cliente", telefono: "", municipio: "" },
+    cliente: { nombre: "PRUEBA-CR cliente", telefono: "", departamento: "", municipio: "" },
     lineas: [{ productoId: producto.id, cantidad: 2, ubicacionId: null }],
     entrega: "recoger", direccion: "", referencia: "", descuento: null, descuentoMotivo: "", notas: "", metodoPago: "transferencia", ...sobre,
   });
@@ -93,11 +93,12 @@ describe("crear y enviar pedidos (con base de datos)", () => {
     const contacto = await db.contact.create({ data: { nombre: "PRUEBA-CR cliente" } });
     contactoId = contacto.id;
     await db.channelIdentity.createMany({ data: [{ contactoId, canal: "simulado", externalContactId: "prueba-cr-sim" }, { contactoId, canal: "tiktok", externalContactId: "prueba-cr-tt" }] });
+    process.env.CHANNELS_ENABLED = "simulado"; // «TikTok» hace de canal sin adaptador activo (no depende de lo que haya en el .env de desarrollo)
     const ahora = new Date();
     convSim = (await db.conversation.create({ data: { contactoId, canal: "simulado", lastInboundAt: ahora } })).id;
     convTikTok = (await db.conversation.create({ data: { contactoId, canal: "tiktok", lastInboundAt: ahora } })).id;
 
-    await db.shippingZone.create({ data: { nombre: "PRUEBA-CR Zona", municipios: ["PRUEBA-CR Ciudad"], costo: 2_500, tiempo: "1 día" } });
+    await db.shippingZone.create({ data: { nombre: "PRUEBA-CR Zona", departamentos: ["Petén"], municipios: ["Flores"], costo: 2_500, tiempo: "1 día" } });
     await db.bankAccount.create({ data: { banco: "PRUEBA-CR Banco", tipo: "monetaria", numero: "000-000000-0", titular: "Home Outlet" } });
   });
   after(async () => {
@@ -130,11 +131,15 @@ describe("crear y enviar pedidos (con base de datos)", () => {
   });
 
   test("envío: pide municipio y dirección, calcula la zona y el costo, y respeta el envío gratis", async () => {
-    const e = base({ entrega: "envio", cliente: { nombre: "PRUEBA-CR cliente", telefono: "", municipio: "PRUEBA-CR Ciudad" }, direccion: "Calle 1" });
+    const e = base({ entrega: "envio", cliente: { nombre: "PRUEBA-CR cliente", telefono: "", departamento: "Petén", municipio: "Flores" }, direccion: "Calle 1" });
     const v = await previsualizar(e, admin);
     assert.ok(v.ok && v.vista.costoEnvio === 2_500 && v.vista.total === 22_500 && v.vista.zona?.nombre === "PRUEBA-CR Zona");
     assert.equal((await previsualizar({ ...e, direccion: " " }, admin)).ok, false);
     assert.equal((await previsualizar({ ...e, cliente: { ...e.cliente, municipio: "" } }, admin)).ok, false);
+    assert.equal((await previsualizar({ ...e, cliente: { ...e.cliente, departamento: "" } }, admin)).ok, false);
+    // el municipio tiene que ser del departamento: «Morales» no está en Petén
+    const fuera = await previsualizar({ ...e, cliente: { ...e.cliente, municipio: "Morales" } }, admin);
+    assert.ok(!fuera.ok && /municipio/i.test(fuera.error));
 
     await ajustes({ envioGratisDesde: 20_000 });
     const gratis = await previsualizar(e, admin);
@@ -163,7 +168,7 @@ describe("crear y enviar pedidos (con base de datos)", () => {
   });
 
   test("guardar borrador: código consecutivo con el prefijo, contacto actualizado y edición del borrador", async () => {
-    const c = base({ cliente: { nombre: "PRUEBA-CR cliente", telefono: "5555 0101", municipio: "PRUEBA-CR Ciudad" } });
+    const c = base({ cliente: { nombre: "PRUEBA-CR cliente", telefono: "5555 0101", departamento: "petén", municipio: "FLORES" } });
     const uno = await guardarBorrador(c, agente);
     assert.ok(uno.ok);
     assert.match(uno.codigo, /^PRCR-\d{6}$/);
@@ -172,7 +177,7 @@ describe("crear y enviar pedidos (con base de datos)", () => {
     assert.equal(Number(dos.codigo.slice(5)), Number(uno.codigo.slice(5)) + 1);
 
     const contacto = await db.contact.findUniqueOrThrow({ where: { id: contactoId } });
-    assert.deepEqual([contacto.telefono, contacto.municipio], ["+50255550101", "PRUEBA-CR Ciudad"]);
+    assert.deepEqual([contacto.telefono, contacto.departamento, contacto.municipio], ["+50255550101", "Petén", "Flores"]); // se guardan con el nombre oficial
 
     const editado = await guardarBorrador({ ...c, pedidoId: uno.pedidoId, lineas: [{ productoId: producto.id, cantidad: 5, ubicacionId: null }] }, agente);
     assert.ok(editado.ok && editado.codigo === uno.codigo);
@@ -198,7 +203,8 @@ describe("crear y enviar pedidos (con base de datos)", () => {
     assert.ok(r.ok);
     assert.match(r.texto, new RegExp(`^Pedido ${g.codigo}\\n\\n3 × ${p.nombre.replace(/[-]/g, "\\-")}   Q300\\.00\\nRecoger en tienda`));
     assert.match(r.texto, /PRUEBA-CR Banco · Monetaria 000-000000-0 · Home Outlet/);
-    assert.match(r.texto, /Apartamos sus productos por 24 horas\.$/);
+    assert.match(r.texto, /Apartamos sus productos por 24 horas\./);
+    assert.match(r.texto, /Envíenos la foto del comprobante por este chat/);
 
     const o = await db.order.findUniqueOrThrow({ where: { id: g.pedidoId } });
     assert.equal(o.estado, "pendiente_pago");

@@ -1,5 +1,6 @@
 import { adaptador } from "@/lib/canales";
-import type { InboundMessage, OutboundMessage } from "@/lib/canales/tipos";
+import type { Channel, InboundMessage, OutboundMessage } from "@/lib/canales/tipos";
+import { textoVentanaCerrada } from "@/lib/canales/ventana";
 import { db } from "@/lib/db";
 import { normalizarTelefono } from "@/lib/telefono";
 
@@ -55,6 +56,31 @@ export async function recibirMensaje(m: InboundMessage): Promise<{ duplicado: bo
   }
 }
 
+/** Cuántos mensajes de la plataforma ocupa un mensaje nuestro (la tarjeta de producto o un texto largo salen partidos). Lo dice el canal. */
+const pesoDe = (canal: Channel, tipo: string, texto?: string | null) =>
+  adaptador(canal)?.contarMensajes?.({ type: tipo === "product" ? "product" : tipo === "image" ? "image" : "text", text: texto ?? undefined }) ?? 1;
+
+/**
+ * Cuántos mensajes más se pueden mandar sin que el cliente vuelva a escribir, o null si el canal no tiene tope (TikTok: 10 seguidos).
+ * Cuenta lo que ya salió desde el último mensaje del cliente; lo que falló no cuenta.
+ */
+export async function salientesRestantes(conv: { id: string; canal: Channel; lastInboundAt: Date | null }): Promise<number | null> {
+  const tope = adaptador(conv.canal)?.maxSalientes;
+  if (!tope) return null;
+  const filas = await db.message.findMany({
+    where: { conversacionId: conv.id, direccion: "saliente", estado: { not: "fallo" }, ...(conv.lastInboundAt ? { fecha: { gt: conv.lastInboundAt } } : {}) },
+    select: { tipo: true, texto: true },
+  });
+  return Math.max(0, tope - filas.reduce((n, m) => n + pesoDe(conv.canal, m.tipo, m.texto), 0));
+}
+
+/** El motivo por el que un mensaje no cabe en el tope del canal, o null si cabe. */
+async function topeSuperado(conv: { id: string; canal: Channel; lastInboundAt: Date | null }, peso: number): Promise<string | null> {
+  const quedan = await salientesRestantes(conv);
+  if (quedan === null || quedan >= peso) return null;
+  return `Este canal solo permite ${adaptador(conv.canal)!.maxSalientes} mensajes seguidos sin que el cliente responda. Podrá escribir cuando el cliente vuelva a escribir.`;
+}
+
 export type ResultadoEnvio = { ok: true; mensajeId: string } | { ok: false; error: string; mensajeId?: string };
 
 /** Envía un mensaje al cliente por el canal de la conversación. Si el canal falla, el mensaje queda en "fallo" para reintentar. */
@@ -66,9 +92,11 @@ export async function enviarMensaje(p: { conversacionId: string; usuarioId?: str
   const canal = adaptador(conv.canal);
   if (!canal) return { ok: false, error: "Este canal todavía no está conectado." };
   // Una plantilla es justamente lo que sí se puede enviar con la ventana cerrada.
-  if (p.mensaje.type !== "template" && !canal.canSendFreeForm(conv)) return { ok: false, error: "Pasaron más de 24 horas desde el último mensaje del cliente. Solo se pueden enviar plantillas aprobadas." };
+  if (p.mensaje.type !== "template" && !canal.canSendFreeForm(conv)) return { ok: false, error: textoVentanaCerrada(conv.canal) };
   const identidad = conv.contacto.identidades.find((i) => i.canal === conv.canal);
   if (!identidad) return { ok: false, error: "El contacto no tiene datos para este canal." };
+  const tope = await topeSuperado(conv, pesoDe(conv.canal, p.mensaje.type, p.mensaje.text));
+  if (tope) return { ok: false, error: tope };
 
   const { type, text, mediaUrl, productId } = p.mensaje;
   const msg = await db.message.create({
@@ -100,9 +128,11 @@ export async function reintentarMensaje(mensajeId: string): Promise<ResultadoEnv
   const conv = msg.conversacion;
   const canal = adaptador(conv.canal);
   if (!canal) return { ok: false, error: "Este canal todavía no está conectado.", mensajeId };
-  if (!canal.canSendFreeForm(conv)) return { ok: false, error: "Pasaron más de 24 horas desde el último mensaje del cliente. Solo se pueden enviar plantillas aprobadas.", mensajeId };
+  if (!canal.canSendFreeForm(conv)) return { ok: false, error: textoVentanaCerrada(conv.canal), mensajeId };
   const identidad = conv.contacto.identidades.find((i) => i.canal === conv.canal);
   if (!identidad) return { ok: false, error: "El contacto no tiene datos para este canal.", mensajeId };
+  const tope = await topeSuperado(conv, pesoDe(conv.canal, msg.tipo, msg.texto));
+  if (tope) return { ok: false, error: tope, mensajeId };
 
   await db.message.update({ where: { id: msg.id }, data: { estado: "enviando" } });
   try {

@@ -7,9 +7,9 @@ import { Burbuja, Compositor, EstadoEntrega, ItemConversacion, SeparadorDia, typ
 import { EstadoVacio, Esqueleto, EsqueletoConversacion } from "@/components/ui/estados";
 import { Avatar, AvatarAsistente, AvatarConCanal, ContadorNoLeidos, IconoCanal, Insignia, InsigniaAtencion, InsigniaCanal, InsigniaConversacion, InsigniaEstado, InsigniaEtiqueta, InsigniaExistencia, InsigniaPago, LogoCanal, nombreCanal, tonos, tonosEstado, type Tono, type TonoEstado } from "@/components/ui/etiquetas";
 import { ListaCompras } from "@/components/ui/pedidos";
-import { AreaTexto, Boton, BotonIcono, Buscador, CampoTexto, Casilla, ControlSegmentado, Interruptor, Selector } from "@/components/ui/form";
+import { AreaTexto, Boton, BotonIcono, Buscador, CampoTexto, Casilla, ControlSegmentado, GrupoCasillas, Interruptor, Selector } from "@/components/ui/form";
 import { ControlDisponibilidad, InsigniaDisponibilidad, ModalPausaLarga } from "@/components/ui/disponibilidad";
-import { ModalDevolver, ResumenEquipo, TablaEquipo } from "@/components/ui/equipo";
+import { ModalAsignar, ModalDevolver, ResumenEquipo, TablaEquipo } from "@/components/ui/equipo";
 import { ModalPlantillas } from "@/components/ui/plantillas";
 import { AvisoAccionable, BotonFiltros, EncabezadoPagina, enlaceTabla, LineaDePasos, MenuDesplegable, Modal, PanelLateral, PestanasConContador, Tabla, type Columna, type Orden } from "@/components/ui/estructura";
 import { useToast } from "@/components/ui/toast";
@@ -147,6 +147,7 @@ export function Guia() {
   const [busqueda, setBusqueda] = useState("");
   const [pestana, setPestana] = useState("sin-asignar");
   const [interruptor, setInterruptor] = useState(true);
+  const [zonasMarcadas, setZonasMarcadas] = useState<string[]>(["Izabal"]);
   const [modal, setModal] = useState(false);
   const [panel, setPanel] = useState(false);
   const [pagina, setPagina] = useState(1);
@@ -157,6 +158,7 @@ export function Guia() {
   const [cargando, setCargando] = useState(false);
   const [pausaLarga, setPausaLarga] = useState(false);
   const [devolver, setDevolver] = useState(false);
+  const [asignar, setAsignar] = useState(false);
   const [plantillas, setPlantillas] = useState(false);
 
   const filas = useMemo(() => {
@@ -431,6 +433,13 @@ export function Guia() {
                   <Casilla etiqueta="Producto activo" defaultChecked />
                   <Casilla etiqueta="Deshabilitada" disabled />
                 </div>
+                <GrupoCasillas
+                  etiqueta="Departamentos que cubre la zona"
+                  ayuda="Varias opciones de una lista larga, con desplazamiento."
+                  opciones={["Guatemala", "Izabal", "Petén", "Zacapa"].map((d) => ({ valor: d, texto: d }))}
+                  valores={zonasMarcadas}
+                  onCambio={setZonasMarcadas}
+                />
                 <div className="flex flex-wrap gap-6">
                   <Interruptor etiqueta="Nota interna" activo={interruptor} onCambio={setInterruptor} />
                   <Interruptor etiqueta="Deshabilitado" activo={false} onCambio={() => {}} disabled />
@@ -592,7 +601,7 @@ export function Guia() {
               <Burbuja tipo="entrante" texto="¿Tienen todavía la pantalla para carro?" hora="10:42" />
               <Burbuja tipo="saliente" texto="Buenos días. Déjeme confirmar la existencia." hora="10:44" estado="leido" autor="Agente de prueba" />
               <Burbuja tipo="nota" texto="Quedan 2 en bodega, confirmar con la tienda." hora="10:45" autor="Agente de prueba" />
-              <Burbuja tipo="producto" hora="10:46" estado="entregado" producto={{ nombre: "Pantalla para carro 9 pulgadas", sku: "EL-001", precioCentavos: 125000, existencia: 2 }} />
+              <Burbuja tipo="producto" hora="10:46" estado="entregado" producto={{ nombre: "Pantalla para carro 9 pulgadas", sku: "EL-001", precioCentavos: 125000, existencia: 2, imagenUrl: "/placeholder/producto.svg" }} />
               <Burbuja tipo="saliente" texto="Este mensaje no salió." hora="10:47" estado="fallo" onReintentar={() => avisar("Reintentando envío")} />
               <Burbuja
                 tipo="saliente"
@@ -609,6 +618,20 @@ export function Guia() {
                   total: 164800,
                   cuentas: [{ banco: "Banco de prueba", tipo: "monetaria", numero: "000-000000-0", titular: "Home Outlet (ficticio)" }],
                 }}
+              />
+              <Burbuja
+                tipo="saliente"
+                hora="10:49"
+                estado="entregado"
+                autor="Agente de prueba"
+                pedido={{ id: "demo", codigo: "HO-000124", estado: "pendiente_pago", lineas: [{ nombre: "Cubreasientos universal", cantidad: 1, total: 19900 }], descuento: 0, envio: "Recoger en tienda", total: 19900, cuentas: [], formaPago: "tarjeta", enlace: "https://pago.ejemplo.com/demo" }}
+              />
+              <Burbuja
+                tipo="saliente"
+                hora="10:50"
+                estado="entregado"
+                autor="Agente de prueba"
+                pedido={{ id: "demo", codigo: "HO-000125", estado: "pendiente_pago", lineas: [{ nombre: "Organizador de maletero", cantidad: 1, total: 12900 }], descuento: 0, envio: "Recoger en tienda", total: 12900, cuentas: [], formaPago: "efectivo_en_tienda" }}
               />
               <Burbuja tipo="sistema" tono="neutro" texto="Conversación asignada a Agente de prueba" />
               <Burbuja tipo="sistema" tono="info" texto="El asistente pasó la conversación a un asesor" />
@@ -749,9 +772,12 @@ export function Guia() {
                   ]}
                 />
               </div>
-              <div>
+              <div className="flex flex-wrap gap-2">
                 <Boton variante="secundario" tamano="sm" onClick={() => setDevolver(true)}>
                   Ver «Devolver a la cola»
+                </Boton>
+                <Boton variante="secundario" tamano="sm" onClick={() => setAsignar(true)}>
+                  Ver «Asignar a otra persona»
                 </Boton>
               </div>
             </div>
@@ -902,6 +928,15 @@ export function Guia() {
           { nombre: "pedido_listo", idioma: "es", categoria: "UTILITY", cuerpo: "Hola {{1}}, su pedido {{2}} ya está listo para recoger. Lo esperamos en Home Outlet.", variables: 2 },
         ]}
         onEnviar={() => (setPlantillas(false), avisar("Plantilla enviada"))}
+      />
+      <ModalAsignar
+        abierto={asignar}
+        usuarios={[{ id: "1", nombre: "Admin de prueba" }, { id: "2", nombre: "Agente de prueba" }, { id: "3", nombre: "Carlos Pérez" }]}
+        actualId="2"
+        yoId="1"
+        onCerrar={() => setAsignar(false)}
+        onAsignar={() => (setAsignar(false), avisar("Conversación asignada"))}
+        onQuitar={() => (setAsignar(false), avisar("Asignación quitada"))}
       />
       <ModalDevolver abierto={devolver} onCerrar={() => setDevolver(false)} onDevolver={() => (setDevolver(false), avisar("Devuelta a la cola"))} />
       <ModalPausaLarga abierto={pausaLarga} minutos={15} onActivar={() => (setPausaLarga(false), avisar("Disponible otra vez"))} onSeguir={() => setPausaLarga(false)} />

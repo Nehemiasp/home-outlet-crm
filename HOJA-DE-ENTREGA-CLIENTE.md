@@ -68,7 +68,7 @@ Para que pase de demostración a **funcionar con clientes reales** nos faltan co
 - Una cuenta de **Instagram profesional** (de empresa) **vinculada a esa Página**. Si hoy es personal, se cambia en Instagram: Configuración → Tipo de cuenta → Cambiar a cuenta profesional.
 - Que la persona que administra la Página nos agregue (**Configuración de la Página → Acceso a la página → Agregar nuevo → control total**) o, mejor, que la Página esté dentro de la cuenta de Meta Business de la sección A.
 
-**Mensaje claro sobre TikTok:** hoy el sistema **no se conecta a los mensajes de TikTok**. Si es un canal importante para ustedes, díganlo y lo evaluamos como trabajo aparte.
+**TikTok:** el sistema ya trae el canal de TikTok, probado con una simulación. Para usarlo con la cuenta real hace falta que **TikTok apruebe el acceso a mensajes** de la cuenta de TikTok Business del negocio (ver la propuesta, sección VI). Reglas de TikTok: el cliente siempre escribe primero, se puede responder hasta 48 horas después de su último mensaje y hasta 10 mensajes seguidos sin que vuelva a escribir; no hay plantillas y no se pueden enviar videos ni notas de voz.
 
 ---
 
@@ -112,12 +112,12 @@ Una fila por cuenta. Estos datos se le envían al cliente cuando se le manda el 
 
 ### E4. Zonas de envío
 
-Una fila por zona. El sistema calcula el costo al elegir el municipio del cliente.
+Una fila por zona. El sistema calcula el costo con el departamento y el municipio de entrega (toda Guatemala está en el sistema). Una zona puede cubrir **departamentos enteros** o **solo algunos municipios** de ellos; si no marcan ninguno, la zona vale para «el resto del país».
 
-| Nombre de la zona | Municipios que incluye | Costo (Q) | Tiempo estimado (ej. «1 a 2 días») |
-|---|---|---|---|
-| | | | |
-| | | | |
+| Nombre de la zona | Departamentos que cubre | Solo estos municipios (si no es todo el departamento) | Costo (Q) | Tiempo estimado (ej. «1 a 2 días») |
+|---|---|---|---|---|
+| | | | | |
+| | | | | |
 
 Indiquen también: ¿**envío gratis** a partir de qué monto? `[monto o «no hay»]`
 

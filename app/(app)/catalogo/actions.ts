@@ -5,7 +5,7 @@ import { MAX_BYTES, almacenamiento, extensionDeImagen } from "@/lib/almacenamien
 import * as catalogo from "@/lib/catalogo";
 import type { CategoriaDTO, DatosProducto, FilaProducto, FilaVistaPrevia, FiltrosCatalogo, ProductoDetalle, Ubicacion } from "@/lib/catalogo-tipos";
 import { puedeGestionarProductos } from "@/lib/permisos";
-import { requireUsuario } from "@/lib/session";
+import { requireConBodega, requireUsuario } from "@/lib/session";
 
 type Resultado = { ok: true } | { ok: false; error: string };
 const fallo = (error: string): { ok: false; error: string } => ({ ok: false, error });
@@ -28,7 +28,7 @@ const filtros = z.object({
 });
 
 export async function listar(f: FiltrosCatalogo): Promise<{ filas: FilaProducto[]; total: number; paginas: number; ubicaciones: Ubicacion[] }> {
-  await requireUsuario();
+  await requireConBodega(); // bodega también mira el catálogo
   return catalogo.listarProductos(filtros.parse(f));
 }
 
@@ -38,7 +38,7 @@ export async function obtener(productoId: string): Promise<ProductoDetalle | nul
 }
 
 export async function opciones(): Promise<{ ubicaciones: Ubicacion[]; categorias: CategoriaDTO[] }> {
-  await requireUsuario();
+  await requireConBodega();
   return { ubicaciones: await catalogo.ubicaciones(), categorias: await catalogo.categorias() };
 }
 

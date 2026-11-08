@@ -144,7 +144,7 @@ async function nombreDePerfil(p: Plataforma, id: string): Promise<string | undef
 }
 
 /** Descarga una imagen entrante (la dirección es pública y temporal) y la guarda. null si no se pudo o pesa demasiado. */
-async function guardarImagenEntrante(url: string): Promise<string | null> {
+export async function guardarImagenEntrante(url: string): Promise<string | null> {
   try {
     const r = await fetch(url);
     if (!r.ok) return null;

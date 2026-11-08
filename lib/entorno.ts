@@ -24,6 +24,7 @@ export function revisarEntorno(env: Env): Revision {
     whatsapp: ["WhatsApp", ["WHATSAPP_TOKEN", "WHATSAPP_PHONE_NUMBER_ID", "WHATSAPP_APP_SECRET", "WHATSAPP_VERIFY_TOKEN"]],
     facebook: ["Facebook", ["FACEBOOK_PAGE_TOKEN", "FACEBOOK_PAGE_ID", "FACEBOOK_APP_SECRET", "FACEBOOK_VERIFY_TOKEN"]],
     instagram: ["Instagram", ["INSTAGRAM_TOKEN", "INSTAGRAM_ACCOUNT_ID", "INSTAGRAM_APP_SECRET", "INSTAGRAM_VERIFY_TOKEN"]],
+    tiktok: ["TikTok", ["TIKTOK_ACCESS_TOKEN", "TIKTOK_BUSINESS_ID", "TIKTOK_APP_SECRET"]],
   };
   for (const [canal, [nombre, variables]] of Object.entries(credenciales)) {
     if (!canales.includes(canal)) continue;
@@ -31,6 +32,8 @@ export function revisarEntorno(env: Env): Revision {
     if (falta.length) errores.push(`${nombre} está activado pero faltan: ${falta.join(", ")}.`);
   }
 
+  const api = env.TIKTOK_API_URL?.trim();
+  if (api && (!api.startsWith("https://") || /simulador/i.test(api))) errores.push("TIKTOK_API_URL apunta a la API de TikTok simulada (o no es https): quite la variable para usar la de TikTok.");
   if (env.PASARELA === "simulada") errores.push("PASARELA=simulada no existe en producción: conecte una pasarela real o quite la variable (el pago con tarjeta queda apagado).");
   if (env.AI_PROVIDER === "anthropic" && !lleno(env.ANTHROPIC_API_KEY)) errores.push("AI_PROVIDER=anthropic pero falta ANTHROPIC_API_KEY.");
   if (env.AI_PROVIDER !== "anthropic") avisos.push("El asistente corre con el proveedor simulado (AI_PROVIDER no es «anthropic»).");

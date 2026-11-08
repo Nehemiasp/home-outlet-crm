@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { Insignia, InsigniaPago, InsigniaEstado, LogoCanal, nombreCanal } from "@/components/ui/etiquetas";
 import { Boton, Casilla, CampoTexto } from "@/components/ui/form";
 import { EncabezadoPagina, LineaDePasos, MenuDesplegable, Modal } from "@/components/ui/estructura";
+import { textoLugar } from "@/lib/guatemala";
 import { avanceDePedido } from "@/lib/pedidos/pasos";
 import { AvisoCopiar } from "./aviso-copiar";
 import { useToast } from "@/components/ui/toast";
@@ -352,7 +353,7 @@ export function Detalle({ inicial }: { inicial: PedidoConPermisos }) {
             ) : (
               <>
                 <p className="cuerpo">
-                  Envío a <strong>{p.municipio}</strong>
+                  Envío a <strong>{textoLugar(p.municipio, p.departamento)}</strong>
                   {p.zona ? ` · ${p.zona}` : ""}
                 </p>
                 {p.direccion && <p className="cuerpo whitespace-pre-wrap text-texto-suave">{p.direccion}</p>}
@@ -364,7 +365,10 @@ export function Detalle({ inicial }: { inicial: PedidoConPermisos }) {
                       void guardarGuia();
                     }}
                   >
-                    <CampoTexto etiqueta="Número de guía" autoComplete="off" maxLength={60} className="flex-1" value={guia} onChange={(e) => setGuia(e.target.value)} />
+                    {/* El `flex-1` va en una caja aparte: puesto en el campo mismo (que vive en una columna) le quitaba la altura. */}
+                    <div className="min-w-0 flex-1">
+                      <CampoTexto etiqueta="Número de guía" autoComplete="off" maxLength={60} value={guia} onChange={(e) => setGuia(e.target.value)} />
+                    </div>
                     <Boton type="submit" variante="secundario" disabled={guia.trim() === (p.guia ?? "")}>
                       Guardar guía
                     </Boton>
@@ -416,7 +420,7 @@ export function Detalle({ inicial }: { inicial: PedidoConPermisos }) {
             void cambio("enviado", "Pedido enviado", guia);
           }}
         >
-          <CampoTexto etiqueta="Número de guía (opcional)" autoComplete="off" maxLength={60} ayuda="Si lo escribe, se manda al cliente en el aviso." value={guia} onChange={(e) => setGuia(e.target.value)} />
+          <CampoTexto etiqueta="Número de guía" required autoComplete="off" maxLength={60} ayuda="Se manda al cliente en el aviso. Si la entrega es propia, escriba por ejemplo «Entrega propia»." value={guia} onChange={(e) => setGuia(e.target.value)} />
           <div className="flex justify-end gap-2">
             <Boton variante="secundario" onClick={() => setEnviar(false)}>
               Cancelar

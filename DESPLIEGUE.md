@@ -51,8 +51,9 @@ Plantilla completa y comentada en `.env.example`. En producción:
 | `UPLOADS_DIR` | `/data/uploads` (ya viene en el `Dockerfile`) | **Sí**, apuntando al volumen |
 | `RESPALDO_AUTOMATICO` | `1` para el respaldo diario a las 2:00 (Guatemala) | Recomendada |
 | `RESPALDOS_CARPETA` | `/data/respaldos` (ya viene en el `Dockerfile`) | Con el respaldo |
-| `CHANNELS_ENABLED` | Canales activos, sin `simulado` en producción: `whatsapp,facebook,instagram` | Con canales |
+| `CHANNELS_ENABLED` | Canales activos, sin `simulado` en producción: `whatsapp,facebook,instagram,tiktok` | Con canales |
 | `WHATSAPP_*`, `FACEBOOK_*`, `INSTAGRAM_*` | Credenciales de Meta (ver `.env.example`) | Con cada canal |
+| `TIKTOK_ACCESS_TOKEN`, `TIKTOK_BUSINESS_ID`, `TIKTOK_APP_SECRET` | Credenciales de TikTok (ver `.env.example`). El webhook público es `/api/webhooks/tiktok`. **No poner `TIKTOK_API_URL`**: es solo para la API simulada de desarrollo y el servidor se niega a arrancar con ella | Con TikTok |
 | `AI_PROVIDER=anthropic`, `ANTHROPIC_API_KEY`, `AI_MONTHLY_BUDGET_USD` | La IA real y su tope mensual | Con la IA |
 
 Al arrancar en producción, el servidor **revisa esto y se niega a iniciar** si hay un secreto débil, la clave de base de desarrollo o un canal a medias; y avisa en el registro de lo que quede sin configurar.

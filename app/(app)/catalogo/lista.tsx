@@ -15,7 +15,7 @@ import { listar } from "./actions";
 import { AjusteRapido } from "./ajuste-rapido";
 import { CeldaExistencia, columnaDeUbicacion, Existencias, FotoProducto } from "./existencias";
 
-export function Catalogo({ categorias, puedeGestionar }: { categorias: CategoriaDTO[]; puedeGestionar: boolean }) {
+export function Catalogo({ categorias, puedeGestionar, puedeAjustar = true }: { categorias: CategoriaDTO[]; puedeGestionar: boolean; /** Bodega solo mira: sin el botón de ajustar existencias. */ puedeAjustar?: boolean }) {
   const router = useRouter();
   const [busqueda, setBusqueda] = useState("");
   const [q, setQ] = useState("");
@@ -80,15 +80,19 @@ export function Catalogo({ categorias, puedeGestionar }: { categorias: Categoria
       titulo: columnaDeUbicacion(u.nombre),
       render: (p) => <CeldaExistencia disponible={Math.max(0, (p.existencias[u.id] ?? 0) - (p.apartados[u.id] ?? 0))} apartado={p.apartados[u.id] ?? 0} />,
     })),
-    {
-      clave: "acciones",
-      titulo: "Acciones",
-      render: (p) => (
-        <Boton variante="secundario" tamano="sm" onClick={() => setAjustando(p)} aria-label={`Ajustar existencias de ${p.nombre}`}>
-          Ajustar
-        </Boton>
-      ),
-    },
+    ...(puedeAjustar
+      ? [
+          {
+            clave: "acciones",
+            titulo: "Acciones",
+            render: (p: FilaProducto) => (
+              <Boton variante="secundario" tamano="sm" onClick={() => setAjustando(p)} aria-label={`Ajustar existencias de ${p.nombre}`}>
+                Ajustar
+              </Boton>
+            ),
+          } satisfies Columna<FilaProducto>,
+        ]
+      : []),
   ];
 
   return (
@@ -173,9 +177,11 @@ export function Catalogo({ categorias, puedeGestionar }: { categorias: Categoria
                       </p>
                       <p className="titulo-panel">{formatQ(p.precioCentavos)}</p>
                       <Existencias ubicaciones={ubicaciones} existencias={p.existencias} apartados={p.apartados} />
-                      <Boton variante="secundario" tamano="sm" className="mt-auto self-start" onClick={() => setAjustando(p)} aria-label={`Ajustar existencias de ${p.nombre}`}>
-                        Ajustar existencias
-                      </Boton>
+                      {puedeAjustar && (
+                        <Boton variante="secundario" tamano="sm" className="mt-auto self-start" onClick={() => setAjustando(p)} aria-label={`Ajustar existencias de ${p.nombre}`}>
+                          Ajustar existencias
+                        </Boton>
+                      )}
                     </div>
                   </li>
                 ))}

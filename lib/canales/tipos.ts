@@ -40,6 +40,10 @@ export interface ChannelAdapter {
   channel: Channel;
   send(to: string, message: OutboundMessage): Promise<{ externalMessageId: string }>;
   canSendFreeForm(conversation: { lastInboundAt: Date | null }): boolean; // ventana de respuesta
+  /** Cuántos mensajes seguidos se pueden mandar sin que el cliente vuelva a escribir (TikTok: 10). Sin valor, no hay tope. */
+  maxSalientes?: number;
+  /** Cuántos mensajes de la plataforma ocupa este envío (un texto largo o una tarjeta de producto salen en varios). Sin esto, uno. */
+  contarMensajes?(m: OutboundMessage): number;
   parseWebhook(req: Request): Promise<{ messages: InboundMessage[]; statuses: StatusUpdate[] }>;
   verifyWebhook(req: Request): Promise<boolean>;
   /** Respuesta al GET con que Meta comprueba la dirección del webhook: el `hub.challenge`, o null si el token no coincide. */

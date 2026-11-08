@@ -291,11 +291,5 @@ describe("adaptadores de Facebook e Instagram (Meta simulado)", () => {
       process.env.CHANNELS_ENABLED = "simulado";
       assert.equal(adaptador("facebook"), null, "sin habilitarlo en CHANNELS_ENABLED no hay adaptador");
     });
-
-    test("el canal de TikTok sigue sin adaptador", () => {
-      process.env.CHANNELS_ENABLED = "simulado,tiktok";
-      assert.equal(adaptador("tiktok"), null);
-      process.env.CHANNELS_ENABLED = "simulado";
-    });
   });
 });

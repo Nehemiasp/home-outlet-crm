@@ -99,6 +99,8 @@ export function Usuarios({ usuarios, yoId }: { usuarios: Fila[]; yoId: string })
       render: (u) =>
         veTodo(u) ? (
           <span className="meta text-texto-suave">Siempre</span>
+        ) : u.rol === "bodega" ? (
+          <span className="meta text-texto-suave">No aplica</span>
         ) : (
           <Interruptor etiquetaOculta etiqueta={`Permiso de verificar pagos de ${u.nombre}`} activo={u.puedeVerificarPagos} onCambio={(v) => void ejecutar(cambiarPermisoVerificarPagos(u.id, v), v ? `${u.nombre} ahora verifica pagos` : `${u.nombre} ya no verifica pagos`)} />
         ),
@@ -141,7 +143,7 @@ export function Usuarios({ usuarios, yoId }: { usuarios: Fila[]; yoId: string })
           <form onSubmit={enviarInvitacion} className="flex flex-col gap-4">
             <CampoTexto etiqueta="Nombre" autoComplete="off" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} />
             <CampoTexto etiqueta="Correo" type="email" autoComplete="off" value={form.correo} onChange={(e) => setForm({ ...form, correo: e.target.value })} />
-            <Selector etiqueta="Rol" value={form.rol} onCambio={(v) => setForm({ ...form, rol: v })} opciones={[{ valor: "agente", texto: "Agente: atiende las conversaciones que le asignan" }, { valor: "jefe_tienda", texto: "Jefe de tienda: ve y gestiona todo, sin cambiar ajustes" }, { valor: "admin", texto: "Administrador: además gestiona ajustes, usuarios y canales" }]} />
+            <Selector etiqueta="Rol" value={form.rol} onCambio={(v) => setForm({ ...form, rol: v })} opciones={[{ valor: "agente", texto: "Agente: atiende las conversaciones que le asignan" }, { valor: "jefe_tienda", texto: "Jefe de tienda: ve y gestiona todo, sin cambiar ajustes" }, { valor: "admin", texto: "Administrador: además gestiona ajustes, usuarios y canales" }, { valor: "bodega", texto: "Bodega: solo ve el catálogo y despacha los pedidos pagados" }]} />
             {error && (
               <p role="alert" className="meta text-error">
                 {error}

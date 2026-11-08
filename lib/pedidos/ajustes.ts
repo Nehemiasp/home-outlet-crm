@@ -5,6 +5,7 @@ import type { ModoInventario, Prisma, TipoCuenta, TipoPago } from "@/generated/p
 import { CLAVES_MENSAJE, MENSAJES, type ClaveMensaje } from "./mensajes";
 import { pasarela } from "@/lib/pagos-tarjeta";
 import { metodosSeleccionables } from "./metodos";
+import { departamentoOficial, municipioOficial } from "@/lib/guatemala";
 import type { Zona } from "./envio";
 
 type Actor = { id: string; nombre: string };
@@ -99,26 +100,34 @@ export async function borrarCuenta(id: string, actor: Actor): Promise<Resultado>
 }
 
 /* ── Zonas de envío ── */
-export const listarZonas = async (): Promise<Zona[]> => (await db.shippingZone.findMany({ orderBy: [{ orden: "asc" }, { nombre: "asc" }] })).map((z) => ({ id: z.id, nombre: z.nombre, municipios: z.municipios, costo: z.costo, tiempo: z.tiempo, activa: z.activa }));
+export const listarZonas = async (): Promise<Zona[]> => (await db.shippingZone.findMany({ orderBy: [{ orden: "asc" }, { nombre: "asc" }] })).map((z) => ({ id: z.id, nombre: z.nombre, departamentos: z.departamentos, municipios: z.municipios, costo: z.costo, tiempo: z.tiempo, activa: z.activa }));
 
-/** Municipios separados por coma o por línea, sin repetidos. */
-export const separarMunicipios = (t: string) => [...new Set(t.split(/[,\n]/).map((m) => m.trim()).filter(Boolean))];
-
-export type EntradaZona = { nombre: string; municipios: string; costo: string; tiempo: string; activa: boolean };
+/** Una zona cubre departamentos enteros o, además, solo algunos municipios de ellos. Sin ninguno de los dos es «el resto del país». */
+export type EntradaZona = { nombre: string; departamentos: string[]; municipios: string[]; costo: string; tiempo: string; activa: boolean };
 
 export async function guardarZona(id: string | null, d: EntradaZona, actor: Actor): Promise<Resultado> {
   const nombre = d.nombre.trim();
   const tiempo = d.tiempo.trim();
-  const municipios = separarMunicipios(d.municipios);
   if (!nombre) return fallo("Escriba el nombre de la zona.");
   if (nombre.length > 60) return fallo("El nombre de la zona pasa de 60 caracteres.");
-  if (municipios.length > 50 || municipios.some((m) => m.length > 60)) return fallo("Revise la lista de municipios.");
+  const departamentos: string[] = [];
+  for (const x of d.departamentos) {
+    const oficial = departamentoOficial(x);
+    if (!oficial) return fallo(`«${x}» no es un departamento de Guatemala.`);
+    if (!departamentos.includes(oficial)) departamentos.push(oficial);
+  }
+  const municipios: string[] = [];
+  for (const x of d.municipios) {
+    const oficial = departamentos.map((dep) => municipioOficial(dep, x)).find(Boolean);
+    if (!oficial) return fallo(departamentos.length === 0 ? "Elija primero el departamento de los municipios." : `«${x}» no es un municipio de los departamentos elegidos.`);
+    if (!municipios.includes(oficial)) municipios.push(oficial);
+  }
   const costo = d.costo.trim() === "0" ? 0 : parsePrecio(d.costo);
   if (costo === null) return fallo("Escriba el costo como un precio, por ejemplo 35.00.");
   if (!tiempo) return fallo("Escriba el tiempo estimado, por ejemplo 1 a 2 días.");
   if (tiempo.length > 60) return fallo("El tiempo estimado pasa de 60 caracteres.");
 
-  const datos = { nombre, municipios, costo, tiempo, activa: d.activa };
+  const datos = { nombre, departamentos, municipios, costo, tiempo, activa: d.activa };
   if (id) {
     if ((await db.shippingZone.updateMany({ where: { id }, data: datos })).count === 0) return fallo("La zona ya no existe.");
   } else {

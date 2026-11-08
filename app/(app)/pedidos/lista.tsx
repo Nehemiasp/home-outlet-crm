@@ -96,8 +96,8 @@ export function ListaPedidos({ vistaInicial, puedeVerificar, veTodo, asesores }:
             { id: "todos", texto: "Todos" },
           ]}
         />
-        <div className="flex items-end gap-2 pb-2">
-          <Buscador valor={busqueda} onCambio={cambiar(setBusqueda)} etiqueta="Buscar pedidos" placeholder="Código, nombre o teléfono" className="w-56" />
+        <div className="flex max-w-full min-w-0 items-end gap-2 pb-2">
+          <Buscador valor={busqueda} onCambio={cambiar(setBusqueda)} etiqueta="Buscar pedidos" placeholder="Código, nombre o teléfono" className="w-72 min-w-0 shrink" />
           <BotonFiltros
             activos={activos}
             onLimpiar={() => {

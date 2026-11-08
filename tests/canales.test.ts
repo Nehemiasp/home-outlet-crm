@@ -44,7 +44,7 @@ describe("interfaz de canales", () => {
   });
   test("un canal habilitado sin credenciales o sin adaptador no se entrega", () => {
     process.env.CHANNELS_ENABLED = "simulado,whatsapp,tiktok";
-    for (const v of ["WHATSAPP_TOKEN", "WHATSAPP_PHONE_NUMBER_ID", "WHATSAPP_APP_SECRET", "WHATSAPP_VERIFY_TOKEN"]) delete process.env[v];
+    for (const v of ["WHATSAPP_TOKEN", "WHATSAPP_PHONE_NUMBER_ID", "WHATSAPP_APP_SECRET", "WHATSAPP_VERIFY_TOKEN", "TIKTOK_ACCESS_TOKEN", "TIKTOK_BUSINESS_ID", "TIKTOK_APP_SECRET"]) delete process.env[v];
     assert.ok(adaptador("simulado"));
     assert.equal(adaptador("whatsapp"), null);
     assert.equal(adaptador("tiktok"), null);

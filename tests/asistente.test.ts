@@ -125,6 +125,17 @@ describe("atención en la conversación (con base de datos)", () => {
     recibirMensaje({ channel: "simulado", externalContactId: TEL, contactName: "PRUEBA-IA cliente", externalMessageId: `ia-${Date.now()}-${Math.random()}`, type: tipo, text: tipo === "text" ? texto : undefined, timestamp: new Date() });
   const mensajes = async (id: string) => db.message.findMany({ where: { conversacionId: id }, orderBy: { fecha: "asc" } });
 
+  test("el municipio que dice el cliente se guarda con su nombre oficial y su departamento (si es único)", async () => {
+    const { id: contactoId } = await db.contact.create({ data: { nombre: "PRUEBA-IA municipio" } }); // se borra en el after (prefijo PRUEBA-IA)
+    const ctx = { conversacionId: null, contactoId, sandbox: false };
+    await ejecutarHerramienta("guardar_dato_cliente", { campo: "municipio", valor: "morales" }, ctx);
+    let c = await db.contact.findUniqueOrThrow({ where: { id: contactoId } });
+    assert.deepEqual([c.municipio, c.departamento], ["Morales", "Izabal"]);
+    await ejecutarHerramienta("guardar_dato_cliente", { campo: "municipio", valor: "San José" }, ctx); // hay dos: no se adivina
+    c = await db.contact.findUniqueOrThrow({ where: { id: contactoId } });
+    assert.deepEqual([c.municipio, c.departamento], ["San José", null]);
+  });
+
   test("se presenta, responde, etiqueta el motivo y registra el costo", async () => {
     const { conversacionId: id } = await entrante("¿Cuánto cuesta la bocina bluetooth?");
     await procesarMensajeEntrante(id!);

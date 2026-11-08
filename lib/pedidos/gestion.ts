@@ -19,13 +19,15 @@ const AVISA: Partial<Record<EstadoPedido, "listo_para_recoger" | "enviado">> = {
 /** Pasa el pedido a otro estado desde el detalle: preparando, listo, enviado (con guía), entregado, cancelar o reactivar uno vencido. */
 export async function avanzarPedido(pedidoId: string, a: EstadoPedido, actor: Actor, o: { guia?: string; sobrePedido?: boolean } = {}): Promise<{ ok: true; aviso?: ResultadoAviso } | Fallo> {
   if (!MANUALES.includes(a)) return fallo("Ese cambio se hace verificando los comprobantes de pago.");
-  const p = await db.order.findUnique({ where: { id: pedidoId }, select: { estado: true, creadoPorId: true, codigo: true, conversacionId: true, pagos: { where: { estado: "verificado" }, select: { id: true } } } });
+  const p = await db.order.findUnique({ where: { id: pedidoId }, select: { estado: true, creadoPorId: true, codigo: true, conversacionId: true, guia: true, pagos: { where: { estado: "verificado" }, select: { id: true } } } });
   if (!p) return fallo("El pedido no existe.");
   if (a === "pendiente_pago" && p.estado !== "vencido") return fallo("Solo se reactiva un pedido vencido.");
   if (a === "cancelado" && !puedeCancelarPedido(actor, p, p.pagos.length > 0)) return fallo(veTodo(actor) ? "No se puede cancelar este pedido." : "Solo puede cancelar los pedidos que creó y que todavía no tienen un pago verificado.");
   if (o.sobrePedido && !puedeSobrePedido(actor)) return fallo("Solo un administrador o un jefe de tienda puede apartar «sobre pedido».");
   const guia = o.guia?.trim();
   if (guia && guia.length > 60) return fallo("La guía pasa de 60 caracteres.");
+  // Para marcarlo como enviado hace falta el número de guía (el que se escribe ahora o uno ya guardado en el pedido). Una entrega propia, sin guía de paquetería, lleva una nota como «Entrega propia».
+  if (a === "enviado" && !guia && !p.guia?.trim()) return fallo("Escriba el número de guía para marcar el pedido como enviado.");
 
   const r = await cambiarEstado({ pedidoId, a, quien: { usuarioId: actor.id }, sobrePedido: a === "pendiente_pago" ? !!o.sobrePedido : undefined, nota: a === "enviado" && guia ? `Guía ${guia}` : undefined });
   if (!r.ok) return r;

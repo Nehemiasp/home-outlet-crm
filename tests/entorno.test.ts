@@ -48,6 +48,15 @@ describe("revisión del entorno de producción", () => {
     assert.match(r.errores[1]!, /Instagram.*INSTAGRAM_APP_SECRET.*INSTAGRAM_VERIFY_TOKEN/);
   });
 
+  it("TikTok tampoco puede quedar activado a medias, y la API de TikTok simulada no se acepta en producción", () => {
+    const r = revisarEntorno({ ...bueno, CHANNELS_ENABLED: "whatsapp,tiktok", TIKTOK_ACCESS_TOKEN: "t" });
+    assert.equal(r.errores.length, 1);
+    assert.match(r.errores[0]!, /TikTok.*TIKTOK_BUSINESS_ID.*TIKTOK_APP_SECRET/);
+    assert.equal(revisarEntorno({ ...bueno, CHANNELS_ENABLED: "whatsapp,tiktok", TIKTOK_ACCESS_TOKEN: "t", TIKTOK_BUSINESS_ID: "1", TIKTOK_APP_SECRET: "s" }).errores.length, 0);
+    for (const TIKTOK_API_URL of ["http://localhost:3000/api/simulador/tiktok", "https://crm.ejemplo.com/api/simulador/tiktok"]) assert.match(revisarEntorno({ ...bueno, TIKTOK_API_URL }).errores[0]!, /TikTok simulada/);
+    assert.equal(revisarEntorno({ ...bueno, TIKTOK_API_URL: "https://business-api.tiktok.com/open_api/v1.3" }).errores.length, 0);
+  });
+
   it("la pasarela simulada no se acepta en producción", () => {
     const r = revisarEntorno({ ...bueno, PASARELA: "simulada" });
     assert.equal(r.errores.length, 1);

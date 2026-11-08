@@ -8,13 +8,13 @@ import { Burbuja, Compositor, SeparadorDia } from "@/components/ui/conversacion"
 import { AvatarConCanal, nombreCanal } from "@/components/ui/etiquetas";
 import { Boton, ControlSegmentado } from "@/components/ui/form";
 import { MenuDesplegable, Modal, type OpcionMenu } from "@/components/ui/estructura";
-import { ModalDevolver } from "@/components/ui/equipo";
+import { ModalAsignar, ModalDevolver } from "@/components/ui/equipo";
 import { ModalPlantillas } from "@/components/ui/plantillas";
 import type { PlantillaCanal } from "@/lib/canales/tipos";
 import { useToast } from "@/components/ui/toast";
 import type { ConversacionDTO, ItemLinea, ProductoDTO } from "@/lib/bandeja-tipos";
 import { formatTelefono } from "@/lib/utils";
-import { AVISO_MS, msRestantes, textoRestante } from "@/lib/canales/ventana";
+import { AVISO_MS, msRestantes, sinPlantillas, textoBloqueoVentana, textoRestante } from "@/lib/canales/ventana";
 import { puedeAsignar, puedeCerrar, veTodo } from "@/lib/permisos";
 import { useActualizacion } from "@/lib/tiempo-real";
 import { alternarAsistente, asignar, cambiarEstado, devolverCola, enviarImagen, enviarPlantilla, enviarProducto, enviarTexto, guardarNota, obtener, plantillas as plantillasDelCanal, reintentar, sugerir } from "./actions";
@@ -38,6 +38,7 @@ export function Vista({ inicial }: { inicial: ConversacionDTO }) {
   const [productos, setProductos] = useState(false);
   const [pedido, setPedido] = useState(false);
   const [devolver, setDevolver] = useState(false);
+  const [asignando, setAsignando] = useState<"cerrado" | "abierto" | "ocupado">("cerrado");
   const [devolviendo, setDevolviendo] = useState(false);
   const [plantillas, setPlantillas] = useState<{ abierta: boolean; lista?: PlantillaCanal[]; error?: string; enviando?: boolean }>({ abierta: false });
   const [comprobante, setComprobante] = useState<{ mensajeId: string; url: string } | null>(null);
@@ -62,14 +63,23 @@ export function Vista({ inicial }: { inicial: ConversacionDTO }) {
     if (el && alFondo.current) el.scrollTop = el.scrollHeight;
   }, [ultimo]);
 
-  /* ── Ventana de 24 horas ── */
-  const restante = msRestantes(c.lastInboundAt ? new Date(c.lastInboundAt) : null, new Date(ahora));
+  /* ── Ventana de respuesta (24 horas; en TikTok, 48) y tope de mensajes seguidos (TikTok: 10) ── */
+  const restante = msRestantes(c.lastInboundAt ? new Date(c.lastInboundAt) : null, new Date(ahora), c.canal);
+  const quedan = c.salientesRestantes;
   const bloqueo = !c.canalActivo
     ? `${nombreCanal(c.canal)} está pendiente de conexión. Por ahora solo puede escribir notas internas.`
     : restante === 0
-      ? "Pasaron más de 24 horas desde el último mensaje del cliente. Solo puede enviar plantillas o escribir notas internas."
-      : undefined;
-  const aviso = !bloqueo && restante < AVISO_MS ? `La ventana para responder vence en ${textoRestante(restante)}` : undefined;
+      ? textoBloqueoVentana(c.canal)
+      : quedan === 0
+        ? `Ya mandó los mensajes que ${nombreCanal(c.canal)} permite sin que el cliente responda. Podrá escribir cuando el cliente vuelva a escribir. Mientras tanto puede escribir notas internas.`
+        : undefined;
+  const aviso = bloqueo
+    ? undefined
+    : restante < AVISO_MS
+      ? `La ventana para responder vence en ${textoRestante(restante)}`
+      : quedan !== null && quedan <= 3
+        ? `${quedan === 1 ? "Queda 1 mensaje" : `Quedan ${quedan} mensajes`} antes de que el cliente tenga que volver a escribir`
+        : undefined;
 
   /* ── Acciones ── */
   const resolver = async (r: { ok: boolean; error?: string; mensajeId?: string } | { ok: true }) => {
@@ -117,13 +127,16 @@ export function Vista({ inicial }: { inicial: ConversacionDTO }) {
   const yo = c.yo;
   const opcionesAsignar: OpcionMenu[] =
     veTodo(yo)
-      ? [
-          ...c.usuarios.map((u) => ({ texto: u.id === yo.id ? `Asignar a ${u.nombre} (yo)` : `Asignar a ${u.nombre}`, onElegir: () => conAviso(asignar(c.id, u.id), `Asignada a ${u.nombre}`) })),
-          ...(c.asignadaA ? [{ texto: "Quitar asignación", onElegir: () => conAviso(asignar(c.id, null), "Asignación quitada") }] : []),
-        ]
+      ? [{ texto: "Asignar a otra persona", onElegir: () => setAsignando("abierto") }]
       : puedeAsignar(yo, { asignadaAId: c.asignadaA?.id ?? null }, yo.id) && c.asignadaA?.id !== yo.id
         ? [{ texto: "Asignarme esta conversación", onElegir: () => conAviso(asignar(c.id, yo.id), "Conversación asignada a usted") }]
         : [];
+  const alAsignar = async (usuarioId: string | null) => {
+    setAsignando("ocupado");
+    const nombre = c.usuarios.find((u) => u.id === usuarioId)?.nombre;
+    await conAviso(asignar(c.id, usuarioId), usuarioId ? `Asignada a ${nombre}` : "Asignación quitada");
+    setAsignando("cerrado");
+  };
   const dueno = { asignadaAId: c.asignadaA?.id ?? null };
   const opcionesEstado: OpcionMenu[] = (["abierta", "pendiente", "cerrada"] as const)
     .filter((e) => e !== c.estado && (e !== "cerrada" || puedeCerrar(yo, dueno)))
@@ -254,7 +267,7 @@ export function Vista({ inicial }: { inicial: ConversacionDTO }) {
           onEnviarProducto={() => setProductos(true)}
           onAdjuntar={() => archivo.current?.click()}
           onSugerir={alSugerir}
-          onEnviarPlantilla={c.canalActivo ? () => void abrirPlantillas() : undefined}
+          onEnviarPlantilla={c.canalActivo && !sinPlantillas(c.canal) ? () => void abrirPlantillas() : undefined}
           aviso={aviso}
           bloqueadoMotivo={bloqueo}
           soloNotas
@@ -264,6 +277,16 @@ export function Vista({ inicial }: { inicial: ConversacionDTO }) {
 
       {ficha && <Ficha c={c} onCambio={refrescar} onCerrar={() => setFicha(false)} />}
 
+      <ModalAsignar
+        abierto={asignando !== "cerrado"}
+        ocupado={asignando === "ocupado"}
+        usuarios={c.usuarios}
+        actualId={c.asignadaA?.id ?? null}
+        yoId={yo.id}
+        onCerrar={() => setAsignando("cerrado")}
+        onAsignar={(id) => void alAsignar(id)}
+        onQuitar={c.asignadaA ? () => void alAsignar(null) : undefined}
+      />
       <ModalDevolver abierto={devolver} ocupado={devolviendo} onCerrar={() => setDevolver(false)} onDevolver={(m) => void alDevolver(m)} />
       <PanelPedido abierto={pedido} onCerrar={() => setPedido(false)} conversacionId={c.id} puedeEnviar={!bloqueo} onCambio={refrescar} />
       <ComprobanteModal imagen={comprobante} onCerrar={() => setComprobante(null)} c={c} onRegistrado={refrescar} />

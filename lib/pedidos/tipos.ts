@@ -16,7 +16,7 @@ export type ProductoPedido = {
 export type EntradaPedido = {
   pedidoId: string | null;
   conversacionId: string;
-  cliente: { nombre: string; telefono: string; municipio: string };
+  cliente: { nombre: string; telefono: string; departamento: string; municipio: string };
   lineas: { productoId: string; cantidad: number; ubicacionId: string | null }[];
   entrega: "recoger" | "envio";
   direccion: string;
@@ -44,7 +44,7 @@ export type VistaPedido = {
 export type AbiertoPedido = { id: string; codigo: string; estado: EstadoPedido; total: number; entrega: "recoger" | "envio" };
 
 export type DatosPanelPedido = {
-  contacto: { nombre: string; telefono: string; municipio: string };
+  contacto: { nombre: string; telefono: string; departamento: string; municipio: string };
   sinLimites: boolean;
   descuentoMaxAgente: number;
   inventario: "separado" | "compartido";
@@ -53,7 +53,7 @@ export type DatosPanelPedido = {
   envioGratisDesde: number | null;
   /** Formas de pago que se pueden elegir (las activas en Ajustes; la tarjeta solo si hay pasarela). El efectivo se filtra según la entrega. */
   metodosPago: { id: TipoPago; nombre: string }[];
-  zonas: { nombre: string; municipios: string[]; costo: number; tiempo: string }[];
+  zonas: { nombre: string; departamentos: string[]; municipios: string[]; costo: number; tiempo: string }[];
   abiertos: AbiertoPedido[];
   sugeridos: ProductoPedido[];
 };

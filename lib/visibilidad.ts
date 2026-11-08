@@ -52,8 +52,10 @@ export async function puedeVerPago(u: Actor, id: string) {
  * sus conversaciones y sus pedidos, o las fotos del catálogo, que son de todos.
  */
 export async function puedeVerArchivo(u: Actor, nombre: string) {
-  if (!(await restringido(u))) return true;
   const url = `/api/archivos/${nombre}`;
+  // Bodega solo ve las fotos del catálogo: nunca las fotos del chat ni los comprobantes de pago.
+  if (u.rol === "bodega") return (await db.product.count({ where: { imagenes: { has: url } } })) > 0;
+  if (!(await restringido(u))) return true;
   const [mensaje, pago, producto] = await Promise.all([
     db.message.count({ where: { archivoUrl: url, conversacion: await filtroConversacion(u) } }),
     db.payment.count({ where: { archivoUrl: url, pedido: await filtroPedido(u) } }),

@@ -11,6 +11,7 @@ enum Rol {
   admin
   agente
   jefe_tienda // ve y gestiona todo lo operativo, pero no cambia ajustes, usuarios ni canales
+  bodega // solo ve el catálogo y despacha los pedidos ya pagados (sin precios, pagos ni conversaciones)
 }
 
 /// Disponibilidad de un asesor (rol agente) para recibir conversaciones nuevas.
@@ -174,6 +175,7 @@ model Contact {
   correo              String?
   notas               String?
   municipio           String?
+  departamento        String?
   creado              DateTime @default(now())
   /// El asesor que lo atiende de forma habitual: tiene prioridad al asignarle una conversación nueva.
   asesorResponsableId String?
@@ -486,6 +488,7 @@ model Order {
   entrega         Entrega      @default(recoger)
   direccion       String?
   municipio       String?
+  departamento    String?
   zona            String?
   guia            String?
   notas           String?
@@ -586,6 +589,8 @@ model BankAccount {
 model ShippingZone {
   id         String   @id @default(cuid())
   nombre     String
+  /// Departamentos que cubre la zona entera. Con municipios, la zona solo vale para esos municipios dentro de esos departamentos.
+  departamentos String[] @default([])
   municipios String[]
   costo      Int // centavos
   tiempo     String // por ejemplo "1 a 2 días"

@@ -110,6 +110,10 @@ export type TarjetaPedidoUI = {
   envio: string;
   total: number;
   cuentas: { banco: string; tipo: "monetaria" | "ahorro"; numero: string; titular: string }[];
+  /** Cómo va a pagar el cliente. Con tarjeta o efectivo la tarjeta no lleva cuentas bancarias. Null en los pedidos anteriores. */
+  formaPago?: "transferencia" | "deposito" | "efectivo_en_tienda" | "tarjeta" | null;
+  /** El enlace de pago abierto (solo con tarjeta). */
+  enlace?: string | null;
 };
 
 /** Mensaje de sistema: centrado, `meta`, con ícono y tono según el evento. */
@@ -149,6 +153,23 @@ function TarjetaDePedido({ p }: { p: TarjetaPedidoUI }) {
         <span>Total</span>
         <span className="tabular-nums">{formatQ(p.total)}</span>
       </p>
+      {p.formaPago === "tarjeta" && (
+        <div>
+          <p className="titulo-seccion mb-1 text-texto-suave">Pago con tarjeta</p>
+          <p className="meta text-texto">El cliente paga con tarjeta de crédito o débito en un enlace seguro.</p>
+          {p.enlace && (
+            <a href={p.enlace} target="_blank" rel="noopener noreferrer" className="cuerpo-fuerte mt-1 inline-block text-texto underline underline-offset-2 hover:no-underline max-md:flex max-md:min-h-11 max-md:items-center">
+              Abrir enlace de pago
+            </a>
+          )}
+        </div>
+      )}
+      {p.formaPago === "efectivo_en_tienda" && (
+        <div>
+          <p className="titulo-seccion mb-1 text-texto-suave">Pago en efectivo</p>
+          <p className="meta text-texto">El cliente paga en efectivo al recoger el pedido en la tienda.</p>
+        </div>
+      )}
       {p.cuentas.length > 0 && (
         <div>
           <p className="titulo-seccion mb-1 text-texto-suave">Cuentas para pagar</p>
@@ -238,9 +259,10 @@ export function Burbuja({ tipo, tono = "neutro", pedido, texto, hora, estado, au
           </>
         ) : tipo === "producto" && producto ? (
           <>
-            <div className="grid h-30 place-items-center bg-fondo text-texto-suave">
-              {/* Sin foto real todavía: marcador de posición */}
-              {producto.imagenUrl ? <img src={producto.imagenUrl} alt={producto.nombre} className="size-full object-cover" /> : <Package className="size-8" aria-hidden />}
+            {/* La foto va dentro de una caja de altura fija que la recorta: sin esto, una foto alta se desborda y tapa el nombre y el precio.
+                `contain` muestra el producto completo (una foto de catálogo no debe cortarse). */}
+            <div className="relative grid h-36 place-items-center overflow-hidden bg-fondo text-texto-suave">
+              {producto.imagenUrl ? <img src={producto.imagenUrl} alt={producto.nombre} className="absolute inset-0 size-full object-contain p-2" /> : <Package className="size-8" aria-hidden />}
             </div>
             <div className="flex flex-col gap-1 p-3">
               <p className="cuerpo-fuerte">{producto.nombre}</p>

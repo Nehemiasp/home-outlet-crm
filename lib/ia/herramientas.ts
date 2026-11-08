@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { obtenerNegocio } from "@/lib/ajustes";
 import { db } from "@/lib/db";
+import { departamentoDe, municipioOficial } from "@/lib/guatemala";
 import { estaAbierto } from "@/lib/horario";
 import { enviarMensaje } from "@/lib/mensajeria";
 import { obtenerAjustesPedidos } from "@/lib/pedidos/ajustes";
@@ -139,7 +140,7 @@ export async function ejecutarHerramienta(nombre: string, entrada: unknown, ctx:
             codigo: o.codigo, estado: o.estado, estado_texto: ETIQUETA_ESTADO[o.estado].toLowerCase(), pago: estadoDePago(o.total, o.pagos),
             // Solo con esto en true se puede decir que el pago está confirmado.
             pago_confirmado: DESCONTADOS.includes(o.estado), total: formatQ(o.total), saldo: formatQ(saldoDe(o.total, verificado)),
-            entrega: o.entrega, municipio: o.municipio, guia: o.guia, tiempo_estimado: zona?.tiempo ?? null,
+            entrega: o.entrega, departamento: o.departamento, municipio: o.municipio, guia: o.guia, tiempo_estimado: zona?.tiempo ?? null,
             ...(cuentas.length ? { cuentas: textoCuentas(cuentas) } : {}),
           },
         }),
@@ -168,7 +169,13 @@ export async function ejecutarHerramienta(nombre: string, entrada: unknown, ctx:
       return { contenido: json({ enviado: true }), consultado: `Envió la tarjeta de ${p.nombre}`, productos: [p.id], mensajesEnviados: [r.mensajeId] };
     }
     case "guardar_dato_cliente": {
-      if (!ctx.sandbox && ctx.contactoId) await db.contact.update({ where: { id: ctx.contactoId }, data: { [args.campo!]: args.valor } });
+      if (!ctx.sandbox && ctx.contactoId) {
+        // Un municipio dicho a mano se guarda con su nombre oficial y su departamento (si el nombre es único en el país).
+        // Si el nombre está en dos departamentos, o no existe, se guarda tal cual y sin departamento (un asesor lo completa al armar el pedido).
+        const dep = args.campo === "municipio" ? departamentoDe(args.valor) : null;
+        const datos = dep ? { municipio: municipioOficial(dep, args.valor) ?? args.valor, departamento: dep } : args.campo === "municipio" ? { municipio: args.valor, departamento: null } : { [args.campo!]: args.valor };
+        await db.contact.update({ where: { id: ctx.contactoId }, data: datos });
+      }
       return { contenido: json({ guardado: args.campo }), consultado: `Guardó ${args.campo}: ${args.valor}` };
     }
     case "pasar_a_asesor":

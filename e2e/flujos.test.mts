@@ -3,9 +3,8 @@
 //
 //   1. npm run db y npm run dev (la aplicación en http://localhost:3000, o la dirección de E2E_URL)
 //   2. npm run e2e
-// Si hay otra persona con la aplicación abierta en su navegador, el servidor de desarrollo recarga todas las páginas conectadas cada
-// vez que otra recompila y estas pruebas entran en un ciclo de recargas: arranque el servidor en otro puerto (npx next dev -p 3100)
-// y use E2E_URL=http://localhost:3100.
+// Si las páginas se recargan sin parar (el servidor muestra «Compiled in 1ms» una y otra vez) es la caché de compilación dañada, que queda así
+// cuando el servidor de desarrollo se mata de golpe: detenga el servidor, borre la carpeta .next y arránquelo de nuevo.
 // E2E_CAPTURAS=<carpeta> guarda capturas del panel de crear pedido, de la página de pago y del detalle del pedido.
 // El pago con tarjeta solo se prueba si la aplicación corre con PASARELA=simulada y se define E2E_PASARELA=1 al correr las pruebas.
 //
@@ -163,6 +162,12 @@ describe("flujos críticos (navegador real)", { timeout: 240_000 }, () => {
     if (process.env.E2E_CAPTURAS) await agente.screenshot({ path: `${process.env.E2E_CAPTURAS}/panel-forma-pago.png` });
     await panel.getByRole("button", { name: "Enviar al cliente" }).click();
     await agente.getByText(/Pedido E2E-000002/).first().waitFor({ timeout: 15_000 });
+    await agente.getByText("Pago con tarjeta").first().waitFor(); // la tarjeta del pedido en el chat: sin cuentas bancarias, con el enlace
+    assert.equal(await agente.getByText("Cuentas para pagar").count(), 1, "solo la del pedido 1 (transferencia) lleva cuentas");
+    if (process.env.E2E_CAPTURAS) {
+      await agente.getByRole("log").evaluate((el) => el.scrollTo(0, el.scrollHeight)); // al final, donde está la tarjeta del pedido nuevo
+      await agente.screenshot({ path: `${process.env.E2E_CAPTURAS}/chat-tarjeta.png` });
+    }
     const pedido = await db.order.findFirstOrThrow({ where: { codigo: "E2E-000002" } });
     assert.equal(pedido.metodoPago, "tarjeta");
     await agente.goto(`${URL_BASE}/pedidos/${pedido.id}`); // directo: en la conversación hay un «Ver pedido» por cada pedido y el orden de los enlaces no es lo que se prueba aquí

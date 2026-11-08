@@ -2,7 +2,7 @@ import { obtenerNegocio, log } from "@/lib/ajustes";
 import { adaptador } from "@/lib/canales";
 import { db } from "@/lib/db";
 import { parsePrecio } from "@/lib/dinero";
-import { enviarMensaje } from "@/lib/mensajeria";
+import { enviarMensaje, salientesRestantes } from "@/lib/mensajeria";
 import { puedeDescontar, puedeSobrePedido } from "@/lib/permisos";
 import { aplicarDatos, textoCuentas } from "@/lib/plantillas";
 import { normalizarTelefono } from "@/lib/telefono";
@@ -11,6 +11,7 @@ import { abrirCobro, cancelarCobrosAbiertos } from "@/lib/pagos-tarjeta/abrir";
 import { pasarela } from "@/lib/pagos-tarjeta";
 import type { Prisma, TipoPago } from "@/generated/prisma/client";
 import { listarZonas, obtenerAjustesPedidos } from "./ajustes";
+import { departamentoOficial, lugarGuardado, municipioOficial, textoLugar } from "@/lib/guatemala";
 import { costoEnvio, zonaPara } from "./envio";
 import { disponibleDe, disponibleProducto, apartadoProducto } from "./existencias";
 import { cambiarEstado } from "./flujo";
@@ -124,15 +125,18 @@ async function preparar(e: EntradaPedido, actor: ActorPedidos) {
   const sinExistencia = avisos.length > 0;
 
   // Entrega
-  const municipio = e.cliente.municipio.trim() || null;
+  // El lugar de entrega se elige de la lista oficial (departamento y, dentro de él, municipio). Para recoger en tienda no hace falta: se guarda solo si viene completo.
+  const departamento = departamentoOficial(e.cliente.departamento);
+  const municipio = municipioOficial(departamento, e.cliente.municipio);
   let zona: Awaited<ReturnType<typeof listarZonas>>[number] | null = null;
   let costo = 0;
   let direccion: string | null = null;
   if (e.entrega === "envio") {
-    if (!municipio) return fallo("Escriba el municipio de entrega.");
+    if (!departamento) return fallo("Elija el departamento de entrega.");
+    if (!municipio) return fallo("Elija el municipio de entrega.");
     if (!e.direccion.trim()) return fallo("Escriba la dirección de entrega.");
-    zona = zonaPara(await listarZonas(), municipio);
-    if (!zona) return fallo(`No hay una zona de envío para ${municipio}. Agréguela en Ajustes → Pagos y envíos.`);
+    zona = zonaPara(await listarZonas(), departamento, municipio);
+    if (!zona) return fallo(`No hay una zona de envío para ${textoLugar(municipio, departamento)}. Agréguela en Ajustes → Pagos y envíos.`);
     costo = costoEnvio(zona, subtotal, aj.envioGratisDesde);
     direccion = e.referencia.trim() ? `${e.direccion.trim()}. Referencia: ${e.referencia.trim()}` : e.direccion.trim();
     if (direccion.length > 500) return fallo("La dirección y la referencia pasan de 500 caracteres.");
@@ -170,7 +174,7 @@ async function preparar(e: EntradaPedido, actor: ActorPedidos) {
 
   return {
     ok: true as const,
-    lineas, ...t, zona, direccion, municipio, avisos, sinExistencia,
+    lineas, ...t, zona, direccion, departamento, municipio, avisos, sinExistencia,
     descuentoMotivo: t.descuentoMonto > 0 ? motivo : null,
     notas: e.notas.trim() || null,
     metodoPago,
@@ -207,19 +211,18 @@ export async function guardarBorrador(e: EntradaPedido, actor: ActorPedidos): Pr
     if (otro && otro.id !== conv.contactoId) return fallo(`Ese teléfono ya pertenece a ${otro.nombre}.`);
     telefono = t;
   }
-  if (e.cliente.municipio.trim().length > 60) return fallo("El municipio pasa de 60 caracteres.");
 
   const p = await preparar(e, actor);
   if (!p.ok) return p;
 
   const datos = {
-    entrega: e.entrega, direccion: p.direccion, municipio: p.municipio, zona: p.zona?.nombre ?? null, subtotal: p.subtotal, descuentoMonto: p.descuentoMonto,
+    entrega: e.entrega, direccion: p.direccion, departamento: p.departamento, municipio: p.municipio, zona: p.zona?.nombre ?? null, subtotal: p.subtotal, descuentoMonto: p.descuentoMonto,
     descuentoMotivo: p.descuentoMotivo, costoEnvio: p.costoEnvio, total: p.total, notas: p.notas, metodoPago: p.metodoPago,
   };
   const lineas = p.lineas.map((l) => ({ productoId: l.productoId, sku: l.sku, nombre: l.nombre, precio: l.precio, cantidad: l.cantidad, ubicacionId: l.ubicacionId }));
 
   const r = await db.$transaction(async (tx) => {
-    const actualizarContacto = () => tx.contact.update({ where: { id: conv.contactoId }, data: { nombre, ...(telefono ? { telefono } : {}), ...(p.municipio ? { municipio: p.municipio } : {}) } });
+    const actualizarContacto = () => tx.contact.update({ where: { id: conv.contactoId }, data: { nombre, ...(telefono ? { telefono } : {}), ...(p.municipio ? { departamento: p.departamento, municipio: p.municipio } : {}) } });
 
     if (e.pedidoId) {
       const o = await tx.order.findUnique({ where: { id: e.pedidoId }, select: { estado: true, conversacionId: true, codigo: true } });
@@ -261,7 +264,7 @@ export async function cargarBorrador(pedidoId: string, conversacionId: string): 
     productos: lineas.map((l) => aProductoPedido(filas.find((p) => p.id === l.productoId)!)),
     entrada: {
       pedidoId: o.id, conversacionId,
-      cliente: { nombre: o.contacto.nombre, telefono: o.contacto.telefono ? formatTelefono(o.contacto.telefono) : "", municipio: o.municipio ?? o.contacto.municipio ?? "" },
+      cliente: { nombre: o.contacto.nombre, telefono: o.contacto.telefono ? formatTelefono(o.contacto.telefono) : "", ...lugarGuardado(o.departamento ?? o.contacto.departamento, o.municipio ?? o.contacto.municipio) },
       lineas: lineas.map((l) => ({ productoId: l.productoId!, cantidad: l.cantidad, ubicacionId: l.ubicacionId })),
       entrega: o.entrega, direccion: dir ?? "", referencia: ref ?? "",
       descuento: o.descuentoMonto > 0 ? { tipo: "monto", valor: (o.descuentoMonto / 100).toFixed(2) } : null,
@@ -299,7 +302,7 @@ export async function construirResumen(pedidoId: string): Promise<string> {
     cuentas: textoCuentas(cuentas) || aplicarDatos("{cuentas}", { ...negocio, cuentas: "" }),
     horas: textoHoras(aj.horasReserva), codigo: o.codigo, enlace: cobro?.url ?? "",
   });
-  return textoResumen({ codigo: o.codigo, lineas: o.lineas, descuentoMonto: o.descuentoMonto, costoEnvio: o.costoEnvio, total: o.total, entrega: o.entrega, municipio: o.municipio, direccionTienda: negocio.direccion }, pie);
+  return textoResumen({ codigo: o.codigo, lineas: o.lineas, descuentoMonto: o.descuentoMonto, costoEnvio: o.costoEnvio, total: o.total, entrega: o.entrega, departamento: o.departamento, municipio: o.municipio, direccionTienda: negocio.direccion }, pie);
 }
 
 /** Una línea gris en la conversación ("Pedido HO-000123 enviado al cliente por Ana"). */
@@ -310,7 +313,9 @@ export const lineaDeSistema = (actor: { id: string; nombre: string } | null, con
 export async function puedeEnviarPorCanal(conversacionId: string) {
   const c = await db.conversation.findUnique({ where: { id: conversacionId } });
   const canal = c ? adaptador(c.canal) : null;
-  return !!c && !!canal && canal.canSendFreeForm(c);
+  if (!c || !canal || !canal.canSendFreeForm(c)) return false;
+  const quedan = await salientesRestantes(c); // en TikTok, con el tope de mensajes seguidos agotado tampoco se puede
+  return quedan === null || quedan > 0;
 }
 
 /**
@@ -363,7 +368,7 @@ export async function datosPanel(conversacionId: string, actor: ActorPedidos): P
   return {
     ok: true,
     datos: {
-      contacto: { nombre: conv.contacto.nombre, telefono: conv.contacto.telefono ? formatTelefono(conv.contacto.telefono) : "", municipio: conv.contacto.municipio ?? "" },
+      contacto: { nombre: conv.contacto.nombre, telefono: conv.contacto.telefono ? formatTelefono(conv.contacto.telefono) : "", ...lugarGuardado(conv.contacto.departamento, conv.contacto.municipio) },
       sinLimites: veTodo(actor),
       descuentoMaxAgente: aj.descuentoMaxAgente,
       inventario: aj.inventario,
@@ -371,7 +376,7 @@ export async function datosPanel(conversacionId: string, actor: ActorPedidos): P
       ubicacionPorEntrega: { recoger: aj.ubicacionRecogerId, envio: aj.ubicacionEnvioId },
       envioGratisDesde: aj.envioGratisDesde,
       metodosPago: METODOS.filter((m) => m.disponible && aj.metodos.includes(m.id) && (m.id !== "tarjeta" || !!pasarela())).map((m) => ({ id: m.id, nombre: m.nombre })),
-      zonas: zonas.filter((z) => z.activa).map((z) => ({ nombre: z.nombre, municipios: z.municipios, costo: z.costo, tiempo: z.tiempo })),
+      zonas: zonas.filter((z) => z.activa).map((z) => ({ nombre: z.nombre, departamentos: z.departamentos, municipios: z.municipios, costo: z.costo, tiempo: z.tiempo })),
       abiertos,
       sugeridos,
     },

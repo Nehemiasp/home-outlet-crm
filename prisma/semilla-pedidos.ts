@@ -10,10 +10,11 @@ const cuentas = [
 
 // FICTICIO: hasta que lleguen las zonas y los costos reales (centavos).
 const zonas = [
-  { nombre: "Puerto Barrios", municipios: ["Puerto Barrios"], costo: 1500, tiempo: "Mismo día" },
-  { nombre: "Santo Tomás de Castilla", municipios: ["Santo Tomás de Castilla"], costo: 2000, tiempo: "1 día" },
-  { nombre: "Morales", municipios: ["Morales"], costo: 3500, tiempo: "1 a 2 días" },
-  { nombre: "Resto del país", municipios: [], costo: 4500, tiempo: "2 a 4 días" },
+  { nombre: "Puerto Barrios", departamentos: ["Izabal"], municipios: ["Puerto Barrios"], costo: 1500, tiempo: "Mismo día" },
+  { nombre: "Morales", departamentos: ["Izabal"], municipios: ["Morales"], costo: 3500, tiempo: "1 a 2 días" },
+  { nombre: "Resto de Izabal", departamentos: ["Izabal"], municipios: [], costo: 4000, tiempo: "1 a 2 días" },
+  { nombre: "Departamento de Guatemala", departamentos: ["Guatemala"], municipios: [], costo: 4000, tiempo: "1 a 2 días" },
+  { nombre: "Resto del país", departamentos: [], municipios: [], costo: 4500, tiempo: "2 a 4 días" },
 ] as const;
 
 export async function sembrarPedidosBase(db: PrismaClient) {
@@ -26,5 +27,5 @@ export async function sembrarPedidosBase(db: PrismaClient) {
     update: {},
   });
   await db.bankAccount.createMany({ data: cuentas.map((c, i) => ({ ...c, orden: i + 1 })) });
-  await db.shippingZone.createMany({ data: zonas.map((z, i) => ({ ...z, municipios: [...z.municipios], orden: i + 1 })) });
+  await db.shippingZone.createMany({ data: zonas.map((z, i) => ({ ...z, departamentos: [...z.departamentos], municipios: [...z.municipios], orden: i + 1 })) });
 }

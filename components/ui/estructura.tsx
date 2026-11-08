@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowDown, ArrowUp, Check, ChevronDown, Info, ListFilter, OctagonAlert, TriangleAlert, X } from "lucide-react";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Boton } from "./form";
 import { ContadorNoLeidos } from "./etiquetas";
@@ -213,8 +213,9 @@ export type OpcionMenu = { texto: string; onElegir: () => void; peligro?: boolea
  */
 export function MenuDesplegable({ etiqueta, opciones, variante = "secundario" }: { etiqueta: string; opciones: OpcionMenu[]; variante?: "secundario" | "fantasma" }) {
   const [abierto, setAbierto] = useState(false);
-  const [pos, setPos] = useState<{ top?: number; bottom?: number; right: number } | null>(null);
+  const [pos, setPos] = useState<{ top?: number; bottom?: number; right?: number; left?: number } | null>(null);
   const raiz = useRef<HTMLDivElement>(null);
+  const menu = useRef<HTMLDivElement>(null);
   const items = useRef<(HTMLButtonElement | null)[]>([]);
 
   const alternar = () => {
@@ -229,6 +230,12 @@ export function MenuDesplegable({ etiqueta, opciones, variante = "secundario" }:
     }
     setAbierto(!abierto);
   };
+
+  // El menú se alinea con el borde derecho del botón; si así se saldría de la pantalla por la izquierda (botón cerca del borde izquierdo), se pega a la izquierda.
+  useLayoutEffect(() => {
+    const r = menu.current?.getBoundingClientRect();
+    if (abierto && r && r.left < 8) setPos((p) => (p ? { top: p.top, bottom: p.bottom, left: 8 } : p));
+  }, [abierto, pos]);
 
   useEffect(() => {
     if (!abierto) return;
@@ -264,7 +271,7 @@ export function MenuDesplegable({ etiqueta, opciones, variante = "secundario" }:
         <ChevronDown className="size-4" aria-hidden />
       </Boton>
       {abierto && pos && (
-        <div role="menu" style={pos} className="fixed z-30 max-h-80 min-w-48 max-w-[calc(100vw-1rem)] overflow-y-auto rounded-tarjeta border border-linea bg-superficie py-1 shadow-menu">
+        <div ref={menu} role="menu" style={pos} className="fixed z-30 max-h-80 min-w-48 max-w-[calc(100vw-1rem)] overflow-y-auto rounded-tarjeta border border-linea bg-superficie py-1 shadow-menu">
           {opciones.map((o, i) => (
             <button
               key={o.texto}

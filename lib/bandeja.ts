@@ -1,7 +1,9 @@
 import { adaptador } from "@/lib/canales";
+import { salientesRestantes } from "@/lib/mensajeria";
 import type { Channel } from "@/lib/canales/tipos";
 import { obtenerNegocio } from "@/lib/ajustes";
 import { db } from "@/lib/db";
+import { textoLugar } from "@/lib/guatemala";
 import { aplicarDatos } from "@/lib/plantillas";
 import { obtenerAjustesPedidos } from "@/lib/pedidos/ajustes";
 import { comprasDeContacto } from "@/lib/pedidos/compras";
@@ -149,6 +151,9 @@ export async function cargarConversacion(id: string, yo: { id: string; rol: Rol 
     : [];
   const negocioActual = await obtenerNegocio();
   const cuentasActivas = pedidosDeMensajes.length ? await db.bankAccount.findMany({ where: { activa: true }, orderBy: [{ orden: "asc" }, { banco: "asc" }], select: { banco: true, tipo: true, numero: true, titular: true } }) : [];
+  // El enlace de pago abierto de los pedidos que se pagan con tarjeta.
+  const cobrosAbiertos = pedidosDeMensajes.length ? await db.cobroTarjeta.findMany({ where: { pedidoId: { in: pedidosDeMensajes.map((o) => o.id) }, estado: "creado" }, orderBy: { creado: "asc" }, select: { pedidoId: true, url: true } }) : [];
+  const enlaceDe = (pedidoId: string) => cobrosAbiertos.filter((c) => c.pedidoId === pedidoId).at(-1)?.url ?? null;
   const tarjetas = new Map<string, TarjetaPedido>(
     pedidosDeMensajes.map((o) => [
       o.id,
@@ -156,9 +161,12 @@ export async function cargarConversacion(id: string, yo: { id: string; rol: Rol 
         id: o.id, codigo: o.codigo, estado: o.estado,
         lineas: agruparLineas(o.lineas).map((l) => ({ nombre: l.nombre, cantidad: l.cantidad, total: l.precio * l.cantidad })),
         descuento: o.descuentoMonto,
-        envio: o.entrega === "envio" ? `Envío a ${o.municipio ?? "su municipio"}${o.costoEnvio === 0 ? " · Gratis" : ""}` : `Recoger en tienda${negocioActual.direccion ? `: ${negocioActual.direccion}` : ""}`,
+        envio: o.entrega === "envio" ? `Envío a ${textoLugar(o.municipio, o.departamento) || "su municipio"}${o.costoEnvio === 0 ? " · Gratis" : ""}` : `Recoger en tienda${negocioActual.direccion ? `: ${negocioActual.direccion}` : ""}`,
         total: o.total,
-        cuentas: cuentasActivas,
+        // las cuentas solo van si se paga por banco (o si el pedido es anterior a la forma de pago)
+        cuentas: o.metodoPago === null || o.metodoPago === "transferencia" || o.metodoPago === "deposito" ? cuentasActivas : [],
+        formaPago: o.metodoPago,
+        enlace: o.metodoPago === "tarjeta" ? enlaceDe(o.id) : null,
       },
     ]),
   );
@@ -194,6 +202,7 @@ export async function cargarConversacion(id: string, yo: { id: string; rol: Rol 
     asignadaA: conv.asignadaA,
     lastInboundAt: conv.lastInboundAt?.toISOString() ?? null,
     canalActivo: adaptador(conv.canal) !== null,
+    salientesRestantes: await salientesRestantes(conv),
     linea,
     contacto: {
       id: conv.contacto.id, nombre: conv.contacto.nombre, telefono: conv.contacto.telefono, correo: conv.contacto.correo, notas: conv.contacto.notas,

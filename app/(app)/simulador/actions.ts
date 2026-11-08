@@ -6,9 +6,11 @@ import { after } from "next/server";
 import { procesarMensajeEntrante } from "@/lib/ia/atencion";
 import { z } from "zod";
 import type { ProductoTarjeta } from "@/components/ui/conversacion";
+import { adaptador } from "@/lib/canales";
+import { entradaSimulada } from "@/lib/canales/tiktok-simulado";
 import { CANALES, type Channel } from "@/lib/canales/tipos";
 import { db } from "@/lib/db";
-import { almacenamiento, guardarImagenSubida } from "@/lib/almacenamiento";
+import { almacenamiento, guardarImagenSubida, TIPOS } from "@/lib/almacenamiento";
 import { recibirMensaje } from "@/lib/mensajeria";
 import { disponibleProducto } from "@/lib/pedidos/existencias";
 import { requireUsuario } from "@/lib/session";
@@ -59,7 +61,16 @@ export async function enviarComoCliente(entrada: z.input<typeof entradaEnvio>): 
     contactName = nombre;
   }
 
-  const recibido = await recibirMensaje({ channel: c, externalContactId, contactName, externalMessageId: `sim-in-${randomUUID()}`, ...(imagenUrl ? { type: "image" as const, mediaUrl: imagenUrl, text: texto || undefined } : { type: "text" as const, text: texto }), timestamp: new Date() });
+  let recibido: { conversacionId?: string } = {};
+  if (c === "tiktok" && adaptador("tiktok")) {
+    // Con TikTok activo, el mensaje entra como entraría el de TikTok: un aviso firmado que el adaptador verifica y lee.
+    const nombreArchivo = imagenUrl?.replace("/api/archivos/", "");
+    const datos = nombreArchivo ? await almacenamiento.leer(nombreArchivo) : null;
+    const mensajes = await entradaSimulada({ usuarioId: externalContactId, nombre: contactName, texto: texto || undefined, imagen: datos && nombreArchivo ? { tipo: TIPOS[nombreArchivo.split(".").pop()!]!, datos } : undefined });
+    for (const m of mensajes) recibido = await recibirMensaje(m);
+  } else {
+    recibido = await recibirMensaje({ channel: c, externalContactId, contactName, externalMessageId: `sim-in-${randomUUID()}`, ...(imagenUrl ? { type: "image" as const, mediaUrl: imagenUrl, text: texto || undefined } : { type: "text" as const, text: texto }), timestamp: new Date() });
+  }
   // Responde el asistente (si le toca) después de contestarle a la pantalla, sin hacer esperar al cliente.
   if (recibido.conversacionId) after(() => procesarMensajeEntrante(recibido.conversacionId!));
 

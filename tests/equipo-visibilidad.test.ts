@@ -233,7 +233,7 @@ describe("visibilidad por asesor (con base de datos)", () => {
         ["app/(app)/bandeja/[id]/page.tsx", /cargarConversacion\(id, usuario\)/],
         ["app/(app)/contactos/[id]/page.tsx", /cargarContacto\(id, usuario\)/],
         ["app/(app)/pedidos/[id]/page.tsx", /obtener\(id\)/],
-        ["app/(app)/pedidos/[id]/bodega/page.tsx", /cargarPedido\(id, u\)/],
+        ["app/(app)/pedidos/[id]/bodega/page.tsx", /cargarHoja\(id, u\)/], // cargarHoja aplica el mismo filtro (y a bodega solo le abre lo de despacho)
       ];
       for (const [ruta, patron] of paginas) {
         const t = readFileSync(ruta, "utf8");

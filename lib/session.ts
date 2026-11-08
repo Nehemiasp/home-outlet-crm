@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
-import type { Rol } from "@/lib/permisos";
+import { inicioDe, type Rol } from "@/lib/permisos";
 
 /**
  * Usuario de la sesión, leído de la base en cada petición: así un usuario
@@ -14,11 +14,23 @@ export async function getUsuario() {
   return u?.activo ? u : null;
 }
 
-/** Validación en el servidor: sin sesión va a /login; con otro rol, a la bandeja. */
+/**
+ * Validación en el servidor: sin sesión va a /login; con otro rol, a donde empieza esa persona.
+ * El rol de bodega queda FUERA por defecto: lo que no lo admite expresamente (con `requireConBodega`) lo rechaza,
+ * así una pantalla o acción nueva nunca queda abierta a bodega por olvido.
+ */
 export async function requireUsuario(rol?: Rol) {
   const u = await getUsuario();
   if (!u) redirect("/login");
-  if (rol && u.rol !== rol) redirect("/bandeja");
+  if (u.rol === "bodega") redirect(inicioDe(u));
+  if (rol && u.rol !== rol) redirect(inicioDe(u));
+  return u;
+}
+
+/** Para lo que también usa bodega (el marco de la aplicación, el catálogo y el despacho). Cualquier otro uso es un error de permisos. */
+export async function requireConBodega() {
+  const u = await getUsuario();
+  if (!u) redirect("/login");
   return u;
 }
 

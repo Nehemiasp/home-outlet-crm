@@ -159,14 +159,20 @@ describe("vencimiento de reservas y avisos de estado (con base de datos)", () =>
     await db.order.update({ where: { id: recoger.id }, data: { estado: "preparando" } });
     const r = await avanzarPedido(recoger.id, "listo_para_recoger", agente);
     assert.ok(r.ok && r.aviso?.estado === "enviado");
-    assert.match((await mensajes(recoger.id)).at(-1)!.texto!, /^Su pedido .* está listo para recoger en: /);
+    assert.match((await mensajes(recoger.id)).at(-1)!.texto!, /¡Su pedido .* está listo para recoger![\s\S]*Lo esperamos en: [\s\S]*Horario: /);
 
     const envio = await pedido(new Date(Date.now() + HORA), { entrega: "envio" });
     await db.order.update({ where: { id: envio.id }, data: { estado: "preparando" } });
     assert.equal((await avanzarPedido(envio.id, "listo_para_recoger", agente)).ok, false); // un envío no se «recoge»
+    const sinGuia = await avanzarPedido(envio.id, "enviado", agente);
+    assert.ok(!sinGuia.ok && /número de guía/i.test(sinGuia.error)); // sin guía no se marca como enviado
+    assert.equal((await avanzarPedido(envio.id, "enviado", agente, { guia: "   " })).ok, false);
+    assert.equal(await estado(envio.id), "preparando");
     const e = await avanzarPedido(envio.id, "enviado", agente, { guia: "GT123456" });
     assert.ok(e.ok);
-    assert.equal((await mensajes(envio.id)).at(-1)!.texto, `Su pedido ${envio.codigo} va en camino. Número de guía: GT123456`);
+    const aviso = (await mensajes(envio.id)).at(-1)!.texto!;
+    assert.match(aviso, new RegExp(`¡Su pedido ${envio.codigo} va en camino!`));
+    assert.match(aviso, /Número de guía: GT123456/);
     assert.equal((await db.order.findUniqueOrThrow({ where: { id: envio.id } })).guia, "GT123456");
   });
 

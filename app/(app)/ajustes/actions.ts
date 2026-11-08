@@ -7,7 +7,7 @@ import { guardarAjustesIa } from "@/lib/ia/ajustes-ia";
 import { probarAsistente } from "@/lib/ia/ayudas";
 import * as preguntas from "@/lib/ia/preguntas";
 import * as pedidos from "@/lib/pedidos/ajustes";
-import { puedeVerAjustes } from "@/lib/permisos";
+import { puedeVerAjustes, ROLES } from "@/lib/permisos";
 import { requireUsuario } from "@/lib/session";
 
 type Resultado = { ok: true } | { ok: false; error: string };
@@ -39,7 +39,7 @@ export async function guardarAjustesEquipo(entrada: z.input<typeof ajustesEquipo
 const usuario = z.object({
   nombre: z.string().trim().min(1, "Escriba el nombre.").max(80, "El nombre pasa de 80 caracteres."),
   correo: z.string().trim().toLowerCase().pipe(z.email("El correo no tiene un formato válido.")),
-  rol: z.enum(["admin", "jefe_tienda", "agente"]),
+  rol: z.enum(ROLES),
 });
 
 export async function invitarUsuario(entrada: z.input<typeof usuario>): Promise<ConClave> {
@@ -53,7 +53,7 @@ export async function invitarUsuario(entrada: z.input<typeof usuario>): Promise<
 export async function cambiarRol(usuarioId: string, rol: string): Promise<Resultado> {
   const u = await admin();
   if (!u) return SOLO_ADMIN;
-  return ajustes.cambiarRol(id.parse(usuarioId), z.enum(["admin", "jefe_tienda", "agente"]).parse(rol), u);
+  return ajustes.cambiarRol(id.parse(usuarioId), z.enum(ROLES).parse(rol), u);
 }
 
 export async function cambiarActivo(usuarioId: string, activo: boolean): Promise<Resultado> {
@@ -169,7 +169,7 @@ export async function borrarCuentaBancaria(cuentaId: string): Promise<Resultado>
   return pedidos.borrarCuenta(id.parse(cuentaId), u);
 }
 
-const zona = z.object({ nombre: z.string().max(100), municipios: z.string().max(2000), costo: z.string().max(20), tiempo: z.string().max(100), activa: z.boolean() });
+const zona = z.object({ nombre: z.string().max(100), departamentos: z.array(z.string().max(60)).max(30), municipios: z.array(z.string().max(80)).max(400), costo: z.string().max(20), tiempo: z.string().max(100), activa: z.boolean() });
 
 export async function guardarZonaEnvio(zonaId: string | null, entrada: z.input<typeof zona>): Promise<Resultado> {
   const u = await admin();

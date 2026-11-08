@@ -9,12 +9,17 @@ export const metadata: Metadata = { title: "Canales · Ajustes · Home Outlet" }
 const NOTAS: Record<Channel, string> = {
   simulado: "Canal de pruebas: los mensajes salen de la pantalla Simulador. No se debe usar en producción.",
   whatsapp: "Necesita una cuenta de Meta Business verificada y un número de WhatsApp Business. Con eso, estos datos se escriben en el archivo de configuración del servidor (.env) y el canal se agrega a CHANNELS_ENABLED.",
-  tiktok: "Se conecta en la fase 3.",
+  tiktok: "Necesita una cuenta de TikTok Business con el acceso a mensajes aprobado por TikTok. El cliente siempre escribe primero: se puede responder hasta 48 horas después de su último mensaje y hasta 10 mensajes seguidos sin que vuelva a escribir. Sin plantillas, video ni voz. Mientras tanto se puede probar con la API de TikTok simulada (solo desarrollo, ver .env.example).",
   instagram: "Se conecta en la fase 3.",
   facebook: "Se conecta en la fase 3.",
 };
 
-// Solo se muestran los nombres de las variables, nunca sus valores.
+// Los canales que ya piden datos de conexión. Solo se muestran los nombres de las variables, nunca sus valores.
+const VARIABLES: Partial<Record<Channel, string[]>> = {
+  whatsapp: ["WHATSAPP_TOKEN", "WHATSAPP_PHONE_NUMBER_ID", "WHATSAPP_APP_SECRET", "WHATSAPP_VERIFY_TOKEN"],
+  tiktok: ["TIKTOK_ACCESS_TOKEN", "TIKTOK_BUSINESS_ID", "TIKTOK_APP_SECRET"],
+};
+
 export default function Canales() {
   const canales = estadoCanales();
   return (
@@ -30,11 +35,11 @@ export default function Canales() {
               </Insignia>
             </div>
             <p className="cuerpo text-texto-suave">{NOTAS[c.canal]}</p>
-            {c.canal === "whatsapp" && (
+            {VARIABLES[c.canal] && (
               <div>
                 <p className="cuerpo-fuerte">Datos que hacen falta</p>
                 <ul className="meta mt-1 flex flex-col gap-1">
-                  {["WHATSAPP_TOKEN", "WHATSAPP_PHONE_NUMBER_ID", "WHATSAPP_APP_SECRET", "WHATSAPP_VERIFY_TOKEN"].map((v) => {
+                  {VARIABLES[c.canal]!.map((v) => {
                     const falta = c.faltantes.includes(v);
                     return (
                       <li key={v} className={falta ? "text-aviso" : "text-exito"}>
