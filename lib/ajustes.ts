@@ -17,8 +17,9 @@ export const TONOS = ["carbon", "naranja", "exito", "aviso", "error", "gris"] as
 const ALFABETO = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789";
 const claveTemporal = () => Array.from({ length: 12 }, () => ALFABETO[randomInt(ALFABETO.length)]).join("");
 
-export const listarUsuarios = () =>
-  db.user.findMany({ orderBy: [{ activo: "desc" }, { nombre: "asc" }], select: { id: true, nombre: true, correo: true, rol: true, activo: true, puedeVerificarPagos: true } });
+/** Los usuarios para la pantalla de Ajustes. Del segundo factor solo se dice si está activo: el secreto nunca sale del servidor. */
+export const listarUsuarios = async () =>
+  (await db.user.findMany({ orderBy: [{ activo: "desc" }, { nombre: "asc" }], select: { id: true, nombre: true, correo: true, rol: true, activo: true, puedeVerificarPagos: true, totpSecreto: true } })).map(({ totpSecreto, ...u }) => ({ ...u, segundoFactor: !!totpSecreto }));
 
 /** True si el cambio dejaría al sistema sin ningún administrador activo. */
 export const dejaSinAdmin = (adminsActivos: number, quitaAdminActivo: boolean) => quitaAdminActivo && adminsActivos <= 1;
@@ -73,6 +74,21 @@ export async function cambiarPermisoPagos(id: string, puede: boolean, actor: Act
   if (u.puedeVerificarPagos === puede) return { ok: true };
   await db.user.update({ where: { id }, data: { puedeVerificarPagos: puede } });
   await log(actor, "permiso_pagos", "User", id, { correo: u.correo, puede });
+  return { ok: true };
+}
+
+/**
+ * Quita el segundo factor de quien perdió su teléfono y sus códigos de respaldo. Sus sesiones abiertas se cierran (la huella cambia) y,
+ * al entrar de nuevo, tiene que activarlo otra vez. Nadie se lo quita a sí mismo: lo hace otro administrador (o, si era el único,
+ * `npm run admin:sin-2fa` en el servidor).
+ */
+export async function quitarSegundoFactor(id: string, actor: Actor): Promise<Resultado> {
+  if (id === actor.id) return fallo("No puede quitarse su propio segundo factor. Pídaselo a otro administrador.");
+  const u = await db.user.findUnique({ where: { id } });
+  if (!u) return fallo("El usuario ya no existe.");
+  if (!u.totpSecreto && !u.totpPendiente) return { ok: true };
+  await db.user.update({ where: { id }, data: { totpSecreto: null, totpPendiente: null, totpUltimoPaso: 0, respaldoHashes: [] } });
+  await log(actor, "quitar_segundo_factor", "User", id, { correo: u.correo });
   return { ok: true };
 }
 

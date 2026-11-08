@@ -31,6 +31,22 @@ Los números naranja junto a Bandeja y Pedidos son lo que está esperando: mensa
 
 **Si se equivoca varias veces:** después de 5 intentos fallidos el sistema espera 15 minutos antes de dejarle intentar otra vez.
 
+### El segundo factor (administradores y jefes de tienda)
+Quienes ven y mueven todo el negocio entran con la contraseña **y** con un código de 6 dígitos que muestra una aplicación de autenticación en su teléfono. Así, aunque alguien consiga la contraseña, no puede entrar. Los demás roles entran solo con su contraseña.
+
+**La primera vez** (al entrar con la contraseña que le dio el administrador, el sistema no le deja pasar a nada más hasta activarlo):
+1. Instale una aplicación de autenticación en su teléfono (Google Authenticator, Microsoft Authenticator, Authy o la de su gestor de contraseñas).
+2. Escanee el código QR de la pantalla (o escriba la clave que aparece debajo).
+3. Escriba el código de 6 dígitos que le muestra la aplicación y pulse **Activar**.
+4. **Guarde los 8 códigos de respaldo** que aparecen: se muestran una sola vez y cada uno sirve una sola vez. Son para entrar si pierde el teléfono.
+5. Pulse **Ya los guardé, entrar de nuevo** y entre con su contraseña y un código.
+
+**Cada vez que entre:** escriba correo y contraseña; en el segundo paso, el código de 6 dígitos (cambia cada 30 segundos y no sirve dos veces). Si perdió el teléfono, escriba en ese lugar un código de respaldo.
+
+**Si se equivoca con el código** cuenta como un intento fallido (5 en 15 minutos y se bloquea). Si el código nunca coincide, revise que la hora del teléfono sea la automática.
+
+**Si perdió el teléfono y los códigos de respaldo:** otro administrador entra a **Ajustes → Usuarios**, abre las acciones de esa persona y elige **Quitar segundo factor**. Al volver a entrar con su contraseña, tendrá que activarlo de nuevo, así que avísele que lo haga cuanto antes. Si era el único administrador, quien tenga acceso al servidor corre `npm run admin:sin-2fa -- --correo persona@empresa.com`.
+
 ## 3. Roles: qué puede hacer cada quien
 
 | | **Agente** | **Jefe de tienda** | **Administrador** |
@@ -197,7 +213,7 @@ Al entrar, si aún faltan cosas para trabajar con datos reales, se abre **Primer
 | Sección | Qué se configura |
 |---|---|
 | **Primeros pasos** | La lista de lo que falta para trabajar con datos reales |
-| **Usuarios** | **Invitar usuario** (nombre, correo y rol: Agente, Jefe de tienda o Administrador; se muestra una contraseña temporal **una sola vez**). En cada fila: cambiar de rol, **Restablecer contraseña**, desactivar, y el interruptor de **Verifica pagos** para los agentes |
+| **Usuarios** | **Invitar usuario** (nombre, correo y rol: Agente, Jefe de tienda o Administrador; se muestra una contraseña temporal **una sola vez**). En cada fila: cambiar de rol, **Restablecer contraseña**, **Quitar segundo factor** (para administradores y jefes de tienda que perdieron su teléfono), desactivar, y el interruptor de **Verifica pagos** para los agentes |
 | **Equipo** | Cómo se asignan las conversaciones (automática o manual), si los agentes ven solo lo suyo, y el estado de cada agente |
 | **Respuestas rápidas** | Los atajos con `/` y sus textos |
 | **Etiquetas** | Las etiquetas de los clientes |

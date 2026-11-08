@@ -122,6 +122,12 @@ model User {
   ultimaSenal         DateTime? // último latido (el sondeo de la barra lateral); 5 min sin señal = desconectado
   puedeVerificarPagos Boolean   @default(false) // el admin siempre puede; un agente solo si se lo activan
 
+  // Segundo factor (código de una aplicación de autenticación, TOTP). Los secretos van cifrados con una clave derivada de AUTH_SECRET.
+  totpSecreto    String? // el secreto ya confirmado: con él se pide el código al entrar
+  totpPendiente  String? // el secreto de una activación a medias (todavía no se confirmó con un código)
+  totpUltimoPaso Int      @default(0) // el último intervalo de 30 s aceptado: un mismo código no sirve dos veces
+  respaldoHashes String[] @default([]) // códigos de respaldo de un solo uso (solo su huella)
+
   // Disponibilidad (solo tiene efecto en los asesores, rol agente)
   estadoAsesor       EstadoAsesor @default(desconectado)
   estadoDesde        DateTime     @default(now())
@@ -498,20 +504,20 @@ model Order {
   creada          DateTime     @default(now())
   actualizada     DateTime     @updatedAt
 
-  contacto     Contact       @relation(fields: [contactoId], references: [id])
-  conversacion Conversation? @relation(fields: [conversacionId], references: [id], onDelete: SetNull)
-  creadoPor    User?         @relation("PedidoCreador", fields: [creadoPorId], references: [id], onDelete: SetNull)
-  lineas       OrderItem[]
-  pagos        Payment[]
-  eventos      OrderEvent[]
-  mensajes     Message[]
+  contacto      Contact        @relation(fields: [contactoId], references: [id])
+  conversacion  Conversation?  @relation(fields: [conversacionId], references: [id], onDelete: SetNull)
+  creadoPor     User?          @relation("PedidoCreador", fields: [creadoPorId], references: [id], onDelete: SetNull)
+  lineas        OrderItem[]
+  pagos         Payment[]
+  eventos       OrderEvent[]
+  mensajes      Message[]
+  metodoPago    TipoPago? // la forma de pago que pidió el cliente y se eligió al crear el pedido (los anteriores no la tienen)
+  cobrosTarjeta CobroTarjeta[]
 
   @@index([estado, creada])
   @@index([contactoId])
   @@index([conversacionId])
   @@index([estado, reservadoHasta])
-  metodoPago    TipoPago? // la forma de pago que pidió el cliente y se eligió al crear el pedido (los anteriores no la tienen)
-  cobrosTarjeta CobroTarjeta[]
 }
 
 // Nombre y precio se copian al hacer el pedido: un cambio posterior en el catálogo no altera pedidos ya hechos.
@@ -587,15 +593,15 @@ model BankAccount {
 }
 
 model ShippingZone {
-  id         String   @id @default(cuid())
-  nombre     String
+  id            String   @id @default(cuid())
+  nombre        String
   /// Departamentos que cubre la zona entera. Con municipios, la zona solo vale para esos municipios dentro de esos departamentos.
   departamentos String[] @default([])
-  municipios String[]
-  costo      Int // centavos
-  tiempo     String // por ejemplo "1 a 2 días"
-  activa     Boolean  @default(true)
-  orden      Int      @default(0)
+  municipios    String[]
+  costo         Int // centavos
+  tiempo        String // por ejemplo "1 a 2 días"
+  activa        Boolean  @default(true)
+  orden         Int      @default(0)
 }
 
 // Una sola fila.

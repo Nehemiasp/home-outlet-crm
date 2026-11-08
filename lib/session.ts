@@ -2,16 +2,34 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { inicioDe, type Rol } from "@/lib/permisos";
+import { segundoFactorPendiente, sesionVigente } from "@/lib/sesion-vigente";
 
 /**
- * Usuario de la sesión, leído de la base en cada petición: así un usuario
- * desactivado o con otro rol pierde acceso al instante, sin esperar a que venza el token.
+ * La sesión leída de la base en cada petición: así un usuario desactivado, con otro rol o con la contraseña restablecida pierde
+ * acceso al instante, sin esperar a que venza el token. `pendiente` = le falta activar el segundo factor (solo puede ir a activarlo).
  */
-export async function getUsuario() {
-  const correo = (await auth())?.user?.email;
+export async function getSesion() {
+  const sesion = await auth();
+  const correo = sesion?.user?.email;
   if (!correo) return null;
   const u = await db.user.findUnique({ where: { correo } });
-  return u?.activo ? u : null;
+  // Además de existir y estar activo, debe haber entrado con las credenciales de hoy (clave y segundo factor).
+  if (!u || !sesionVigente(u, (sesion as { ph?: string } | null)?.ph)) return null;
+  return { u, pendiente: segundoFactorPendiente(u, (sesion as { sf?: boolean } | null)?.sf) };
+}
+
+/** El usuario de una sesión completa; null sin sesión o si todavía le falta activar el segundo factor. */
+export async function getUsuario() {
+  const s = await getSesion();
+  return s && !s.pendiente ? s.u : null;
+}
+
+/** Sin sesión va a /login; con el segundo factor pendiente, a activarlo. */
+async function sesionCompleta() {
+  const s = await getSesion();
+  if (!s) redirect("/login");
+  if (s.pendiente) redirect("/seguridad");
+  return s.u;
 }
 
 /**
@@ -20,8 +38,7 @@ export async function getUsuario() {
  * así una pantalla o acción nueva nunca queda abierta a bodega por olvido.
  */
 export async function requireUsuario(rol?: Rol) {
-  const u = await getUsuario();
-  if (!u) redirect("/login");
+  const u = await sesionCompleta();
   if (u.rol === "bodega") redirect(inicioDe(u));
   if (rol && u.rol !== rol) redirect(inicioDe(u));
   return u;
@@ -29,9 +46,7 @@ export async function requireUsuario(rol?: Rol) {
 
 /** Para lo que también usa bodega (el marco de la aplicación, el catálogo y el despacho). Cualquier otro uso es un error de permisos. */
 export async function requireConBodega() {
-  const u = await getUsuario();
-  if (!u) redirect("/login");
-  return u;
+  return sesionCompleta();
 }
 
 /** Igual, pero por permiso (de `lib/permisos.ts`): sin él va a `destino`. */
@@ -39,4 +54,11 @@ export async function requirePermiso(permiso: (u: { rol: Rol }) => boolean, dest
   const u = await requireUsuario();
   if (!permiso(u)) redirect(destino);
   return u;
+}
+
+/** SOLO para la pantalla de activar el segundo factor: acepta la sesión a medias (la que todavía no lo tiene). */
+export async function requireSesionParcial() {
+  const s = await getSesion();
+  if (!s) redirect("/login");
+  return s;
 }

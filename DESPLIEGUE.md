@@ -45,7 +45,7 @@ Plantilla completa y comentada en `.env.example`. En producción:
 | Variable | Qué es | Obligatoria |
 |---|---|---|
 | `DATABASE_URL` | Dirección de la base. **No** puede usar la clave `postgres:postgres` | **Sí** |
-| `AUTH_SECRET` | Secreto de las sesiones: 32 caracteres o más, propio (`npx auth secret`) | **Sí** |
+| `AUTH_SECRET` | Secreto de las sesiones: 32 caracteres o más, propio (`npx auth secret`). **También cifra los secretos del segundo factor**: si lo cambia, los administradores y jefes de tienda que ya lo activaron no podrán entrar con su código (hay que quitárselo con `npm run admin:sin-2fa` para que lo activen de nuevo). Cámbielo solo si se filtró | **Sí** |
 | `AUTH_URL` | La dirección pública (`https://crm.ejemplo.com`), o `AUTH_TRUST_HOST=true` | **Sí** detrás de un proxy |
 | `PROXIES_CONFIABLES` | Cuántos proxies hay delante (normalmente `1`). Sin esto el login se limita solo por correo, no por IP | Recomendada |
 | `UPLOADS_DIR` | `/data/uploads` (ya viene en el `Dockerfile`) | **Sí**, apuntando al volumen |

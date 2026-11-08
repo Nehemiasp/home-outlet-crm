@@ -15,6 +15,9 @@ export type Actor = { id: string; rol: Rol };
 type ConDueno = { asignadaAId: string | null };
 
 export const esAdmin = (u: { rol: Rol }) => u.rol === "admin";
+
+/** Quienes deben entrar con segundo factor (código de una aplicación de autenticación): los que ven y mueven todo el negocio. */
+export const requiereSegundoFactor = (u: { rol: Rol }) => u.rol === "admin" || u.rol === "jefe_tienda";
 /** Administrador o jefe de tienda: no se les limita lo que ven y pueden gestionar todo lo operativo. */
 export const veTodo = (u: { rol: Rol }) => u.rol === "admin" || u.rol === "jefe_tienda";
 

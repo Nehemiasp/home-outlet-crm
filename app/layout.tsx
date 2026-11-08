@@ -9,6 +9,7 @@ const nunito = Nunito_Sans({ subsets: ["latin"], weight: ["400", "600", "700"], 
 export const metadata: Metadata = {
   title: "Home Outlet",
   description: "Bandeja de mensajes, contactos y catálogo de Home Outlet Internacional.",
+  robots: { index: false, follow: false }, // sistema privado: que ningún buscador lo indexe
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

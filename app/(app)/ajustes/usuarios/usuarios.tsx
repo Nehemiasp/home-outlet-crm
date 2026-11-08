@@ -7,10 +7,10 @@ import { Insignia } from "@/components/ui/etiquetas";
 import { Boton, CampoTexto, Interruptor, Selector } from "@/components/ui/form";
 import { MenuDesplegable, Modal, Tabla, type Columna } from "@/components/ui/estructura";
 import { useToast } from "@/components/ui/toast";
-import { NOMBRE_ROL, ROLES, veTodo, type Rol } from "@/lib/permisos";
-import { cambiarActivo, cambiarPermisoVerificarPagos, cambiarRol, invitarUsuario, restablecerClave } from "../actions";
+import { NOMBRE_ROL, ROLES, requiereSegundoFactor, veTodo, type Rol } from "@/lib/permisos";
+import { cambiarActivo, cambiarPermisoVerificarPagos, cambiarRol, invitarUsuario, quitarSegundoFactor, restablecerClave } from "../actions";
 
-type Fila = { id: string; nombre: string; correo: string; rol: Rol; activo: boolean; puedeVerificarPagos: boolean };
+type Fila = { id: string; nombre: string; correo: string; rol: Rol; activo: boolean; puedeVerificarPagos: boolean; segundoFactor: boolean };
 
 /** La contraseña temporal se muestra una sola vez. */
 function ClaveTemporal({ titulo, clave, onListo }: { titulo: string; clave: string; onListo: () => void }) {
@@ -50,6 +50,7 @@ export function Usuarios({ usuarios, yoId }: { usuarios: Fila[]; yoId: string })
   const [enviando, setEnviando] = useState(false);
   const [clave, setClave] = useState<{ titulo: string; valor: string } | null>(null);
   const [desactivar, setDesactivar] = useState<Fila | null>(null);
+  const [quitar2fa, setQuitar2fa] = useState<Fila | null>(null);
 
   const ejecutar = async (promesa: Promise<{ ok: boolean; error?: string }>, ok: string) => {
     const r = await promesa;
@@ -105,6 +106,12 @@ export function Usuarios({ usuarios, yoId }: { usuarios: Fila[]; yoId: string })
           <Interruptor etiquetaOculta etiqueta={`Permiso de verificar pagos de ${u.nombre}`} activo={u.puedeVerificarPagos} onCambio={(v) => void ejecutar(cambiarPermisoVerificarPagos(u.id, v), v ? `${u.nombre} ahora verifica pagos` : `${u.nombre} ya no verifica pagos`)} />
         ),
     },
+    {
+      clave: "segundoFactor",
+      titulo: "Segundo factor",
+      render: (u) =>
+        requiereSegundoFactor(u) ? <Insignia tono={u.segundoFactor ? "exito" : "aviso"}>{u.segundoFactor ? "Activo" : "Pendiente"}</Insignia> : <span className="meta text-texto-suave">No aplica</span>,
+    },
     { clave: "estado", titulo: "Estado", render: (u) => <Insignia tono={u.activo ? "exito" : "gris"}>{u.activo ? "Activo" : "Desactivado"}</Insignia> },
     {
       clave: "acciones",
@@ -118,6 +125,7 @@ export function Usuarios({ usuarios, yoId }: { usuarios: Fila[]; yoId: string })
             opciones={[
               ...ROLES.filter((r) => r !== u.rol).map((r) => ({ texto: `Cambiar a ${NOMBRE_ROL[r].toLowerCase()}`, onElegir: () => ejecutar(cambiarRol(u.id, r), "Rol actualizado") })),
               { texto: "Restablecer contraseña", onElegir: () => reiniciar(u) },
+              ...(requiereSegundoFactor(u) && u.segundoFactor ? [{ texto: "Quitar segundo factor", peligro: true, onElegir: () => setQuitar2fa(u) }] : []),
               u.activo ? { texto: "Desactivar", peligro: true, onElegir: () => setDesactivar(u) } : { texto: "Activar", onElegir: () => ejecutar(cambiarActivo(u.id, true), "Usuario activado") },
             ]}
           />
@@ -159,6 +167,27 @@ export function Usuarios({ usuarios, yoId }: { usuarios: Fila[]; yoId: string })
             </div>
           </form>
         )}
+      </Modal>
+
+      <Modal abierto={!!quitar2fa} onCerrar={() => setQuitar2fa(null)} titulo="Quitar segundo factor">
+        <p className="cuerpo mb-4">
+          Úselo solo si <strong>{quitar2fa?.nombre}</strong> perdió su teléfono y sus códigos de respaldo. Se cerrarán sus sesiones abiertas y, al volver a entrar con su contraseña, tendrá que activar el segundo factor de nuevo. Mientras tanto, cualquiera que tenga su contraseña podría activarlo con su propio teléfono: avísele que entre cuanto antes.
+        </p>
+        <div className="flex justify-end gap-2">
+          <Boton variante="secundario" onClick={() => setQuitar2fa(null)}>
+            Cancelar
+          </Boton>
+          <Boton
+            variante="peligro"
+            onClick={() => {
+              const u = quitar2fa;
+              setQuitar2fa(null);
+              if (u) void ejecutar(quitarSegundoFactor(u.id), "Segundo factor quitado");
+            }}
+          >
+            Quitar
+          </Boton>
+        </div>
       </Modal>
 
       <Modal abierto={!!desactivar} onCerrar={() => setDesactivar(null)} titulo="Desactivar usuario">

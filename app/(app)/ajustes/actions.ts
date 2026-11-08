@@ -68,6 +68,12 @@ export async function cambiarPermisoVerificarPagos(usuarioId: string, puede: boo
   return ajustes.cambiarPermisoPagos(id.parse(usuarioId), z.boolean().parse(puede), u);
 }
 
+export async function quitarSegundoFactor(usuarioId: string): Promise<Resultado> {
+  const u = await admin();
+  if (!u) return SOLO_ADMIN;
+  return ajustes.quitarSegundoFactor(id.parse(usuarioId), u);
+}
+
 export async function restablecerClave(usuarioId: string): Promise<ConClave> {
   const u = await admin();
   if (!u) return SOLO_ADMIN;

@@ -7,6 +7,7 @@ import { Burbuja, Compositor, EstadoEntrega, ItemConversacion, SeparadorDia, typ
 import { EstadoVacio, Esqueleto, EsqueletoConversacion } from "@/components/ui/estados";
 import { Avatar, AvatarAsistente, AvatarConCanal, ContadorNoLeidos, IconoCanal, Insignia, InsigniaAtencion, InsigniaCanal, InsigniaConversacion, InsigniaEstado, InsigniaEtiqueta, InsigniaExistencia, InsigniaPago, LogoCanal, nombreCanal, tonos, tonosEstado, type Tono, type TonoEstado } from "@/components/ui/etiquetas";
 import { ListaCompras } from "@/components/ui/pedidos";
+import { CodigosRespaldo, QrSegundoFactor } from "@/components/ui/seguridad";
 import { AreaTexto, Boton, BotonIcono, Buscador, CampoTexto, Casilla, ControlSegmentado, GrupoCasillas, Interruptor, Selector } from "@/components/ui/form";
 import { ControlDisponibilidad, InsigniaDisponibilidad, ModalPausaLarga } from "@/components/ui/disponibilidad";
 import { ModalAsignar, ModalDevolver, ResumenEquipo, TablaEquipo } from "@/components/ui/equipo";
@@ -108,6 +109,9 @@ const respuestasRapidas = [
   { atajo: "/envios", texto: "[Información de envíos: pendiente de confirmar]" },
 ];
 
+/** Un cuadro gris de ejemplo (GIF de 1 píxel): en la pantalla real el QR lo genera el servidor. */
+const QR_DE_EJEMPLO = "data:image/gif;base64,R0lGODlhAQABAIAAAMLCwgAAACH5BAAAAAAALAAAAAABAAEAAAICRAEAOw==";
+
 function Seccion({ id, titulo, children }: { id: string; titulo: string; children: React.ReactNode }) {
   return (
     <section id={id} aria-labelledby={`${id}-t`} className="scroll-mt-4 py-8">
@@ -138,6 +142,7 @@ const secciones = [
   ["conversacion", "Conversación"],
   ["estructura", "Estructura"],
   ["estados", "Carga y vacío"],
+  ["seguridad", "Seguridad"],
   ["asistente", "Asistente"],
   ["graficas", "Gráficas"],
 ];
@@ -829,6 +834,17 @@ export function Guia() {
               </Boton>
             </div>
           </Bloque>
+        </Seccion>
+
+        <Seccion id="seguridad" titulo="Seguridad">
+          <div className="grid gap-6 md:grid-cols-2">
+            <Bloque titulo="Código QR del segundo factor · imagen generada en el servidor, con la clave para teclearla debajo">
+              <QrSegundoFactor qr={QR_DE_EJEMPLO} secreto="ABCD EFGH IJKL MNOP QRST UVWX YZ23 4567" />
+            </Bloque>
+            <Bloque titulo="Códigos de respaldo · se muestran una sola vez; cada uno sirve una vez">
+              <CodigosRespaldo codigos={["k3m9x-q7vbn", "p4w8d-h2tzr", "n6c5y-e9ajs", "x2f7q-m3kvu", "t8b4h-w5pdn", "r9j6z-c2ymg", "d5s3v-k7ewq", "g4n8a-u6xhc"]} onListo={() => avisar("Códigos guardados")} />
+            </Bloque>
+          </div>
         </Seccion>
 
         <Seccion id="estados" titulo="Carga y vacío">

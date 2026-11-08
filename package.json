@@ -17,6 +17,7 @@
     "restaurar": "node scripts/restaurar.mjs",
     "e2e": "node --import tsx --test --test-concurrency=1 e2e/*.test.mts",
     "admin:crear": "tsx scripts/crear-admin.mts",
+    "admin:sin-2fa": "tsx scripts/quitar-2fa.mts",
     "demo:limpiar": "tsx scripts/limpiar-demo.mts"
   },
   "dependencies": {
@@ -28,6 +29,7 @@
     "next": "^16.4.3",
     "next-auth": "^5.0.0-beta.32",
     "pg": "^8.23.1",
+    "qrcode-generator": "2.0.4",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "zod": "^4.6.7"
