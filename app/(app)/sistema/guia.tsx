@@ -7,7 +7,7 @@ import { Burbuja, Compositor, EstadoEntrega, ItemConversacion, SeparadorDia, typ
 import { EstadoVacio, Esqueleto, EsqueletoConversacion } from "@/components/ui/estados";
 import { Avatar, AvatarAsistente, AvatarConCanal, ContadorNoLeidos, IconoCanal, Insignia, InsigniaAtencion, InsigniaCanal, InsigniaConversacion, InsigniaEstado, InsigniaEtiqueta, InsigniaExistencia, InsigniaPago, LogoCanal, nombreCanal, tonos, tonosEstado, type Tono, type TonoEstado } from "@/components/ui/etiquetas";
 import { ListaCompras } from "@/components/ui/pedidos";
-import { CodigosRespaldo, QrSegundoFactor } from "@/components/ui/seguridad";
+import { AvisoInactividad, CodigosRespaldo, QrSegundoFactor } from "@/components/ui/seguridad";
 import { AreaTexto, Boton, BotonIcono, Buscador, CampoTexto, Casilla, ControlSegmentado, GrupoCasillas, Interruptor, Selector } from "@/components/ui/form";
 import { ControlDisponibilidad, InsigniaDisponibilidad, ModalPausaLarga } from "@/components/ui/disponibilidad";
 import { ModalAsignar, ModalDevolver, ResumenEquipo, TablaEquipo } from "@/components/ui/equipo";
@@ -162,6 +162,7 @@ export function Guia() {
   const [rango, setRango] = useState<"7" | "30" | "90">("30");
   const [cargando, setCargando] = useState(false);
   const [pausaLarga, setPausaLarga] = useState(false);
+  const [inactividad, setInactividad] = useState(false);
   const [devolver, setDevolver] = useState(false);
   const [asignar, setAsignar] = useState(false);
   const [plantillas, setPlantillas] = useState(false);
@@ -844,6 +845,11 @@ export function Guia() {
             <Bloque titulo="Códigos de respaldo · se muestran una sola vez; cada uno sirve una vez">
               <CodigosRespaldo codigos={["k3m9x-q7vbn", "p4w8d-h2tzr", "n6c5y-e9ajs", "x2f7q-m3kvu", "t8b4h-w5pdn", "r9j6z-c2ymg", "d5s3v-k7ewq", "g4n8a-u6xhc"]} onListo={() => avisar("Códigos guardados")} />
             </Bloque>
+            <Bloque titulo="Aviso de cierre por inactividad · un minuto antes de cerrar la sesión; cualquier movimiento lo quita">
+              <Boton variante="secundario" tamano="sm" onClick={() => setInactividad(true)}>
+                Ver el aviso de inactividad
+              </Boton>
+            </Bloque>
           </div>
         </Seccion>
 
@@ -955,6 +961,7 @@ export function Guia() {
         onQuitar={() => (setAsignar(false), avisar("Asignación quitada"))}
       />
       <ModalDevolver abierto={devolver} onCerrar={() => setDevolver(false)} onDevolver={() => (setDevolver(false), avisar("Devuelta a la cola"))} />
+      <AvisoInactividad abierto={inactividad} segundos={42} onSeguir={() => setInactividad(false)} onSalir={() => (setInactividad(false), avisar("Aquí se cerraría la sesión"))} />
       <ModalPausaLarga abierto={pausaLarga} minutos={15} onActivar={() => (setPausaLarga(false), avisar("Disponible otra vez"))} onSeguir={() => setPausaLarga(false)} />
       <Modal abierto={modal} onCerrar={() => setModal(false)} titulo="Cerrar conversación">
         <p className="cuerpo mb-4">La conversación pasará a cerradas. Si el cliente vuelve a escribir, se abrirá de nuevo.</p>

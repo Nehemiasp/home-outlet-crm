@@ -1,11 +1,12 @@
 "use server";
 
 import { AuthError } from "next-auth";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { auth, signIn, signOut } from "@/auth";
 import { verificarClave } from "@/lib/credenciales";
 import { db } from "@/lib/db";
 import { alCerrarSesion } from "@/lib/equipo/estado";
+import { COOKIE_SALIDA } from "@/lib/inactividad";
 import { ipDelCliente } from "@/lib/ip";
 import { limpiarFallos, minutosBloqueado, registrarFallo } from "@/lib/limite-intentos";
 import { requiereSegundoFactor } from "@/lib/permisos";
@@ -22,6 +23,7 @@ export async function entrar(_previo: EstadoLogin, datos: FormData): Promise<Est
   const codigo = String(datos.get("codigo") ?? "").trim();
   const paso = codigo ? ("codigo" as const) : undefined; // si ya estaba en el segundo paso, sigue en él aunque falle
   const ip = ipDelCliente(await headers());
+  (await cookies()).delete({ name: COOKIE_SALIDA, path: "/login" }); // quien vuelve a entrar ya vio el aviso de inactividad
   const claves = ip ? [`correo:${correo}`, `ip:${ip}`] : [`correo:${correo}`]; // sin proxy confiable no hay IP que valga
 
   const espera = Math.max(...(await Promise.all(claves.map((c) => minutosBloqueado(c)))));
@@ -47,9 +49,17 @@ export async function entrar(_previo: EstadoLogin, datos: FormData): Promise<Est
   }
 }
 
-export async function salir() {
+/**
+ * Desde el botón «Salir» llega el FormData del formulario; el cierre por inactividad la llama con "inactividad". El motivo va en una
+ * cookie corta y no en la dirección: al cerrarse la sesión, el latido y la propia pantalla también redirigen a /login (sin nada más) y
+ * cualquiera de esas redirecciones puede llegar última. Así /login lo muestra llegue por donde llegue.
+ */
+export async function salir(motivo?: unknown) {
   const correo = (await auth())?.user?.email;
   const u = correo ? await db.user.findUnique({ where: { correo }, select: { id: true } }) : null;
   if (u) await alCerrarSesion(u.id); // cerrar sesión lo pasa a Desconectado
+  const galletas = await cookies();
+  if (motivo === "inactividad") galletas.set(COOKIE_SALIDA, "inactividad", { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/login", maxAge: 120 });
+  else galletas.delete({ name: COOKIE_SALIDA, path: "/login" });
   await signOut({ redirectTo: "/login" });
 }

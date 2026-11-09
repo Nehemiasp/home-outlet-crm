@@ -3,10 +3,13 @@ import { describe, test } from "node:test";
 import { DEPARTAMENTOS, LUGARES, departamentoDe, departamentoOficial, lugarGuardado, municipioOficial, municipiosDe, textoLugar } from "@/lib/guatemala";
 
 describe("departamentos y municipios de Guatemala", () => {
-  test("están los 22 departamentos y ninguno repite municipios", () => {
+  test("están los 22 departamentos, los 340 municipios oficiales y ninguno se repite", () => {
     assert.equal(DEPARTAMENTOS.length, 22);
     for (const d of DEPARTAMENTOS) assert.equal(new Set(LUGARES[d]).size, LUGARES[d]!.length, `${d} repite un municipio`);
-    assert.ok(Object.values(LUGARES).flat().length >= 335);
+    // Cuántos tiene cada departamento según la división oficial vigente (Sipacate, el último de Escuintla, es de 2015).
+    const oficiales: Record<string, number> = { "Alta Verapaz": 17, "Baja Verapaz": 8, Chimaltenango: 16, Chiquimula: 11, "El Progreso": 8, Escuintla: 14, Guatemala: 17, Huehuetenango: 33, Izabal: 5, Jalapa: 7, Jutiapa: 17, Petén: 14, Quetzaltenango: 24, Quiché: 21, Retalhuleu: 9, Sacatepéquez: 16, "San Marcos": 30, "Santa Rosa": 14, Sololá: 19, Suchitepéquez: 21, Totonicapán: 8, Zacapa: 11 };
+    for (const d of DEPARTAMENTOS) assert.equal(LUGARES[d]!.length, oficiales[d], `${d} no tiene sus municipios oficiales`);
+    assert.equal(Object.values(LUGARES).flat().length, 340);
   });
 
   test("busca sin importar mayúsculas ni tildes y devuelve el nombre oficial", () => {

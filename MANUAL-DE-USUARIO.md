@@ -113,6 +113,8 @@ Los agentes tienen un estado que se ve en la barra de arriba:
 - **En pausa:** no recibe conversaciones nuevas. Use **Pausar** y elija el motivo (**Almuerzo**, **Atendiendo en tienda**, **Otro** o **Sin motivo**). Para volver, **Activarme**.
 - **Desconectado:** al cerrar sesión, o si el sistema no recibe señal suya durante **5 minutos** (por ejemplo, si cierra la pestaña).
 
+Por seguridad, si nadie usa el sistema durante **30 minutos** (sin mover el ratón, escribir ni tocar la pantalla), la sesión se cierra sola y usted queda **Desconectado**. Un minuto antes aparece el aviso **«¿Sigue ahí?»**: basta con mover el ratón o pulsar **Seguir en el sistema**.
+
 Si lleva **15 minutos en pausa** el sistema le avisa. Si hay muchas conversaciones sin asignar y nadie disponible, quedan en **Sin asignar** hasta que alguien se active.
 
 El jefe de tienda y el administrador **no tienen estado**: ven el resumen del equipo («Equipo · N de M disponibles») y pueden cambiar el estado de un agente o **Repartir sus conversaciones** (aparece cuando lleva más de 30 minutos en pausa o desconectado y tiene conversaciones abiertas).

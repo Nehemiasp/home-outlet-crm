@@ -1,5 +1,6 @@
 import { Navegacion } from "@/components/shell/barra";
 import { BarraDisponibilidad } from "@/components/shell/barra-disponibilidad";
+import { CierrePorInactividad } from "@/components/shell/inactividad";
 import { ProveedorLatido } from "@/components/shell/latido";
 import { contarSinAsignar } from "@/lib/equipo/asignacion";
 import { disponibilidadDe } from "@/lib/equipo/estado";
@@ -19,6 +20,7 @@ export default async function LayoutApp({ children }: { children: React.ReactNod
   // --alto-barra: la barra superior del asesor ocupa 3 rem; las pantallas de altura completa (la bandeja) la descuentan.
   return (
     <ProveedorLatido inicial={{ noLeidos, sinAsignar, disponibilidad: disponibilidadDe(usuario) }}>
+    <CierrePorInactividad />
     <div className="flex min-h-dvh" style={{ "--alto-barra": usuario.rol === "agente" ? "3rem" : "0rem" } as React.CSSProperties}>
       <Navegacion
         nombre={usuario.nombre}

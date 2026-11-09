@@ -2,7 +2,25 @@
 
 import { Check, Copy } from "lucide-react";
 import { useState } from "react";
+import { Modal } from "@/components/ui/estructura";
 import { Boton } from "@/components/ui/form";
+
+/** Aviso antes de cerrar la sesión por inactividad (ver lib/inactividad.ts). Cerrarlo con Escape o fuera del cuadro también es «seguir». */
+export function AvisoInactividad({ abierto, segundos, onSeguir, onSalir }: { abierto: boolean; segundos: number; onSeguir: () => void; onSalir: () => void }) {
+  return (
+    <Modal abierto={abierto} onCerrar={onSeguir} titulo="¿Sigue ahí?">
+      <p className="cuerpo mb-4">
+        Por seguridad, su sesión se cerrará en <span className="cuerpo-fuerte tabular-nums">{segundos} s</span> porque nadie ha usado el sistema en un buen rato.
+      </p>
+      <div className="flex justify-end gap-2">
+        <Boton variante="secundario" onClick={onSalir}>
+          Salir ahora
+        </Boton>
+        <Boton onClick={onSeguir}>Seguir en el sistema</Boton>
+      </div>
+    </Modal>
+  );
+}
 
 /** Los códigos de respaldo del segundo factor: se muestran una sola vez, para guardarlos antes de seguir. */
 export function CodigosRespaldo({ codigos, onListo, textoListo = "Ya los guardé" }: { codigos: string[]; onListo: () => void; textoListo?: string }) {
