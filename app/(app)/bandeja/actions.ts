@@ -18,6 +18,7 @@ import { requireUsuario } from "@/lib/session";
 import { puedeVerConversacion, puedeVerMensaje } from "@/lib/visibilidad";
 import { listarAsesores } from "@/lib/equipo/asesores";
 import { devolverACola } from "@/lib/equipo/gestion";
+import { esCompartida, participantesAlAsignar } from "@/lib/equipo/compartida";
 import type { Rol } from "@/lib/permisos";
 import { veTodo } from "@/lib/permisos";
 
@@ -157,11 +158,13 @@ export async function asignar(conversacionId: string, destinoId: string | null):
   if (destinoId && !destino) return fallo("El usuario no existe o está desactivado.");
   const anterior = conv.asignadaAId && conv.asignadaAId !== destino?.id ? await db.user.findUnique({ where: { id: conv.asignadaAId }, select: { nombre: true } }) : null;
 
-  await db.$transaction([
+  const compartida = await esCompartida();
+  await db.$transaction(async (tx) => {
     // Con asesor asignado, el asistente deja de responder; sin asignación, la conversación queda esperando a alguien.
-    db.conversation.update({ where: { id: conv.id }, data: destino ? { asignadaAId: destino.id, atendidaPor: "asesor", esperandoAsesorDesde: null } : { asignadaAId: null, atendidaPor: "nadie", esperandoAsesorDesde: new Date() } }),
-    db.activityLog.create({ data: { usuarioId: u.id, accion: "asignar", entidad: "Conversation", entidadId: conv.id, detalle: { a: destino?.nombre ?? null, por: u.nombre, ...(destino && anterior ? { tipo: "reasignar", de: anterior.nombre } : {}) } } }),
-  ]);
+    await tx.conversation.update({ where: { id: conv.id }, data: destino ? { asignadaAId: destino.id, atendidaPor: "asesor", esperandoAsesorDesde: null } : { asignadaAId: null, atendidaPor: "nadie", esperandoAsesorDesde: new Date() } });
+    if (compartida) await participantesAlAsignar(tx, conv.id, conv.asignadaAId, destino?.id ?? null); // es un traspaso: quien la tenía deja de participar
+    await tx.activityLog.create({ data: { usuarioId: u.id, accion: "asignar", entidad: "Conversation", entidadId: conv.id, detalle: { a: destino?.nombre ?? null, por: u.nombre, ...(destino && anterior ? { tipo: "reasignar", de: anterior.nombre } : {}) } } });
+  });
   return { ok: true };
 }
 
@@ -176,8 +179,9 @@ export async function cambiarEstado(conversacionId: string, estado: string): Pro
   const u = await requireUsuario();
   if (!(await ve(u, conversacionId))) return NO_EXISTE;
   const nuevo = z.enum(["abierta", "pendiente", "cerrada"]).parse(estado);
-  const conv = await db.conversation.findUnique({ where: { id: id.parse(conversacionId) }, select: { id: true, asignadaAId: true, estado: true } });
-  if (!conv) return fallo("La conversación no existe.");
+  const fila = await db.conversation.findUnique({ where: { id: id.parse(conversacionId) }, select: { id: true, asignadaAId: true, estado: true, participantes: { select: { usuarioId: true } } } });
+  if (!fila) return fallo("La conversación no existe.");
+  const conv = { ...fila, participantes: fila.participantes.map((p) => p.usuarioId) };
   if (conv.estado === nuevo) return { ok: true };
   if (nuevo === "cerrada" && !puedeCerrar(u, conv)) return fallo("Solo puede cerrar las conversaciones que tiene asignadas.");
 

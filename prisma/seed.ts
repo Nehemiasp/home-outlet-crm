@@ -228,6 +228,9 @@ async function main() {
   await db.$executeRaw`UPDATE "Contact" c SET "asesorResponsableId" = s."asignadaAId"
     FROM (SELECT DISTINCT ON ("contactoId") "contactoId", "asignadaAId" FROM "Conversation" WHERE "asignadaAId" IS NOT NULL ORDER BY "contactoId", "lastMessageAt" DESC) s
     WHERE c.id = s."contactoId"`;
+  // Bandeja compartida (el modo de fábrica): quien atiende cada conversación es su participante principal.
+  await db.$executeRaw`INSERT INTO "ParticipanteConversacion" ("conversacionId", "usuarioId", "desde")
+    SELECT "id", "asignadaAId", "lastMessageAt" FROM "Conversation" WHERE "asignadaAId" IS NOT NULL ON CONFLICT DO NOTHING`;
 
   console.log("\nSemilla lista.");
   console.log(claves.length ? `Usuarios nuevos (anótelas, no se vuelven a mostrar):\n${claves.join("\n")}\n` : "Los usuarios que ya existían conservan su contraseña.\n");

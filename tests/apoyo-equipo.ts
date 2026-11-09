@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { olvidarAjustesEquipo } from "@/lib/equipo/ajustes";
-import type { EstadoAsesor } from "@/generated/prisma/client";
+import type { EstadoAsesor, ModoAsignacion } from "@/generated/prisma/client";
 import type { Rol } from "@/lib/permisos";
 
 /** Utilidades de las pruebas del equipo. No es una prueba: el nombre no termina en .test.ts. */
@@ -11,14 +11,14 @@ export const crearUsuario = (clave: string, rol: Rol = "agente", estado: EstadoA
   db.user.create({ data: { nombre: `${PREFIJO} ${clave}`, correo: `${clave}@prueba-eq.test`, passwordHash: "x", rol, estadoAsesor: estado, ultimaSenal: new Date() } });
 
 let guardados: { id: string; estadoAsesor: EstadoAsesor; estadoDesde: Date; motivoPausa: string | null; activo: boolean }[] = [];
-let ajustesPrevios: { modoAsignacion: "manual" | "automatica"; asesoresVenSoloSuyas: boolean } | null = null;
+let ajustesPrevios: { modoAsignacion: ModoAsignacion; asesoresVenSoloSuyas: boolean } | null = null;
 
 /**
  * Deja a los asesores de la base (los de demostración) desactivados y Desconectados mientras corren las pruebas, para que el
  * reparto solo considere a los de prueba (aunque alguien tenga la aplicación abierta con esa cuenta, su latido no los revive),
  * y fija los ajustes del equipo. `restaurar()` lo devuelve todo como estaba.
  */
-export async function aislar(ajustes: { modoAsignacion?: "manual" | "automatica"; asesoresVenSoloSuyas?: boolean } = {}) {
+export async function aislar(ajustes: { modoAsignacion?: ModoAsignacion; asesoresVenSoloSuyas?: boolean } = {}) {
   guardados = await db.user.findMany({ where: { rol: "agente", NOT: { correo: { endsWith: "@prueba-eq.test" } } }, select: { id: true, estadoAsesor: true, estadoDesde: true, motivoPausa: true, activo: true } });
   await db.user.updateMany({ where: { id: { in: guardados.map((g) => g.id) } }, data: { estadoAsesor: "desconectado", activo: false } });
   const f = await db.ajustesEquipo.upsert({ where: { id: "equipo" }, update: {}, create: { id: "equipo" } });
@@ -27,7 +27,7 @@ export async function aislar(ajustes: { modoAsignacion?: "manual" | "automatica"
   olvidarAjustesEquipo();
 }
 
-export async function fijarAjustes(a: { modoAsignacion?: "manual" | "automatica"; asesoresVenSoloSuyas?: boolean }) {
+export async function fijarAjustes(a: { modoAsignacion?: ModoAsignacion; asesoresVenSoloSuyas?: boolean }) {
   await db.ajustesEquipo.update({ where: { id: "equipo" }, data: a });
   olvidarAjustesEquipo();
 }

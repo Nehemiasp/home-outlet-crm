@@ -13,7 +13,7 @@ import { ModalPlantillas } from "@/components/ui/plantillas";
 import type { PlantillaCanal } from "@/lib/canales/tipos";
 import { useToast } from "@/components/ui/toast";
 import type { ConversacionDTO, ItemLinea, ProductoDTO } from "@/lib/bandeja-tipos";
-import { formatTelefono } from "@/lib/utils";
+import { formatTelefono, juntarNombres } from "@/lib/utils";
 import { AVISO_MS, msRestantes, sinPlantillas, textoBloqueoVentana, textoRestante } from "@/lib/canales/ventana";
 import { puedeAsignar, puedeCerrar, veTodo } from "@/lib/permisos";
 import { useActualizacion } from "@/lib/tiempo-real";
@@ -139,7 +139,7 @@ export function Vista({ inicial, cotizacion }: { inicial: ConversacionDTO; cotiz
     await conAviso(asignar(c.id, usuarioId), usuarioId ? `Asignada a ${nombre}` : "Asignación quitada");
     setAsignando("cerrado");
   };
-  const dueno = { asignadaAId: c.asignadaA?.id ?? null };
+  const dueno = { asignadaAId: c.asignadaA?.id ?? null, participantes: c.asignados.map((a) => a.id) };
   const opcionesEstado: OpcionMenu[] = (["abierta", "pendiente", "cerrada"] as const)
     .filter((e) => e !== c.estado && (e !== "cerrada" || puedeCerrar(yo, dueno)))
     .map((e) => ({
@@ -148,8 +148,8 @@ export function Vista({ inicial, cotizacion }: { inicial: ConversacionDTO; cotiz
       onElegir: () => (e === "cerrada" ? setConfirmarCierre(true) : conAviso(cambiarEstado(c.id, e), `Conversación ${e === "abierta" ? "abierta" : "pendiente"}`)),
     }));
 
-  // Un asesor puede devolver a la cola una conversación suya; deja de verla y se reparte a otro.
-  const puedeDevolver = yo.rol === "agente" && c.asignadaA?.id === yo.id && c.estado !== "cerrada";
+  // Un asesor puede devolver a la cola una conversación suya; deja de verla y se reparte a otro (en la bandeja compartida, solo deja de participar).
+  const puedeDevolver = yo.rol === "agente" && c.asignados.some((a) => a.id === yo.id) && c.estado !== "cerrada";
   const alDevolver = async (motivo: string) => {
     setDevolviendo(true);
     const r = await devolverCola(c.id, motivo);
@@ -217,7 +217,7 @@ export function Vista({ inicial, cotizacion }: { inicial: ConversacionDTO; cotiz
             <h2 className="cuerpo-fuerte truncate">{c.contacto.nombre}</h2>
             <p className="meta truncate text-texto-suave">
               {c.contacto.telefono ? `${formatTelefono(c.contacto.telefono)} · ` : ""}
-              {c.asignadaA ? `Asignada a ${c.asignadaA.id === yo.id ? "usted" : c.asignadaA.nombre}` : "Sin asignar"}
+              {c.asignados.length ? `Asignada a ${juntarNombres(c.asignados.map((a) => (a.id === yo.id ? "usted" : a.nombre)))}` : "Sin asignar"}
               {c.atencion === "esperando" ? " · Esperando asesor" : ""}
             </p>
           </div>

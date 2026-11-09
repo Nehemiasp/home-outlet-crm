@@ -73,7 +73,8 @@ El **jefe de tienda** está pensado para quien dirige la operación diaria: ve y
 ## 4. Bandeja: conversaciones
 
 ### La lista (izquierda)
-- Pestañas: **Sin asignar** (nadie las tiene), **Mías** y **Todas**. Un agente con la visibilidad limitada solo ve **Mías**.
+- Pestañas: **Sin asignar** (nadie las tiene), **Mías** y **Todas**. Un agente con la visibilidad limitada solo ve **Mías** (no pasa en la bandeja compartida).
+- **Bandeja compartida** (el modo de fábrica, en **Ajustes → Equipo**): todos ven todas las conversaciones y nada se reparte solo; lo nuevo espera en **Sin asignar**, a la vista de todos. **Quien le escribe al cliente queda asignado** («Asignada a Ana al responder»). Si otra persona también le escribe, **se suma**: arriba dice «Asignada a Ana y Carlos» y en la lista aparece un **2** junto al nombre. **Mías** muestra las conversaciones en las que usted participa. Las notas internas y los avisos automáticos no asignan. **Devolver a la cola** solo lo quita a usted: si era la persona principal, queda la que se sumó; si no queda nadie, vuelve a **Sin asignar**. Así ningún chat se queda esperando porque alguien olvidó ponerse en pausa.
 - **Buscar** por nombre, teléfono o texto, y **Filtros** (estado, canal, quién atiende). El jefe de tienda y el administrador también filtran por **asesor**.
 - Cada fila muestra el último mensaje, el canal, **quién atiende** (el asistente, una persona o nadie) y los mensajes sin leer.
 

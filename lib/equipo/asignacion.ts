@@ -57,7 +57,7 @@ export type TipoAsignacion = "automatica" | "cola" | "reparto";
  * `excluirId` evita devolverla a quien acaba de devolverla a la cola.
  */
 export async function asignarConversacion(conversacionId: string, o: { excluirId?: string | null; tipo?: TipoAsignacion; ahora?: Date; /** En un reparto: quién perdió la conversación y quién lo hizo. */ de?: string; por?: string } = {}): Promise<ResultadoAsignacion> {
-  if ((await obtenerAjustesEquipo()).modoAsignacion === "manual") return { ok: false, motivo: "no_aplica" };
+  if ((await obtenerAjustesEquipo()).modoAsignacion !== "automatica") return { ok: false, motivo: "no_aplica" }; // manual y bandeja compartida no reparten
   const ahora = o.ahora ?? new Date();
 
   return db.$transaction(async (tx) => {
@@ -88,7 +88,7 @@ export async function asignarConversacion(conversacionId: string, o: { excluirId
  * Devuelve cuántas asignó.
  */
 export async function procesarCola(o: { ahora?: Date } = {}): Promise<number> {
-  if ((await obtenerAjustesEquipo()).modoAsignacion === "manual") return 0;
+  if ((await obtenerAjustesEquipo()).modoAsignacion !== "automatica") return 0;
   const pendientes = await db.conversation.findMany({
     where: { ...esperaAsesor, esperandoAsesorDesde: { not: null } },
     orderBy: [{ esperandoAsesorDesde: "asc" }, { lastMessageAt: "asc" }],

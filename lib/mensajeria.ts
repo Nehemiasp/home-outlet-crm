@@ -2,6 +2,7 @@ import { adaptador } from "@/lib/canales";
 import type { Channel, InboundMessage, OutboundMessage } from "@/lib/canales/tipos";
 import { textoVentanaCerrada } from "@/lib/canales/ventana";
 import { db } from "@/lib/db";
+import { alResponder } from "@/lib/equipo/compartida";
 import { normalizarTelefono } from "@/lib/telefono";
 
 const conTelefono = (canal: string) => canal === "whatsapp" || canal === "simulado";
@@ -109,6 +110,8 @@ export async function enviarMensaje(p: { conversacionId: string; usuarioId?: str
   }
   // Cuando una persona escribe, el asistente deja de responder en esa conversación.
   await db.conversation.update({ where: { id: conv.id }, data: { lastMessageAt: msg.fecha, ...(autor === "asesor" && !p.aviso ? { atendidaPor: "asesor", esperandoAsesorDesde: null } : {}) } });
+  // En la bandeja compartida, quien le escribe al cliente queda asignado o se suma (los avisos automáticos no cuentan).
+  if (autor === "asesor" && !p.aviso && p.usuarioId) await alResponder(conv.id, p.usuarioId);
 
   try {
     const { externalMessageId } = await canal.send(identidad.externalContactId, p.mensaje);

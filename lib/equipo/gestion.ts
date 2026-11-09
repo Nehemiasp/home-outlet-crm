@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import type { EstadoAsesor } from "@/generated/prisma/client";
 import { asignarConversacion } from "./asignacion";
+import { dejarConversacion, esCompartida } from "./compartida";
 import { cambiarEstadoAsesor } from "./estado";
 import { AUSENCIA_LARGA_MS, type FilaEquipo } from "./tipos";
 import type { Rol } from "@/lib/permisos";
@@ -15,6 +16,7 @@ const fallo = (error: string): { ok: false; error: string } => ({ ok: false, err
 export async function devolverACola(conversacionId: string, actor: { id: string; nombre: string; rol: Rol }, motivo?: string): Promise<Resultado<{ asignadaA: string | null }>> {
   if (actor.rol !== "agente") return fallo("Solo un asesor puede devolver sus conversaciones a la cola.");
   const limpio = motivo?.trim().slice(0, 200) || undefined;
+  if (await esCompartida()) return dejarConversacion(conversacionId, actor, limpio); // en la bandeja compartida no se reparte: solo deja de participar
   const hecho = await db.$transaction(async (tx) => {
     // Solo la suelta quien la tiene asignada y mientras esté abierta; si otra persona la movió un instante antes, no pasa nada.
     const r = await tx.conversation.updateMany({

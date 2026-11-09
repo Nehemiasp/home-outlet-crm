@@ -34,6 +34,7 @@ enum OrigenEstadoAsesor {
 enum ModoAsignacion {
   manual
   automatica
+  compartida // bandeja compartida: todos ven todo, no se reparte, y quien le escribe al cliente queda asignado (ver lib/equipo/compartida.ts)
 }
 
 enum Autor {
@@ -139,10 +140,11 @@ model User {
   mensajes         Message[]
   notas            Note[]
   actividad        ActivityLog[]
-  pedidosCreados   Order[]               @relation("PedidoCreador")
-  cotizaciones     Cotizacion[]          @relation("CotizacionCreador")
-  pagosRegistrados Payment[]             @relation("PagoRegistrador")
-  pagosVerificados Payment[]             @relation("PagoVerificador")
+  pedidosCreados   Order[]                    @relation("PedidoCreador")
+  cotizaciones     Cotizacion[]               @relation("CotizacionCreador")
+  participaEn      ParticipanteConversacion[]
+  pagosRegistrados Payment[]                  @relation("PagoRegistrador")
+  pagosVerificados Payment[]                  @relation("PagoVerificador")
   eventosPedido    OrderEvent[]
 
   contactosResponsable Contact[]               @relation("AsesorResponsable")
@@ -171,7 +173,7 @@ model HistorialEstadoAsesor {
 /// Ajustes del equipo (una sola fila).
 model AjustesEquipo {
   id                   String         @id @default("equipo")
-  modoAsignacion       ModoAsignacion @default(automatica)
+  modoAsignacion       ModoAsignacion @default(compartida)
   asesoresVenSoloSuyas Boolean        @default(true)
 }
 
@@ -228,19 +230,34 @@ model Conversation {
   /// El asesor que la devolvió a la cola: no se le vuelve a asignar en el siguiente reparto.
   excluirAsesorId      String?
 
-  contacto     Contact               @relation(fields: [contactoId], references: [id], onDelete: Cascade)
-  asignadaA    User?                 @relation(fields: [asignadaAId], references: [id])
-  mensajes     Message[]
-  notas        Note[]
-  resumenes    ConversationSummary[]
-  aiRuns       AiRun[]
-  pedidos      Order[]
-  cotizaciones Cotizacion[]
+  contacto      Contact                    @relation(fields: [contactoId], references: [id], onDelete: Cascade)
+  asignadaA     User?                      @relation(fields: [asignadaAId], references: [id])
+  mensajes      Message[]
+  notas         Note[]
+  resumenes     ConversationSummary[]
+  aiRuns        AiRun[]
+  pedidos       Order[]
+  cotizaciones  Cotizacion[]
+  participantes ParticipanteConversacion[]
 
   @@index([estado, lastMessageAt])
   @@index([atendidaPor, esperandoAsesorDesde])
   @@index([creada])
   @@index([asignadaAId])
+}
+
+/// Bandeja compartida: quienes le escribieron al cliente en esta conversación. La primera es la asignada principal
+/// (`Conversation.asignadaAId`); las demás se sumaron. «Mías» incluye todas las conversaciones en las que uno participa.
+model ParticipanteConversacion {
+  conversacionId String
+  usuarioId      String
+  desde          DateTime @default(now())
+
+  conversacion Conversation @relation(fields: [conversacionId], references: [id], onDelete: Cascade)
+  usuario      User         @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@id([conversacionId, usuarioId])
+  @@index([usuarioId])
 }
 
 model Message {

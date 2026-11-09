@@ -40,6 +40,7 @@ export function ItemConversacion({
   atencion,
   estado,
   asesor,
+  asignados = 0,
   onClick,
 }: {
   nombre: string;
@@ -53,6 +54,8 @@ export function ItemConversacion({
   estado?: "abierta" | "pendiente" | "cerrada";
   /** Nombre del asesor cuando atiende uno. */
   asesor?: string | null;
+  /** Cuántas personas la atienden: con más de una, el número va junto al nombre de la principal. */
+  asignados?: number;
   onClick?: () => void;
 }) {
   const cerrada = estado === "cerrada";
@@ -78,6 +81,12 @@ export function ItemConversacion({
             {nombreCanal(canal)}
             {textoAtencion && ` · ${textoAtencion}`}
           </span>
+          {!cerrada && atencion === "asesor" && asignados > 1 && (
+            <span className="mini inline-flex h-4 min-w-4 shrink-0 items-center justify-center rounded-pildora bg-linea px-1 text-texto" title={`${asignados} personas la atienden`}>
+              <span aria-hidden>{asignados}</span>
+              <span className="sr-only">{`, ${asignados} personas la atienden`}</span>
+            </span>
+          )}
           {esperando && <InsigniaAtencion atencion="esperando" />}
         </span>
       </span>

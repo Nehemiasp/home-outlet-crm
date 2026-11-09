@@ -12,7 +12,8 @@ export const ROLES = ["admin", "jefe_tienda", "agente", "bodega"] as const satis
 export const NOMBRE_ROL: Record<Rol, string> = { admin: "Administrador", jefe_tienda: "Jefe de tienda", agente: "Agente", bodega: "Bodega" };
 
 export type Actor = { id: string; rol: Rol };
-type ConDueno = { asignadaAId: string | null };
+/** `participantes`: en la bandeja compartida, quienes le escribieron al cliente (también la pueden cerrar). */
+type ConDueno = { asignadaAId: string | null; participantes?: readonly string[] };
 
 export const esAdmin = (u: { rol: Rol }) => u.rol === "admin";
 
@@ -34,8 +35,8 @@ export const inicioDe = (u: { rol: Rol }) => (esBodega(u) ? "/despacho" : "/band
 export const puedeAsignar = (u: Actor, c: ConDueno, destinoId: string | null) =>
   veTodo(u) || (destinoId === u.id && (c.asignadaAId === null || c.asignadaAId === u.id));
 
-/** Quien ve todo cierra cualquiera; un asesor solo las que tiene asignadas. */
-export const puedeCerrar = (u: Actor, c: ConDueno) => veTodo(u) || c.asignadaAId === u.id;
+/** Quien ve todo cierra cualquiera; un asesor solo las que tiene asignadas (o en las que participa, en la bandeja compartida). */
+export const puedeCerrar = (u: Actor, c: ConDueno) => veTodo(u) || c.asignadaAId === u.id || !!c.participantes?.includes(u.id);
 
 export const puedeUnirContactos = veTodo;
 export const puedeGestionarProductos = veTodo; // crear, editar y borrar, y las existencias

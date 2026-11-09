@@ -17,6 +17,7 @@ import { agruparLineas } from "@/lib/pedidos/mensajes";
 import { modoDePrueba } from "@/lib/ia/proveedor";
 import type { Rol } from "@/lib/permisos";
 import { veTodo } from "@/lib/permisos";
+import { deAsesor, nombresAsignados } from "@/lib/equipo/compartida";
 
 const NOMBRES_TIPO: Record<string, string> = {
   image: "Imagen", audio: "Audio", video: "Video", document: "Documento", location: "Ubicación", product: "Producto", unsupported: "Mensaje no compatible",
@@ -33,9 +34,10 @@ export async function listarConversaciones(f: Filtros, u: Actor): Promise<{ item
   const q = f.q.trim();
   const digitos = q.replace(/\D/g, "");
   const where: Prisma.ConversationWhereInput = {
-    AND: [visible],
-    ...(f.tab === "sin-asignar" ? { asignadaAId: null } : f.tab === "mias" ? { asignadaAId: usuarioId } : {}),
-    ...(veTodo(u) && f.asesor === "sin" ? { asignadaAId: null } : veTodo(u) && f.asesor !== "todos" ? { asignadaAId: f.asesor } : {}),
+    // «Mías» y el filtro «Asesor» incluyen las conversaciones en las que la persona participa (bandeja compartida). Van en el AND:
+    // son un OR, y la búsqueda de abajo también lo es; sueltos, uno pisaría al otro.
+    AND: [visible, ...(f.tab === "mias" ? [deAsesor(usuarioId)] : []), ...(veTodo(u) && f.asesor !== "todos" && f.asesor !== "sin" ? [deAsesor(f.asesor)] : [])],
+    ...(f.tab === "sin-asignar" || (veTodo(u) && f.asesor === "sin") ? { asignadaAId: null } : {}),
     ...(f.estado !== "todos" ? { estado: f.estado } : {}),
     ...(f.canal !== "todos" ? { canal: f.canal } : {}),
     ...(f.atencion === "asistente" ? { atendidaPor: "asistente" as const } : f.atencion === "esperando" ? { atendidaPor: "nadie" as const, esperandoAsesorDesde: { not: null }, estado: { not: "cerrada" as const } } : {}),
@@ -54,17 +56,18 @@ export async function listarConversaciones(f: Filtros, u: Actor): Promise<{ item
     // Como en WhatsApp: la conversación con el último mensaje (enviado o recibido) va arriba.
     orderBy: { lastMessageAt: "desc" },
     take: f.limite + 1,
-    include: { asignadaA: { select: { nombre: true } }, contacto: { select: { nombre: true } }, mensajes: { orderBy: { fecha: "desc" }, take: 1, select: { texto: true, tipo: true, direccion: true } } },
+    include: { asignadaA: { select: { nombre: true } }, _count: { select: { participantes: true } }, contacto: { select: { nombre: true } }, mensajes: { orderBy: { fecha: "desc" }, take: 1, select: { texto: true, tipo: true, direccion: true } } },
   });
   const [sinAsignar, mias] = await Promise.all([
     db.conversation.count({ where: { estado: { not: "cerrada" }, asignadaAId: null, ...visible } }),
-    db.conversation.count({ where: { estado: { not: "cerrada" }, asignadaAId: usuarioId } }),
+    db.conversation.count({ where: { estado: { not: "cerrada" }, ...deAsesor(usuarioId) } }),
   ]);
   return {
     contadores: { sinAsignar, mias },
     hayMas: filas.length > f.limite,
     items: filas.slice(0, f.limite).map((c) => ({
       id: c.id, nombre: c.contacto.nombre, canal: c.canal, ultimo: vistaPrevia(c.mensajes[0]), hora: c.lastMessageAt.toISOString(), noLeidos: c.noLeidos, estado: c.estado, atencion: atencionDe(c), asesor: c.asignadaA?.nombre ?? null,
+      asignados: Math.max(c._count.participantes, c.asignadaA ? 1 : 0),
     })),
   };
 }
@@ -98,6 +101,8 @@ const textoActividad = (accion: string, d: DetalleActividad) => {
   if (accion === "asignar" && d.tipo) {
     // Cada asignación del equipo queda a la vista en la conversación.
     if (d.tipo === "automatica" || d.tipo === "cola") return `Asignada a ${d.a} automáticamente`;
+    if (d.tipo === "respuesta") return `Asignada a ${d.a} al responder`;
+    if (d.tipo === "se_suma") return `${d.a} se sumó a la conversación`;
     if (d.tipo === "reparto") return `Reasignada a ${d.a}${d.de ? ` porque ${d.de} no estaba disponible` : ""} · Por ${d.por}`;
     if (d.tipo === "reasignar") return `${d.por} reasignó la conversación${d.de ? ` de ${d.de}` : ""} a ${d.a}`;
     if (d.tipo === "devolver") return `${d.por} devolvió la conversación a la cola${d.motivo ? ` · Motivo: ${d.motivo}` : ""}`;
@@ -118,6 +123,7 @@ export async function cargarConversacion(id: string, yo: { id: string; rol: Rol 
     where: { id, ...visible },
     include: {
       asignadaA: { select: { id: true, nombre: true } },
+      participantes: { select: { desde: true, usuario: { select: { id: true, nombre: true } } } },
       contacto: { include: { etiquetas: true, identidades: true } },
       mensajes: { orderBy: { fecha: "desc" }, take: 200, include: { producto: { include: { stock: true } }, enviadoPor: { select: { nombre: true } }, aiRun: { select: { consultado: true } } } },
       resumenes: { orderBy: { creado: "desc" }, take: 1 },
@@ -200,6 +206,7 @@ export async function cargarConversacion(id: string, yo: { id: string; rol: Rol 
     resumen: conv.resumenes[0] ? { texto: conv.resumenes[0].texto, creado: conv.resumenes[0].creado.toISOString() } : null,
     modoDePrueba: modoDePrueba(),
     asignadaA: conv.asignadaA,
+    asignados: nombresAsignados(conv),
     lastInboundAt: conv.lastInboundAt?.toISOString() ?? null,
     canalActivo: adaptador(conv.canal) !== null,
     salientesRestantes: await salientesRestantes(conv),

@@ -64,25 +64,34 @@ export function Equipo({ inicial }: { inicial: AjustesEquipo }) {
           disabled={guardando}
           onCambio={(v) => void guardar({ modoAsignacion: v })}
           opciones={[
-            { valor: "manual", texto: "Manual" },
+            { valor: "compartida", texto: "Bandeja compartida" },
             { valor: "automatica", texto: "Automática" },
+            { valor: "manual", texto: "Manual" },
           ]}
         />
         <p className="cuerpo text-texto-suave">
-          {ajustes.modoAsignacion === "automatica"
-            ? "Cuando el asistente pasa una conversación a un asesor, o llega un mensaje y el asistente está apagado, se asigna sola al asesor disponible con menos conversaciones abiertas (primero al asesor responsable del cliente, si está disponible)."
-            : "Nada se asigna solo: todo queda en «Sin asignar» y un administrador o un jefe de tienda reparte."}
+          {ajustes.modoAsignacion === "compartida"
+            ? "Todos ven todas las conversaciones y nada se reparte: lo nuevo espera en «Sin asignar», a la vista de todos. Quien le escribe al cliente queda asignado; si otra persona también le escribe, se suma («Asignada a Ana y Carlos»). Las notas internas no asignan. Así ningún chat se queda esperando porque alguien olvidó ponerse en pausa."
+            : ajustes.modoAsignacion === "automatica"
+              ? "Cuando el asistente pasa una conversación a un asesor, o llega un mensaje y el asistente está apagado, se asigna sola al asesor disponible con menos conversaciones abiertas (primero al asesor responsable del cliente, si está disponible)."
+              : "Nada se asigna solo: todo queda en «Sin asignar» y un administrador o un jefe de tienda reparte."}
         </p>
       </section>
 
       <section aria-label="Visibilidad" className="flex max-w-3xl flex-col gap-3 rounded-tarjeta border border-linea bg-superficie p-4">
         <h2 className="titulo-panel">Qué ve cada asesor</h2>
-        <Interruptor etiqueta="Los asesores ven solo sus conversaciones" activo={ajustes.asesoresVenSoloSuyas} disabled={guardando} onCambio={(v) => void guardar({ asesoresVenSoloSuyas: v })} />
-        <p className="cuerpo text-texto-suave">
-          {ajustes.asesoresVenSoloSuyas
-            ? "Cada asesor ve únicamente las conversaciones asignadas a él, y los contactos y pedidos ligados a ellas. Los administradores y los jefes de tienda ven todo."
-            : "Todos los asesores ven todas las conversaciones, contactos y pedidos."}
-        </p>
+        {ajustes.modoAsignacion === "compartida" ? (
+          <p className="cuerpo text-texto-suave">En la bandeja compartida todos los asesores ven todas las conversaciones, contactos y pedidos.</p>
+        ) : (
+          <>
+            <Interruptor etiqueta="Los asesores ven solo sus conversaciones" activo={ajustes.asesoresVenSoloSuyas} disabled={guardando} onCambio={(v) => void guardar({ asesoresVenSoloSuyas: v })} />
+            <p className="cuerpo text-texto-suave">
+              {ajustes.asesoresVenSoloSuyas
+                ? "Cada asesor ve únicamente las conversaciones asignadas a él, y los contactos y pedidos ligados a ellas. Los administradores y los jefes de tienda ven todo."
+                : "Todos los asesores ven todas las conversaciones, contactos y pedidos."}
+            </p>
+          </>
+        )}
       </section>
 
       <section aria-label="Equipo" className="flex flex-col gap-3">

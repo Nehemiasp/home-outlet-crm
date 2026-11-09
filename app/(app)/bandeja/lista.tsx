@@ -184,6 +184,7 @@ export function ListaConversaciones({ idActivo, soloMias, veTodo }: { idActivo?:
                     atencion={c.atencion}
                     estado={c.estado}
                     asesor={c.asesor}
+                    asignados={c.asignados}
                     onClick={() => router.push(`/bandeja/${c.id}`)}
                   />
                 </li>

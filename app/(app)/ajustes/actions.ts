@@ -24,7 +24,7 @@ async function admin() {
 const SOLO_ADMIN = fallo("Solo un administrador puede hacer esto.");
 
 /* ── Equipo ── */
-const ajustesEquipo = z.object({ modoAsignacion: z.enum(["manual", "automatica"]), asesoresVenSoloSuyas: z.boolean() }).partial();
+const ajustesEquipo = z.object({ modoAsignacion: z.enum(["manual", "automatica", "compartida"]), asesoresVenSoloSuyas: z.boolean() }).partial();
 
 export async function guardarAjustesEquipo(entrada: z.input<typeof ajustesEquipo>): Promise<Resultado> {
   const u = await admin();

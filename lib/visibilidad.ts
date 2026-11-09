@@ -12,9 +12,11 @@ import type { Rol } from "@/lib/permisos";
  */
 export type Actor = { id: string; rol: Rol };
 
-/** ¿Se le limita lo que ve? Solo a los asesores (rol «agente»), y solo si el ajuste está activo. */
+/** ¿Se le limita lo que ve? Solo a los asesores (rol «agente»), solo si el ajuste está activo, y nunca en la bandeja compartida (ahí todos ven todo). */
 export async function restringido(u: Actor): Promise<boolean> {
-  return u.rol === "agente" && (await obtenerAjustesEquipo()).asesoresVenSoloSuyas;
+  if (u.rol !== "agente") return false;
+  const a = await obtenerAjustesEquipo();
+  return a.asesoresVenSoloSuyas && a.modoAsignacion !== "compartida";
 }
 
 export async function filtroConversacion(u: Actor): Promise<Prisma.ConversationWhereInput> {

@@ -598,6 +598,7 @@ export function Guia() {
                     atencion={atencion as "asistente"}
                     estado={estado as "abierta"}
                     asesor="Agente de prueba"
+                    asignados={i === 2 ? 2 : 1}
                     seleccionada={seleccionada === i}
                     onClick={() => setSeleccionada(i)}
                   />

@@ -31,6 +31,8 @@ export type ItemLista = {
   estado: EstadoConv;
   atencion: Atencion;
   asesor: string | null;
+  /** Cuántas personas la atienden (en la bandeja compartida se suman quienes le escriben al cliente). */
+  asignados: number;
 };
 
 /** Cuántas conversaciones abiertas hay en cada pestaña de la lista. */
@@ -75,6 +77,8 @@ export type ConversacionDTO = {
   resumen: { texto: string; creado: string } | null;
   modoDePrueba: boolean;
   asignadaA: { id: string; nombre: string } | null;
+  /** Quienes la atienden, la principal primero: «Asignada a Ana y Carlos». */
+  asignados: { id: string; nombre: string }[];
   lastInboundAt: string | null;
   canalActivo: boolean;
   /** Mensajes que aún se pueden mandar sin que el cliente escriba, si el canal tiene tope (TikTok); null si no. */
