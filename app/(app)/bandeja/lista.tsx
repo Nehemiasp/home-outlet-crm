@@ -22,10 +22,11 @@ const POR_PAGINA = 30;
 /**
  * `soloMias`: el asesor con la visibilidad limitada solo ve «Mías». `veTodo`: el filtro «Asesor» es solo del administrador.
  */
-export function ListaConversaciones({ idActivo, soloMias, veTodo }: { idActivo?: string; soloMias: boolean; veTodo: boolean }) {
+/** `compartida`: en la bandeja compartida la lista abre en «Todas» (ahí nada se mueve de pestaña al responder). */
+export function ListaConversaciones({ idActivo, soloMias, veTodo, compartida }: { idActivo?: string; soloMias: boolean; veTodo: boolean; compartida: boolean }) {
   const router = useRouter();
   const vista = useSearchParams().get("vista");
-  const [tab, setTab] = useState<Filtros["tab"]>(soloMias ? "mias" : vista === "mias" || vista === "todas" || vista === "sin-asignar" ? vista : "sin-asignar");
+  const [tab, setTab] = useState<Filtros["tab"]>(soloMias ? "mias" : vista === "mias" || vista === "todas" || vista === "sin-asignar" ? vista : compartida ? "todas" : "sin-asignar");
   const [estado, setEstado] = useState<Filtros["estado"]>("todos");
   const [canal, setCanal] = useState<Filtros["canal"]>("todos");
   const [asesor, setAsesor] = useState("todos");
@@ -43,7 +44,21 @@ export function ListaConversaciones({ idActivo, soloMias, veTodo }: { idActivo?:
   }, [busqueda]);
 
   const filtros: Filtros = { tab, atencion, estado, canal, asesor, q, limite };
-  const { datos, fallo, refrescar } = useActualizacion(JSON.stringify(filtros), () => listar(filtros), 4000);
+  // Cada respuesta lleva la pestaña que la pidió: al cambiar de pestaña, los datos anteriores siguen un instante y no deben contar.
+  const { datos, fallo, refrescar } = useActualizacion(JSON.stringify(filtros), async () => ({ ...(await listar(filtros)), tab: filtros.tab }), 4000);
+
+  // Si la conversación abierta estaba en la lista y deja de cumplir la pestaña (por ejemplo, alguien le respondió y ya no está
+  // «Sin asignar»), la lista pasa a «Todas» para que no se pierda de vista. Cambiar de pestaña a mano no lo dispara.
+  const abiertaEnLista = useRef<string | null>(null);
+  useEffect(() => {
+    if (!datos || !idActivo || datos.tab !== tab) return;
+    const esta = datos.items.some((i) => i.id === idActivo);
+    if (esta) abiertaEnLista.current = idActivo;
+    else if (abiertaEnLista.current === idActivo && tab !== "todas" && !soloMias) {
+      abiertaEnLista.current = null;
+      setTab("todas");
+    }
+  }, [datos, idActivo, tab, soloMias]);
   const cambiar = <T,>(poner: (v: T) => void) => (v: T) => {
     poner(v);
     setLimite(POR_PAGINA);
@@ -132,14 +147,18 @@ export function ListaConversaciones({ idActivo, soloMias, veTodo }: { idActivo?:
       <PestanasConContador
         etiqueta="Filtro de conversaciones"
         activa={tab}
-        onCambio={cambiar((v: string) => setTab(v as Filtros["tab"]))}
+        onCambio={cambiar((v: string) => {
+          abiertaEnLista.current = null;
+          setTab(v as Filtros["tab"]);
+        })}
         pestanas={
           soloMias
             ? [{ id: "mias", texto: "Mías", contador: datos?.contadores.mias }]
             : [
-                { id: "sin-asignar", texto: "Sin asignar", contador: datos?.contadores.sinAsignar, urgente: true },
-                { id: "mias", texto: "Mías", contador: datos?.contadores.mias },
+                // En este orden lo pidió Home Outlet: primero todas, luego las propias y al final las que esperan a alguien.
                 { id: "todas", texto: "Todas" },
+                { id: "mias", texto: "Mías", contador: datos?.contadores.mias },
+                { id: "sin-asignar", texto: "Sin asignar", contador: datos?.contadores.sinAsignar, urgente: true },
               ]
         }
       />
