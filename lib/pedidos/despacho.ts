@@ -4,6 +4,7 @@ import { textoLugar } from "@/lib/guatemala";
 import { esBodega, type ActorPedido } from "@/lib/permisos";
 import { puedeVerPedido } from "@/lib/visibilidad";
 import type { ResultadoAviso } from "./avisos";
+import { tiendaDeRecoger } from "./ajustes";
 import { siguientes } from "./estados";
 import { avanzarPedido, marcarEnviado, type EnvioPedido, type ResultadoGuia } from "./gestion";
 
@@ -29,6 +30,8 @@ export type FilaDespacho = {
   municipio: string | null;
   /** «Morales, Izabal» (vacío si es para recoger). */
   lugar: string;
+  /** La tienda donde recoge el cliente (solo con «recoger»). */
+  tienda: string | null;
   direccion: string | null;
   guia: string | null;
   paqueteria: string | null;
@@ -43,15 +46,18 @@ export type FilaDespacho = {
 
 const SELECCION = {
   id: true, codigo: true, estado: true, entrega: true, metodoPago: true, departamento: true, municipio: true, direccion: true, guia: true, paqueteria: true, guiaArchivoUrl: true, guiaArchivoNombre: true, notas: true, creada: true,
+  recogerEn: { select: { nombre: true } },
   contacto: { select: { nombre: true, telefono: true } },
   lineas: { orderBy: [{ nombre: "asc" }, { id: "asc" }], select: { id: true, nombre: true, sku: true, cantidad: true, ubicacion: { select: { nombre: true } }, producto: { select: { imagenes: true } } } },
 } satisfies Prisma.OrderSelect;
 
 type Fila = Prisma.OrderGetPayload<{ select: typeof SELECCION }>;
 
-const aFila = (o: Fila): FilaDespacho => ({
+/** `tiendaPorDefecto`: la de Ajustes, para los pedidos de antes que no dicen tienda. */
+const aFila = (o: Fila, tiendaPorDefecto: string | null): FilaDespacho => ({
   id: o.id, codigo: o.codigo, estado: o.estado, entrega: o.entrega, cliente: o.contacto.nombre, telefono: o.contacto.telefono,
   departamento: o.departamento, municipio: o.municipio, lugar: o.entrega === "envio" ? textoLugar(o.municipio, o.departamento) : "",
+  tienda: o.entrega === "recoger" ? (o.recogerEn?.nombre ?? tiendaPorDefecto) : null,
   direccion: o.direccion, guia: o.guia, paqueteria: o.paqueteria, guiaArchivo: o.guiaArchivoUrl ? { url: o.guiaArchivoUrl, nombre: o.guiaArchivoNombre ?? "guia" } : null, notas: o.notas, creada: o.creada.toISOString(),
   lineas: o.lineas.map((l) => ({ id: l.id, nombre: l.nombre, sku: l.sku, cantidad: l.cantidad, ubicacion: l.ubicacion?.nombre ?? null, imagenUrl: l.producto?.imagenes[0] ?? null })),
   // La forma de pago solo se usa para saber los pasos (contra entrega se prepara sin pago previo); no viaja a la pantalla de bodega.
@@ -61,7 +67,8 @@ const aFila = (o: Fila): FilaDespacho => ({
 /** Los pedidos por despachar, del más antiguo al más nuevo (el primero en pagar, el primero en salir). */
 export async function listarDespacho(): Promise<FilaDespacho[]> {
   const filas = await db.order.findMany({ where: EN_DESPACHO, orderBy: { creada: "asc" }, take: 200, select: SELECCION });
-  return filas.map(aFila);
+  const defecto = (await tiendaDeRecoger(null))?.nombre ?? null;
+  return filas.map((o) => aFila(o, defecto));
 }
 
 /**
@@ -71,7 +78,7 @@ export async function listarDespacho(): Promise<FilaDespacho[]> {
 export async function cargarHoja(id: string, u: { id: string; rol: ActorPedido["rol"] }): Promise<FilaDespacho | null> {
   if (!esBodega(u) && !(await puedeVerPedido(u, id))) return null;
   const o = await db.order.findFirst({ where: { id, ...(esBodega(u) ? EN_DESPACHO : {}) }, select: SELECCION });
-  return o ? aFila(o) : null;
+  return o ? aFila(o, (await tiendaDeRecoger(null))?.nombre ?? null) : null;
 }
 
 type Fallo = { ok: false; error: string };

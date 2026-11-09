@@ -10,7 +10,7 @@ import { formatQ, formatTelefono } from "@/lib/utils";
 import { abrirCobro, cancelarCobrosAbiertos } from "@/lib/pagos-tarjeta/abrir";
 import { pasarela } from "@/lib/pagos-tarjeta";
 import type { Prisma, TipoPago } from "@/generated/prisma/client";
-import { listarZonas, obtenerAjustesPedidos } from "./ajustes";
+import { listarZonas, obtenerAjustesPedidos, tiendaDeRecoger, tiendasActivas } from "./ajustes";
 import { departamentoOficial, lugarGuardado, municipioOficial, textoLugar } from "@/lib/guatemala";
 import { costoSegunPago, zonaPara } from "./envio";
 import { disponibleDe, disponibleProducto, apartadoProducto } from "./existencias";
@@ -21,6 +21,7 @@ import { calcularTotales, saldoDe, type Descuento } from "./totales";
 import { estadoDeCotizacion } from "./vigencia";
 import type { DatosPanelPedido, EntradaPedido, ProductoPedido, ResultadoPedido, VistaPedido } from "./tipos";
 import type { Rol } from "@/lib/permisos";
+import { compararTiendas } from "@/lib/tiendas";
 import { veTodo } from "@/lib/permisos";
 
 export type ActorPedidos = { id: string; nombre: string; rol: Rol };
@@ -48,7 +49,7 @@ export function aProductoPedido(p: ProductoConStock): ProductoPedido {
   return {
     id: p.id, nombre: p.nombre, sku: p.sku, precioCentavos: p.precio, imagenUrl: p.imagenes[0],
     disponible: disponibleProducto(stock), apartado: apartadoProducto(stock),
-    ubicaciones: stock.map((s) => ({ id: s.ubicacionId, nombre: s.ubicacion.nombre, disponible: disponibleDe(s), apartado: s.apartado })).sort((a, b) => a.nombre.localeCompare(b.nombre, "es")),
+    ubicaciones: stock.map((s) => ({ id: s.ubicacionId, nombre: s.ubicacion.nombre, disponible: disponibleDe(s), apartado: s.apartado })).sort(compararTiendas),
   };
 }
 const CON_STOCK = { stock: { include: { ubicacion: true } } } as const;
@@ -103,7 +104,10 @@ async function preparar(e: EntradaPedido, actor: ActorPedidos) {
   const aj = await obtenerAjustesPedidos();
   const ubicaciones = await db.location.findMany({ where: { activa: true }, select: { id: true } });
   const activas = new Set(ubicaciones.map((u) => u.id));
-  const defecto = (e.entrega === "recoger" ? aj.ubicacionRecogerId : aj.ubicacionEnvioId) ?? null;
+  // Al recoger, la tienda que se eligió (o la de Ajustes): de ahí salen las líneas que no dicen otra.
+  const recogerEnId = e.entrega === "recoger" ? (e.recogerEnId ?? aj.ubicacionRecogerId ?? null) : null;
+  if (recogerEnId && !activas.has(recogerEnId)) return fallo("La tienda donde se recoge ya no existe o está desactivada.");
+  const defecto = (e.entrega === "recoger" ? recogerEnId : aj.ubicacionEnvioId) ?? null;
 
   if (e.lineas.length === 0) return fallo("Agregue al menos un producto.");
   if (e.lineas.length > MAX_LINEAS) return fallo(`Un pedido lleva hasta ${MAX_LINEAS} productos.`);
@@ -199,7 +203,7 @@ async function preparar(e: EntradaPedido, actor: ActorPedidos) {
 
   return {
     ok: true as const,
-    lineas, ...t, zona, direccion, departamento, municipio, avisos, sinExistencia,
+    lineas, ...t, zona, direccion, departamento, municipio, avisos, sinExistencia, recogerEnId,
     descuentoMotivo: t.descuentoMonto > 0 ? motivo : null,
     notas: e.notas.trim() || null,
     metodoPago,
@@ -252,7 +256,7 @@ export async function guardarBorrador(e: EntradaPedido, actor: ActorPedidos): Pr
   if (!p.ok) return p;
 
   const datos = {
-    entrega: e.entrega, direccion: p.direccion, departamento: p.departamento, municipio: p.municipio, zona: p.zona?.nombre ?? null, subtotal: p.subtotal, descuentoMonto: p.descuentoMonto,
+    entrega: e.entrega, recogerEnId: p.recogerEnId, direccion: p.direccion, departamento: p.departamento, municipio: p.municipio, zona: p.zona?.nombre ?? null, subtotal: p.subtotal, descuentoMonto: p.descuentoMonto,
     descuentoMotivo: p.descuentoMotivo, costoEnvio: p.costoEnvio, total: p.total, notas: p.notas, metodoPago: p.metodoPago,
   };
   const lineas = p.lineas.map((l) => ({ productoId: l.productoId, sku: l.sku, nombre: l.nombre, precio: l.precio, cantidad: l.cantidad, ubicacionId: l.ubicacionId }));
@@ -308,7 +312,7 @@ export async function cargarBorrador(pedidoId: string, conversacionId: string): 
       pedidoId: o.id, conversacionId, cotizacionId: o.cotizacionId,
       cliente: { nombre: o.contacto.nombre, telefono: o.contacto.telefono ? formatTelefono(o.contacto.telefono) : "", ...lugarGuardado(o.departamento ?? o.contacto.departamento, o.municipio ?? o.contacto.municipio) },
       lineas: lineas.map((l) => ({ productoId: l.productoId!, cantidad: l.cantidad, ubicacionId: l.ubicacionId })),
-      entrega: o.entrega, direccion: dir ?? "", referencia: ref ?? "",
+      entrega: o.entrega, recogerEnId: o.recogerEnId, direccion: dir ?? "", referencia: ref ?? "",
       descuento: o.descuentoMonto > 0 ? { tipo: "monto", valor: (o.descuentoMonto / 100).toFixed(2) } : null,
       descuentoMotivo: o.descuentoMotivo ?? "", notas: o.notas ?? "", metodoPago: o.metodoPago,
     },
@@ -331,20 +335,21 @@ export async function descartarBorrador(pedidoId: string, actor: ActorPedidos): 
  */
 export async function construirResumen(pedidoId: string): Promise<string> {
   const { configMensajes } = await import("./avisos"); // import dinámico: avisos.ts importa este archivo
-  const [o, aj, negocio, cuentas, cfg, cobro] = await Promise.all([
-    db.order.findUniqueOrThrow({ where: { id: pedidoId }, include: { lineas: { orderBy: { id: "asc" } } } }),
+  const o = await db.order.findUniqueOrThrow({ where: { id: pedidoId }, include: { lineas: { orderBy: { id: "asc" } } } });
+  const [aj, negocio, cuentas, cfg, cobro, tienda] = await Promise.all([
     obtenerAjustesPedidos(),
     obtenerNegocio(),
     db.bankAccount.findMany({ where: { activa: true }, orderBy: [{ orden: "asc" }, { banco: "asc" }] }),
     configMensajes(),
     db.cobroTarjeta.findFirst({ where: { pedidoId, estado: "creado" }, orderBy: { creado: "desc" }, select: { url: true } }),
+    o.entrega === "recoger" ? tiendaDeRecoger(o.recogerEnId) : null,
   ]);
   const clave = o.metodoPago === "tarjeta" ? "resumen_tarjeta" : o.metodoPago === "efectivo_en_tienda" ? "resumen_efectivo" : o.metodoPago === "contra_entrega" ? "resumen_contra_entrega" : "resumen";
   const pie = rellenar(cfg[clave].texto, {
     cuentas: textoCuentas(cuentas) || aplicarDatos("{cuentas}", { ...negocio, cuentas: "" }),
     horas: textoHoras(aj.horasReserva), codigo: o.codigo, enlace: cobro?.url ?? "", total: formatQ(o.total),
   });
-  return textoResumen({ codigo: o.codigo, lineas: o.lineas, descuentoMonto: o.descuentoMonto, costoEnvio: o.costoEnvio, total: o.total, entrega: o.entrega, departamento: o.departamento, municipio: o.municipio, direccionTienda: negocio.direccion }, pie);
+  return textoResumen({ codigo: o.codigo, lineas: o.lineas, descuentoMonto: o.descuentoMonto, costoEnvio: o.costoEnvio, total: o.total, entrega: o.entrega, departamento: o.departamento, municipio: o.municipio, tienda }, pie);
 }
 
 /** Una línea gris en la conversación ("Pedido HO-000123 enviado al cliente por Ana"). */
@@ -404,7 +409,7 @@ export async function datosPanel(conversacionId: string, actor: ActorPedidos): P
   const ahora = new Date();
   const [aj, ubicaciones, zonas, abiertos, cotizaciones, sugeridos] = await Promise.all([
     obtenerAjustesPedidos(),
-    db.location.findMany({ where: { activa: true }, orderBy: { nombre: "asc" }, select: { id: true, nombre: true } }),
+    tiendasActivas(),
     listarZonas(),
     db.order.findMany({ where: { conversacionId, estado: { in: [...ABIERTOS] } }, orderBy: { creada: "desc" }, select: { id: true, codigo: true, estado: true, total: true, entrega: true } }),
     // Las que todavía se pueden convertir: sin pedido en curso, vigentes o vencidas hace menos de una semana (se convierten con los precios de hoy).
@@ -449,11 +454,11 @@ export async function cambiarFormaDePago(pedidoId: string, metodo: TipoPago, act
   if (error) return fallo(error);
   if (await db.payment.count({ where: { pedidoId, estado: "en_revision" } })) return fallo("Hay un comprobante por verificar. Resuélvalo antes de cambiar la forma de pago.");
 
-  // El envío depende de la forma de pago (contra entrega cuesta; las demás, gratis): el total se vuelve a calcular.
+  // El envío depende de la forma de pago (contra entrega cuesta; las demás, gratis desde el mínimo): el total se vuelve a calcular.
   let costoEnvio = o.costoEnvio;
   if (o.entrega === "envio") {
     const zona = zonaPara(await listarZonas(), o.departamento, o.municipio);
-    costoEnvio = zona ? costoSegunPago(aj, zona, o.subtotal, metodo) : metodo === "contra_entrega" ? aj.costoContraEntrega : aj.envioGratisSinContraEntrega ? 0 : o.costoEnvio;
+    costoEnvio = costoSegunPago(aj, zona ?? { costo: o.costoEnvio }, o.subtotal, metodo); // sin zona (la borraron), el costo que ya tenía
   }
   const total = o.subtotal - o.descuentoMonto + costoEnvio;
   if (metodo === "tarjeta") {

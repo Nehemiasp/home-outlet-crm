@@ -138,13 +138,13 @@ describe("adaptador de TikTok (TikTok simulado)", () => {
       assert.deepEqual(cuerpoDe(llamadas[1]!), { business_id: "negocio-tt", recipient_type: "USER", recipient: "usuario-1", message_type: "IMAGE", image: { media_id: "med-1" } });
     });
 
-    test("una tarjeta de producto manda la foto y luego el texto con nombre, precio y existencia, sin asteriscos", async () => {
+    test("una tarjeta de producto manda la foto y luego el texto con nombre y precio (sin existencia), sin asteriscos", async () => {
       simular(enviosOk);
       await adaptadorTikTok.send("usuario-1", { type: "product", productId: productoId });
       const envios = llamadas.filter((l) => l.url.endsWith("send/")).map(cuerpoDe);
       assert.equal(envios.length, 2);
       assert.equal(envios[0].message_type, "IMAGE");
-      assert.match(envios[1].text.body, /Licuadora de prueba\nQ349\.00\n/);
+      assert.equal(envios[1].text.body, "Licuadora de prueba\nQ349.00");
       assert.equal(envios[1].text.body.includes("*"), false);
     });
 

@@ -6,10 +6,15 @@ const dia = (abre: string, cierra: string) => ({ abre, cierra });
 export const datosNegocio = {
   nombre: "Home Outlet Internacional",
   horario: "Lunes a sábado de 8:00 a 18:00 y domingo de 9:00 a 13:00",
-  direccion: "7a. avenida y 10a. calle, zona 1, Puerto Barrios, Izabal, frente al parque. Hay parqueo.",
-  // Temporal: hoy solo cobran por transferencia y depósito; se cambia cuando el cliente confirme los métodos.
-  pagos: "Por ahora cobramos solo por transferencia o depósito bancario. Todavía no aceptamos tarjeta.",
-  envios: "Enviamos a Puerto Barrios, Morales, Los Amates y Santo Tomás de Castilla. El costo depende del municipio y del tamaño del producto.",
+  // Las dos tiendas (9-nov-2026), una por línea. Cada una tiene además su dirección en Ajustes → Pagos y envíos (la del resumen al recoger).
+  direccion:
+    "Tienda Puerto Barrios: 7a. avenida y 10a. calle, zona 1, Puerto Barrios, Izabal, frente al parque (hay parqueo).\nTienda Mixco: 4 calle 11-47 zona 2 de Mixco, colonia Santa Mónica, Guatemala.",
+  // Formas de pago y cobertura reales de Home Outlet (9-nov-2026).
+  pagos: "Aceptamos transferencia y depósito bancario, efectivo en la tienda, pago contra entrega y Visacuotas (tarjeta Visa en cuotas).",
+  // El costo sale de Ajustes → Pagos y envíos → Costo del envío (Q35 contra entrega; con las demás formas, gratis desde Q200 y Q35 por debajo): si cambia allá, cambiar aquí.
+  // El mismo día: en Puerto Barrios solo lo que sale de esa tienda, y en el departamento de Guatemala lo que sale de la de Mixco (igual que las zonas).
+  envios:
+    "Enviamos a toda Guatemala. Con pago contra entrega el envío cuesta Q35. Si paga antes por depósito, transferencia o tarjeta, el envío es gratis en compras de Q200 o más (en compras menores cuesta Q35). Entregamos el mismo día en Puerto Barrios los productos de la tienda de Puerto Barrios, y en el departamento de Guatemala los de la tienda de Mixco.",
   // La política real de Home Outlet (garantías, cambios y devoluciones), dada por el cliente el 9-nov-2026. El cliente no dio plazo:
   // 30 días es el que fijó Nehemias mientras el cliente lo confirma. No pide factura.
   garantia:
@@ -20,11 +25,13 @@ export const datosNegocio = {
 
 export const preguntasFrecuentes: [string, string, string][] = [
   ["¿Cuál es el horario de atención?", "Atendemos de lunes a sábado de 8:00 a 18:00 y los domingos de 9:00 a 13:00.", "horario"],
-  ["¿Dónde están ubicados?", "Estamos en la 7a. avenida y 10a. calle, zona 1, Puerto Barrios, frente al parque. Tenemos parqueo para clientes.", "ubicación"],
-  ["¿Hacen envíos a Morales, Los Amates o Santo Tomás de Castilla?", "Sí, enviamos a Morales, Los Amates y Santo Tomás de Castilla. El costo depende del municipio y del tamaño del producto.", "envíos"],
-  ["¿Cuánto tarda un envío?", "En Puerto Barrios entregamos el mismo día si el pedido se confirma temprano. A otros municipios tarda de 1 a 2 días hábiles.", "envíos"],
-  ["¿Qué formas de pago aceptan?", "Por ahora cobramos solo por transferencia o depósito bancario. Todavía no aceptamos tarjeta.", "pagos"],
-  ["¿Cobran recargo por pagar con tarjeta?", "Por ahora no se paga con tarjeta, y por transferencia o depósito no hay ningún recargo.", "pagos"],
+  ["¿Dónde están ubicados?", "Tenemos dos tiendas: en Puerto Barrios, en la 7a. avenida y 10a. calle, zona 1, frente al parque (con parqueo), y en Mixco, en la 4 calle 11-47 zona 2, colonia Santa Mónica.", "ubicación"],
+  ["¿Tienen tienda en la capital?", "Sí, tenemos tienda en Mixco: 4 calle 11-47 zona 2, colonia Santa Mónica. También tenemos tienda en Puerto Barrios.", "ubicación"],
+  ["¿Hacen envíos a todo el país?", "Sí, enviamos a toda Guatemala. Con pago contra entrega el envío cuesta Q35; si paga antes por depósito, transferencia o tarjeta, es gratis en compras de Q200 o más.", "envíos"],
+  ["¿Cuánto cuesta el envío?", "Con pago contra entrega cuesta Q35 y paga todo al recibir. Si paga antes por depósito, transferencia o tarjeta, el envío es gratis en compras de Q200 o más; en compras menores cuesta Q35.", "envíos"],
+  ["¿Cuánto tarda un envío?", "Depende del municipio. En Puerto Barrios entregamos el mismo día los productos de la tienda de Puerto Barrios, y en el departamento de Guatemala, los de la tienda de Mixco. Al hacer su pedido le indicamos el tiempo de entrega.", "envíos"],
+  ["¿Qué formas de pago aceptan?", "Aceptamos transferencia y depósito bancario, efectivo en la tienda, pago contra entrega y Visacuotas (tarjeta Visa en cuotas).", "pagos"],
+  ["¿Puedo pagar con tarjeta en cuotas?", "Sí, aceptamos Visacuotas. Un asesor le explica las cuotas disponibles y las condiciones al hacer su pedido.", "pagos"],
   ["¿Los productos tienen garantía?", "Sí, la garantía es de 30 días y cubre las fallas de fábrica. Si su producto no funciona, escríbanos: primero lo revisamos con usted por llamada y, si se confirma la falla, le enviamos la guía para devolverlo por Forza. Si es una falla de fábrica, le enviamos uno nuevo sin costo de envío.", "garantía"],
   ["¿Hacen cambios y devoluciones?", "Sí, hacemos cambios: si el producto no cumplió lo que esperaba, primero le explicamos cómo usarlo o le enviamos uno para que lo pruebe. Si aun así no queda satisfecho, lo cambiamos por otro producto del mismo valor, o por uno de mayor valor pagando la diferencia. Aplican las mismas condiciones que la garantía y cada caso lo autoriza la administración.", "garantía"],
   ["¿En qué condiciones debe volver el producto?", "Debe volver en su caja original, con todos sus accesorios, envuelto en nailon, limpio y sin golpes ni roturas. Si llega dañado o incompleto, no se puede aplicar la garantía ni el cambio.", "garantía"],
@@ -35,8 +42,7 @@ export const preguntasFrecuentes: [string, string, string][] = [
   ["¿Se pueden apartar productos?", "Sí, se puede apartar un producto con un anticipo. Un asesor le explica las condiciones.", "compras"],
   ["¿Dan factura?", "Sí, emitimos factura en todas las compras. Si la necesita a nombre de una empresa, indique su NIT.", "compras"],
   ["¿Tienen precio por mayoreo?", "Las compras al por mayor las revisa un asesor caso por caso.", "compras"],
-  ["¿Las existencias de la tienda en línea y de la tienda física son las mismas?", "Llevamos las existencias de la tienda física y de la tienda en línea por separado. Puedo consultar cuántas unidades hay en cada una.", "existencias"],
-  ["¿Puedo recoger mi pedido en la tienda?", "Sí, puede recogerlo en el local durante el horario de atención.", "compras"],
+  ["¿Puedo recoger mi pedido en la tienda?", "Sí, puede recogerlo en nuestra tienda de Puerto Barrios o en la de Mixco, durante el horario de atención. Al hacer su pedido nos dice en cuál.", "compras"],
   ["¿Los productos son nuevos?", "Todos nuestros productos son nuevos y vienen en su empaque original, salvo que se indique lo contrario.", "productos"],
 ];
 

@@ -111,15 +111,15 @@ describe("herramienta estado_pedido (con base de datos)", () => {
     assert.deepEqual([p?.codigo, p?.saldo, p?.pago, p?.pago_confirmado], [o.codigo, "Q450.00", "parcial", false]);
   });
 
-  test("con inventario compartido, ver_producto da el total y no por tienda", async () => {
+  test("el asistente no recibe la existencia: ni buscar_productos ni ver_producto la traen (Home Outlet no la promete)", async () => {
     const a = await db.location.create({ data: { nombre: "PRUEBA-AS A" } });
     const b = await db.location.create({ data: { nombre: "PRUEBA-AS B" } });
     const prod = await db.product.create({ data: { sku: "PRUEBA-AS-P", nombre: "PRUEBA-AS producto", precio: 1000 } });
     await db.stock.createMany({ data: [{ productoId: prod.id, ubicacionId: a.id, cantidad: 3, apartado: 1 }, { productoId: prod.id, ubicacionId: b.id, cantidad: 4 }] });
-    const ver = async () => JSON.parse((await ejecutarHerramienta("ver_producto", { id: prod.id }, ctx(null))).contenido).existencias as Record<string, number>;
-    await db.ajustesPedidos.update({ where: { id: "pedidos" }, data: { inventario: "separado" } });
-    assert.deepEqual(await ver(), { "PRUEBA-AS A": 2, "PRUEBA-AS B": 4 }); // lo apartado ya no se ofrece
-    await db.ajustesPedidos.update({ where: { id: "pedidos" }, data: { inventario: "compartido" } });
-    assert.deepEqual(await ver(), { Total: 6 });
+    const ver = (await ejecutarHerramienta("ver_producto", { id: prod.id }, ctx(null))).contenido;
+    const buscar = (await ejecutarHerramienta("buscar_productos", { texto: "PRUEBA-AS producto" }, ctx(null))).contenido;
+    assert.deepEqual(Object.keys(JSON.parse(ver)).sort(), ["categoria", "descripcion", "foto", "id", "nombre", "precio", "sku"]);
+    assert.ok(JSON.parse(buscar).some((p: { nombre: string }) => p.nombre === "PRUEBA-AS producto"));
+    for (const t of [ver, buscar]) assert.doesNotMatch(t, /existencia|cantidad|apartado|"(Total|PRUEBA-AS A)"/);
   });
 });

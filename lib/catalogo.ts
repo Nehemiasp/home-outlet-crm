@@ -3,21 +3,20 @@ import { db } from "@/lib/db";
 import { parsePrecio } from "@/lib/dinero";
 import type { Prisma } from "@/generated/prisma/client";
 import type { CategoriaDTO, DatosProducto, FilaProducto, FilaVistaPrevia, FiltrosCatalogo, ProductoDetalle, Ubicacion } from "@/lib/catalogo-tipos";
+import { compararTiendas, TIENDA_MIXCO, TIENDA_PUERTO_BARRIOS, TIENDAS } from "@/lib/tiendas";
 
 export const POR_PAGINA = 24;
 export const MAX_IMAGENES = 5;
-export const NOMBRE_TIENDA = "Tienda física";
-export const NOMBRE_LINEA = "Tienda en línea";
 
 type Actor = { id: string; nombre: string };
 
-/** Las dos ubicaciones del documento, con la tienda física primero. Si faltan, se crean. */
+/** Las dos tiendas, con Puerto Barrios primero. Si faltan, se crean con su dirección. */
 export async function ubicaciones(): Promise<Ubicacion[]> {
-  for (const nombre of [NOMBRE_TIENDA, NOMBRE_LINEA]) {
-    if (!(await db.location.findUnique({ where: { nombre } }))) await db.location.create({ data: { nombre } });
+  for (const t of TIENDAS) {
+    if (!(await db.location.findUnique({ where: { nombre: t.nombre } }))) await db.location.create({ data: t });
   }
   const todas = await db.location.findMany({ where: { activa: true }, select: { id: true, nombre: true } });
-  return todas.sort((a, b) => (a.nombre === NOMBRE_TIENDA ? -1 : b.nombre === NOMBRE_TIENDA ? 1 : a.nombre.localeCompare(b.nombre, "es")));
+  return todas.sort(compararTiendas);
 }
 
 export const categorias = (): Promise<CategoriaDTO[]> => db.category.findMany({ orderBy: [{ orden: "asc" }, { nombre: "asc" }], select: { id: true, nombre: true } });
@@ -164,7 +163,9 @@ export async function importarProductos(texto: string, actor: Actor): Promise<{ 
   const r = await revisar(texto);
   if (r.error) return { error: r.error, creados: 0, actualizados: 0, omitidas: 0, categoriasNuevas: 0 };
   const validas = r.filas.filter((f) => f.errores.length === 0);
-  const [tienda, linea] = await ubicaciones();
+  const locs = await ubicaciones();
+  const tienda = locs.find((u) => u.nombre === TIENDA_PUERTO_BARRIOS.nombre);
+  const linea = locs.find((u) => u.nombre === TIENDA_MIXCO.nombre);
 
   const resultado = await db.$transaction(
     async (tx) => {

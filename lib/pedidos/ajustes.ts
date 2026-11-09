@@ -7,6 +7,7 @@ import { pasarela } from "@/lib/pagos-tarjeta";
 import { metodosSeleccionables } from "./metodos";
 import { departamentoOficial, municipioOficial } from "@/lib/guatemala";
 import type { Zona } from "./envio";
+import { compararTiendas, TIENDA_MIXCO, TIENDA_PUERTO_BARRIOS } from "@/lib/tiendas";
 
 type Actor = { id: string; nombre: string };
 type Resultado = { ok: true } | { ok: false; error: string };
@@ -14,13 +15,24 @@ const fallo = (error: string): { ok: false; error: string } => ({ ok: false, err
 
 /* ── Ajustes generales de pedidos (una fila) ── */
 
-/** La fila de ajustes; si no existe se crea con Tienda física para recoger y Tienda en línea para envíos. */
+/** La fila de ajustes; si no existe se crea con Puerto Barrios para recoger y Mixco para envíos. */
 export async function obtenerAjustesPedidos(c: Prisma.TransactionClient = db) {
   const a = await c.ajustesPedidos.findUnique({ where: { id: "pedidos" } });
   if (a) return a;
   const ubicaciones = await c.location.findMany({ select: { id: true, nombre: true } });
   const por = (n: string) => ubicaciones.find((u) => u.nombre === n)?.id ?? null;
-  return c.ajustesPedidos.upsert({ where: { id: "pedidos" }, create: { ubicacionRecogerId: por("Tienda física"), ubicacionEnvioId: por("Tienda en línea") }, update: {} });
+  return c.ajustesPedidos.upsert({ where: { id: "pedidos" }, create: { ubicacionRecogerId: por(TIENDA_PUERTO_BARRIOS.nombre), ubicacionEnvioId: por(TIENDA_MIXCO.nombre) }, update: {} });
+}
+
+/** Las tiendas activas con su dirección, Puerto Barrios primero. */
+export async function tiendasActivas(c: Prisma.TransactionClient = db) {
+  return (await c.location.findMany({ where: { activa: true }, select: { id: true, nombre: true, direccion: true } })).sort(compararTiendas);
+}
+
+/** La tienda donde se recoge: la del pedido (o cotización) o, si no tiene una (los de antes), la de Ajustes. */
+export async function tiendaDeRecoger(recogerEnId: string | null | undefined) {
+  const id = recogerEnId ?? (await obtenerAjustesPedidos()).ubicacionRecogerId;
+  return id ? db.location.findUnique({ where: { id }, select: { id: true, nombre: true, direccion: true } }) : null;
 }
 
 export type EntradaAjustesPedidos = {
@@ -33,7 +45,7 @@ export type EntradaAjustesPedidos = {
   descuentoMaxAgente: number;
   inventario: ModoInventario;
   metodos: string[];
-  /** Monto en quetzales; vacío = envío gratis desactivado. */
+  /** Monto en quetzales desde el que el envío es gratis; vacío = sin mínimo. */
   envioGratisDesde: string;
   /** Lo que cuesta el envío con pago contra entrega, en quetzales (Q35 de fábrica). */
   costoContraEntrega: string;
@@ -151,6 +163,18 @@ export async function guardarZona(id: string | null, d: EntradaZona, actor: Acto
     id = (await db.shippingZone.create({ data: { ...datos, orden: (ultima._max.orden ?? 0) + 1 } })).id;
   }
   await log(actor, "guardar_zona", "ShippingZone", id, { nombre, costo });
+  return { ok: true };
+}
+
+/** La dirección de una tienda: sale en el resumen y en el aviso «listo para recoger» cuando el cliente recoge ahí. */
+export async function guardarDireccionTienda(id: string, texto: string, actor: Actor): Promise<Resultado> {
+  const direccion = texto.trim();
+  if (!direccion) return fallo("Escriba la dirección de la tienda.");
+  if (direccion.length > 300) return fallo("La dirección pasa de 300 caracteres.");
+  const t = await db.location.findUnique({ where: { id }, select: { nombre: true } });
+  if (!t) return fallo("La tienda ya no existe.");
+  await db.location.update({ where: { id }, data: { direccion } });
+  await log(actor, "guardar_tienda", "Location", id, { nombre: t.nombre });
   return { ok: true };
 }
 

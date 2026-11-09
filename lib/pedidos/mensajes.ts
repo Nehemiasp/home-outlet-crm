@@ -116,14 +116,20 @@ export type DatosResumen = {
   entrega: "recoger" | "envio";
   departamento?: string | null;
   municipio: string | null;
-  direccionTienda: string | null;
+  /** Donde recoge el cliente (solo con «recoger»). */
+  tienda: TiendaRecoger | null;
 };
+
+export type TiendaRecoger = { nombre: string; direccion: string | null };
+
+/** «Recoger en Tienda Mixco: 4 calle 11-47…»; sin tienda conocida, «Recoger en tienda». */
+export const textoRecoger = (t: TiendaRecoger | null) => (t ? `Recoger en ${t.nombre}${t.direccion ? `: ${t.direccion}` : ""}` : "Recoger en tienda");
 
 /** El mensaje que recibe el cliente al enviar el pedido (o la cotización): las líneas, los totales y el pie con las cuentas o la vigencia. */
 export function textoResumen(d: DatosResumen, pie: string, encabezado: "Pedido" | "Cotización" = "Pedido") {
   const filas = agruparLineas(d.lineas).map((l) => `${l.cantidad} × ${l.nombre}   ${formatQ(l.precio * l.cantidad)}`);
   if (d.descuentoMonto > 0) filas.push(`Descuento   -${formatQ(d.descuentoMonto)}`);
-  filas.push(d.entrega === "envio" ? `Envío a ${textoLugar(d.municipio, d.departamento) || "su municipio"}   ${d.costoEnvio === 0 ? "Gratis" : formatQ(d.costoEnvio)}` : `Recoger en tienda${d.direccionTienda ? `: ${d.direccionTienda}` : ""}`);
+  filas.push(d.entrega === "envio" ? `Envío a ${textoLugar(d.municipio, d.departamento) || "su municipio"}   ${d.costoEnvio === 0 ? "Gratis" : formatQ(d.costoEnvio)}` : textoRecoger(d.tienda));
   filas.push(`Total   ${formatQ(d.total)}`);
   return `${encabezado} ${d.codigo}\n\n${filas.join("\n")}\n\n${pie}`;
 }

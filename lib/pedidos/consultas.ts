@@ -2,6 +2,7 @@ import type { Channel } from "@/lib/canales/tipos";
 import { db } from "@/lib/db";
 import type { EstadoPedido, Prisma, TipoPago } from "@/generated/prisma/client";
 import { filtroCotizacion, filtroPedido, redactarDuplicados, type Actor, type DuplicadoVisible } from "@/lib/visibilidad";
+import { tiendaDeRecoger } from "./ajustes";
 import { nombreMetodo } from "./metodos";
 import { buscarDuplicados } from "./pagos";
 import { estadoDePago, saldoDe, type EstadoPagoVista } from "./totales";
@@ -108,6 +109,8 @@ export type DetallePedido = {
   departamento: string | null;
   municipio: string | null;
   zona: string | null;
+  /** La tienda donde recoge (solo con «recoger»): la del pedido o, en los de antes, la de Ajustes. */
+  tienda: { nombre: string; direccion: string | null } | null;
   sobrePedido: boolean;
   reservadoHasta: string | null;
   subtotal: number;
@@ -138,6 +141,7 @@ export async function cargarPedido(id: string, u: Actor): Promise<DetallePedido 
     include: {
       contacto: { select: { id: true, nombre: true, telefono: true } },
       creadoPor: { select: { id: true, nombre: true } },
+      recogerEn: { select: { nombre: true, direccion: true } },
       lineas: { orderBy: [{ nombre: "asc" }, { id: "asc" }], include: { ubicacion: { select: { nombre: true } }, producto: { select: { imagenes: true } } } },
       pagos: { orderBy: { creado: "asc" }, include: { mensaje: { select: { archivoUrl: true } }, registradoPor: { select: { nombre: true } }, verificadoPor: { select: { nombre: true } } } },
       eventos: { orderBy: { fecha: "asc" }, include: { usuario: { select: { nombre: true } } } },
@@ -150,6 +154,7 @@ export async function cargarPedido(id: string, u: Actor): Promise<DetallePedido 
   const duplicados = await Promise.all(o.pagos.map(async (p) => (p.estado === "rechazado" ? [] : redactarDuplicados(u, await buscarDuplicados(p.banco, p.referencia, p.id)))));
   return {
     id: o.id, codigo: o.codigo, estado: o.estado, entrega: o.entrega, canal: o.canal as Channel, creada: o.creada.toISOString(), notas: o.notas, guia: o.guia, paqueteria: o.paqueteria, guiaArchivo: o.guiaArchivoUrl ? { url: o.guiaArchivoUrl, nombre: o.guiaArchivoNombre ?? "guia" } : null, direccion: o.direccion, departamento: o.departamento, municipio: o.municipio, zona: o.zona,
+    tienda: o.entrega === "recoger" ? (o.recogerEn ?? (await tiendaDeRecoger(null))) : null,
     sobrePedido: o.sobrePedido, reservadoHasta: o.reservadoHasta?.toISOString() ?? null,
     subtotal: o.subtotal, descuentoMonto: o.descuentoMonto, descuentoMotivo: o.descuentoMotivo, costoEnvio: o.costoEnvio, total: o.total,
     contacto: o.contacto, conversacionId: o.conversacionId, creadoPor: o.creadoPor,

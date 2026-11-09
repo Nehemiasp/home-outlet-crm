@@ -5,15 +5,14 @@ import { obtenerNegocio } from "@/lib/ajustes";
 import { db } from "@/lib/db";
 import { textoLugar } from "@/lib/guatemala";
 import { aplicarDatos } from "@/lib/plantillas";
-import { obtenerAjustesPedidos } from "@/lib/pedidos/ajustes";
+import { obtenerAjustesPedidos, tiendaDeRecoger } from "@/lib/pedidos/ajustes";
 import { comprasDeContacto } from "@/lib/pedidos/compras";
 import { filtroConversacion, filtroPedido, type Actor } from "@/lib/visibilidad";
-import { disponibleProducto } from "@/lib/pedidos/existencias";
 import { METODOS } from "@/lib/pedidos/metodos";
 import { saldoDe } from "@/lib/pedidos/totales";
 import type { Prisma } from "@/generated/prisma/client";
 import type { Atencion, ContadoresLista, ConversacionDTO, Filtros, ItemLinea, ItemLista, ProductoDTO, TarjetaPedido, TonoSistema } from "@/lib/bandeja-tipos";
-import { agruparLineas } from "@/lib/pedidos/mensajes";
+import { agruparLineas, textoRecoger } from "@/lib/pedidos/mensajes";
 import { modoDePrueba } from "@/lib/ia/proveedor";
 import type { Rol } from "@/lib/permisos";
 import { veTodo } from "@/lib/permisos";
@@ -125,7 +124,7 @@ export async function cargarConversacion(id: string, yo: { id: string; rol: Rol 
       asignadaA: { select: { id: true, nombre: true } },
       participantes: { select: { desde: true, usuario: { select: { id: true, nombre: true } } } },
       contacto: { include: { etiquetas: true, identidades: true } },
-      mensajes: { orderBy: { fecha: "desc" }, take: 200, include: { producto: { include: { stock: true } }, enviadoPor: { select: { nombre: true } }, aiRun: { select: { consultado: true } } } },
+      mensajes: { orderBy: { fecha: "desc" }, take: 200, include: { producto: true, enviadoPor: { select: { nombre: true } }, aiRun: { select: { consultado: true } } } },
       resumenes: { orderBy: { creado: "desc" }, take: 1 },
       notas: { orderBy: { fecha: "desc" }, take: 100, include: { autor: { select: { nombre: true } } } },
     },
@@ -153,9 +152,10 @@ export async function cargarConversacion(id: string, yo: { id: string; rol: Rol 
   // Los mensajes que son el resumen de un pedido se dibujan como tarjeta (el texto plano sigue siendo el que ve el cliente).
   const idsPedido = [...new Set(conv.mensajes.flatMap((m) => (m.pedidoId ? [m.pedidoId] : [])))];
   const pedidosDeMensajes = idsPedido.length
-    ? await db.order.findMany({ where: { id: { in: idsPedido } }, include: { lineas: { orderBy: { id: "asc" } } } })
+    ? await db.order.findMany({ where: { id: { in: idsPedido } }, include: { lineas: { orderBy: { id: "asc" } }, recogerEn: { select: { nombre: true, direccion: true } } } })
     : [];
-  const negocioActual = await obtenerNegocio();
+  // Los pedidos de antes no dicen tienda: recogen en la de Ajustes.
+  const tiendaPorDefecto = pedidosDeMensajes.some((o) => o.entrega === "recoger" && !o.recogerEn) ? await tiendaDeRecoger(null) : null;
   const cuentasActivas = pedidosDeMensajes.length ? await db.bankAccount.findMany({ where: { activa: true }, orderBy: [{ orden: "asc" }, { banco: "asc" }], select: { banco: true, tipo: true, numero: true, titular: true } }) : [];
   // El enlace de pago abierto de los pedidos que se pagan con tarjeta.
   const cobrosAbiertos = pedidosDeMensajes.length ? await db.cobroTarjeta.findMany({ where: { pedidoId: { in: pedidosDeMensajes.map((o) => o.id) }, estado: "creado" }, orderBy: { creado: "asc" }, select: { pedidoId: true, url: true } }) : [];
@@ -167,7 +167,7 @@ export async function cargarConversacion(id: string, yo: { id: string; rol: Rol 
         id: o.id, codigo: o.codigo, estado: o.estado,
         lineas: agruparLineas(o.lineas).map((l) => ({ nombre: l.nombre, cantidad: l.cantidad, total: l.precio * l.cantidad })),
         descuento: o.descuentoMonto,
-        envio: o.entrega === "envio" ? `Envío a ${textoLugar(o.municipio, o.departamento) || "su municipio"}${o.costoEnvio === 0 ? " · Gratis" : ""}` : `Recoger en tienda${negocioActual.direccion ? `: ${negocioActual.direccion}` : ""}`,
+        envio: o.entrega === "envio" ? `Envío a ${textoLugar(o.municipio, o.departamento) || "su municipio"}${o.costoEnvio === 0 ? " · Gratis" : ""}` : textoRecoger(o.recogerEn ?? tiendaPorDefecto),
         total: o.total,
         // las cuentas solo van si se paga por banco (o si el pedido es anterior a la forma de pago)
         cuentas: o.metodoPago === null || o.metodoPago === "transferencia" || o.metodoPago === "deposito" ? cuentasActivas : [],
@@ -182,7 +182,7 @@ export async function cargarConversacion(id: string, yo: { id: string; rol: Rol 
   };
 
   const producto = (p: (typeof conv.mensajes)[number]["producto"]): ProductoDTO | null =>
-    p ? { id: p.id, nombre: p.nombre, sku: p.sku, precioCentavos: p.precio, existencia: disponibleProducto(p.stock), imagenUrl: p.imagenes[0] } : null;
+    p ? { id: p.id, nombre: p.nombre, sku: p.sku, precioCentavos: p.precio, imagenUrl: p.imagenes[0] } : null;
 
   const linea: ItemLinea[] = [
     ...conv.mensajes.map((m): ItemLinea => ({

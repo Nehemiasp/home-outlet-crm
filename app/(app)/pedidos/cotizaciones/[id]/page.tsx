@@ -89,7 +89,8 @@ export default async function Pagina({ params }: { params: Promise<{ id: string 
           <p className="meta text-texto-suave">Para</p>
           <p className="cuerpo-fuerte">{c.cliente.nombre}</p>
           {c.cliente.telefono && <p>Teléfono: {formatTelefono(c.cliente.telefono)}</p>}
-          <p>{c.entrega === "envio" ? `Envío a ${textoLugar(c.municipio, c.departamento) || "su municipio"}` : "Recoger en tienda"}</p>
+          <p>{c.entrega === "envio" ? `Envío a ${textoLugar(c.municipio, c.departamento) || "su municipio"}` : `Recoger en ${c.tienda?.nombre ?? "tienda"}`}</p>
+          {c.entrega === "recoger" && c.tienda?.direccion && <p>Dirección: {c.tienda.direccion}</p>}
           {c.entrega === "envio" && c.direccion && <p className="whitespace-pre-wrap">Dirección: {c.direccion}</p>}
         </section>
 

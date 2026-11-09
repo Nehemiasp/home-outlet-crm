@@ -110,7 +110,7 @@ describe("adaptador de WhatsApp (Meta simulado)", () => {
     await assert.rejects(adaptadorWhatsApp.send("+50240432655", { type: "text", text: "hola" }), /id del mensaje/);
   });
 
-  test("la tarjeta de producto sube la foto y sale como imagen con nombre, precio y existencia", async () => {
+  test("la tarjeta de producto sube la foto y sale como imagen con nombre y precio, sin existencia", async () => {
     simular((u) => (u.endsWith("/media") ? json({ id: "medio-77" }) : json({ messages: [{ id: "wamid.prod" }] })));
     const r = await adaptadorWhatsApp.send("+50240432655", { type: "product", productId: productoId });
     assert.equal(r.externalMessageId, "wamid.prod");
@@ -122,7 +122,7 @@ describe("adaptador de WhatsApp (Meta simulado)", () => {
     const envio = cuerpoDe(llamadas[1]!);
     assert.equal(envio.type, "image");
     assert.equal(envio.image.id, "medio-77");
-    assert.equal(envio.image.caption, "*Licuadora de prueba*\nQ349.00\nSin existencia por ahora");
+    assert.equal(envio.image.caption, "*Licuadora de prueba*\nQ349.00");
   });
 
   test("una imagen del sistema se sube y se manda por id; sin foto, el producto sale como texto", async () => {

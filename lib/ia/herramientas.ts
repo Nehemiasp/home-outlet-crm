@@ -4,9 +4,7 @@ import { db } from "@/lib/db";
 import { departamentoDe, municipioOficial } from "@/lib/guatemala";
 import { estaAbierto } from "@/lib/horario";
 import { enviarMensaje } from "@/lib/mensajeria";
-import { obtenerAjustesPedidos } from "@/lib/pedidos/ajustes";
 import { DESCONTADOS, ETIQUETA_ESTADO } from "@/lib/pedidos/estados";
-import { disponibleDe, disponibleProducto } from "@/lib/pedidos/existencias";
 import { estadoDePago, saldoDe } from "@/lib/pedidos/totales";
 import { textoCuentas } from "@/lib/plantillas";
 import { formatQ } from "@/lib/utils";
@@ -29,11 +27,11 @@ const esquemas = {
 export type NombreHerramienta = keyof typeof esquemas;
 
 export const HERRAMIENTAS: ToolDefinition[] = [
-  { name: "buscar_productos", description: "Busca hasta 5 productos activos del catálogo por nombre o descripción. Devuelve nombre, precio y existencia total.", schema: esquemas.buscar_productos },
-  { name: "ver_producto", description: "Detalle de un producto: precio, existencia por ubicación (tienda física y tienda en línea), descripción y foto.", schema: esquemas.ver_producto },
+  { name: "buscar_productos", description: "Busca hasta 5 productos activos del catálogo por nombre o descripción. Devuelve nombre y precio.", schema: esquemas.buscar_productos },
+  { name: "ver_producto", description: "Detalle de un producto: precio, descripción y foto.", schema: esquemas.ver_producto },
   { name: "datos_negocio", description: "Horario, dirección, formas de pago, envíos y garantía de Home Outlet.", schema: esquemas.datos_negocio },
   { name: "buscar_respuesta", description: "Busca en las preguntas frecuentes del negocio (cambios y devoluciones, apartados, instalación, envíos a municipios, etc.).", schema: esquemas.buscar_respuesta },
-  { name: "enviar_producto", description: "Manda al cliente la tarjeta del producto con foto, precio y existencia.", schema: esquemas.enviar_producto },
+  { name: "enviar_producto", description: "Manda al cliente la tarjeta del producto con foto y precio.", schema: esquemas.enviar_producto },
   { name: "guardar_dato_cliente", description: "Guarda el nombre o el municipio que el cliente acaba de decir. No guarda nada más.", schema: esquemas.guardar_dato_cliente },
   { name: "estado_pedido", description: "Estado de un pedido DEL CLIENTE de esta conversación: estado, si el pago está confirmado, total, saldo, entrega y guía. Sin código devuelve el último pedido abierto. Si el pedido espera pago, incluye las cuentas bancarias. No puede ver pedidos de otras personas.", schema: esquemas.estado_pedido },
   { name: "pasar_a_asesor", description: "Termina la atención del asistente y deja la conversación esperando a una persona. Úsela cuando el cliente quiera comprar, apartar, pagar, pedir descuento, reclamar, o hable con una persona.", schema: esquemas.pasar_a_asesor },
@@ -60,11 +58,13 @@ export type ResultadoHerramienta = {
 const json = (o: unknown) => JSON.stringify(o);
 const falla = (m: string): ResultadoHerramienta => ({ contenido: json({ error: m }), sinResultado: true });
 
-type FilaProducto = { id: string; nombre: string; sku: string; descripcion: string | null; categoria: string | null; precio: number; existencia: number };
+// Sin existencia: Home Outlet no lleva el inventario al día (el dueño retira productos sin avisar y se cuenta cada semana),
+// así que el asistente no la recibe y no puede prometerla. Muestra el producto y el precio; la existencia la confirma un asesor.
+type FilaProducto = { id: string; nombre: string; sku: string; descripcion: string | null; categoria: string | null; precio: number };
 
 async function productosActivos(): Promise<FilaProducto[]> {
-  const ps = await db.product.findMany({ where: { activo: true }, include: { categoria: true, stock: true }, take: 5000 });
-  return ps.map((p) => ({ id: p.id, nombre: p.nombre, sku: p.sku, descripcion: p.descripcion, categoria: p.categoria?.nombre ?? null, precio: p.precio, existencia: disponibleProducto(p.stock) }));
+  const ps = await db.product.findMany({ where: { activo: true }, include: { categoria: true }, take: 5000 });
+  return ps.map((p) => ({ id: p.id, nombre: p.nombre, sku: p.sku, descripcion: p.descripcion, categoria: p.categoria?.nombre ?? null, precio: p.precio }));
 }
 
 export async function buscarProductosPorTexto(texto: string, categoria?: string, max = 5): Promise<FilaProducto[]> {
@@ -100,21 +100,18 @@ export async function ejecutarHerramienta(nombre: string, entrada: unknown, ctx:
     case "buscar_productos": {
       const r = await buscarProductosPorTexto(args.texto!, args.categoria);
       return {
-        contenido: json(r.map((p) => ({ id: p.id, nombre: p.nombre, precio: vistaPrecio(p), existencia_total: p.existencia }))),
+        contenido: json(r.map((p) => ({ id: p.id, nombre: p.nombre, precio: vistaPrecio(p) }))),
         consultado: r.length ? `Consultó: ${r.map((p) => p.nombre).join(", ")}` : `Buscó "${args.texto}" y no encontró productos`,
         productos: r.map((p) => p.id),
         sinResultado: r.length === 0,
       };
     }
     case "ver_producto": {
-      const [p, aj] = await Promise.all([db.product.findFirst({ where: { id: args.id, activo: true }, include: { stock: { include: { ubicacion: true } }, categoria: true } }), obtenerAjustesPedidos()]);
+      const p = await db.product.findFirst({ where: { id: args.id, activo: true }, include: { categoria: true } });
       if (!p) return falla("Producto no encontrado.");
       return {
-        contenido: json({
-          id: p.id, nombre: p.nombre, sku: p.sku, categoria: p.categoria?.nombre ?? null, precio: formatQ(p.precio), descripcion: p.descripcion,
-          existencias: aj.inventario === "compartido" ? { Total: disponibleProducto(p.stock) } : Object.fromEntries(p.stock.map((s) => [s.ubicacion.nombre, disponibleDe(s)])), foto: p.imagenes[0] ?? null,
-        }),
-        consultado: `Consultó: ${p.nombre} · existencia`,
+        contenido: json({ id: p.id, nombre: p.nombre, sku: p.sku, categoria: p.categoria?.nombre ?? null, precio: formatQ(p.precio), descripcion: p.descripcion, foto: p.imagenes[0] ?? null }),
+        consultado: `Consultó: ${p.nombre}`,
         productos: [p.id],
       };
     }

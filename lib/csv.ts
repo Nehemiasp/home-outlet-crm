@@ -101,8 +101,9 @@ export function analizarProductosCsv(texto: string): { error?: string; filas: Fi
       linea, sku, nombre, descripcion, errores,
       categoria: leer(fila, "categoria"),
       precioCentavos: precio ?? 0,
-      tienda: entero(leer(fila, "existencia_tienda"), "La existencia de la tienda", errores),
-      enLinea: entero(leer(fila, "existencia_linea"), "La existencia en línea", errores),
+      // existencia_tienda y existencia_linea son los nombres de antes (Tienda física y Tienda en línea): se siguen aceptando.
+      tienda: entero(leer(fila, "existencia_puerto_barrios") || leer(fila, "existencia_tienda"), "La existencia de Puerto Barrios", errores),
+      enLinea: entero(leer(fila, "existencia_mixco") || leer(fila, "existencia_linea"), "La existencia de Mixco", errores),
     };
   });
   return { filas };

@@ -6,7 +6,7 @@ import { useState } from "react";
 import { cn, formatQ } from "@/lib/utils";
 import { Boton, BotonIcono, Interruptor } from "./form";
 import { AvisoAccionable } from "./estructura";
-import { Avatar, AvatarAsistente, ContadorNoLeidos, InsigniaAtencion, InsigniaEstado, InsigniaExistencia, LogoCanal, nombreCanal, type Canal, type EstadoPedidoVista, type TonoEstado } from "./etiquetas";
+import { Avatar, AvatarAsistente, ContadorNoLeidos, InsigniaAtencion, InsigniaEstado, LogoCanal, nombreCanal, type Canal, type EstadoPedidoVista, type TonoEstado } from "./etiquetas";
 
 /* ── Estado de entrega ── */
 export type Entrega = "enviando" | "enviado" | "entregado" | "leido" | "fallo";
@@ -203,7 +203,8 @@ function TarjetaDePedido({ p }: { p: TarjetaPedidoUI }) {
     </div>
   );
 }
-export type ProductoTarjeta = { nombre: string; sku: string; precioCentavos: number; existencia: number; imagenUrl?: string };
+/** Lo mismo que recibe el cliente: nombre, foto y precio. Sin existencia (Home Outlet no la promete; ver lib/canales/whatsapp.ts). */
+export type ProductoTarjeta = { nombre: string; sku: string; precioCentavos: number; imagenUrl?: string };
 
 type BurbujaProps = {
   tipo: "entrante" | "saliente" | "nota" | "producto" | "sistema";
@@ -282,10 +283,7 @@ export function Burbuja({ tipo, tono = "neutro", pedido, texto, hora, estado, au
             <div className="flex flex-col gap-1 p-3">
               <p className="cuerpo-fuerte">{producto.nombre}</p>
               <p className="meta text-texto-suave">SKU {producto.sku}</p>
-              <div className="flex items-center justify-between gap-2">
-                <p className="cuerpo-fuerte">{formatQ(producto.precioCentavos)}</p>
-                <InsigniaExistencia cantidad={producto.existencia} />
-              </div>
+              <p className="cuerpo-fuerte">{formatQ(producto.precioCentavos)}</p>
             </div>
             <div className="px-3 pb-2">{pie}</div>
           </>

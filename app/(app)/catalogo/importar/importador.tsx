@@ -10,7 +10,7 @@ import type { FilaVistaPrevia } from "@/lib/catalogo-tipos";
 import { formatQ } from "@/lib/utils";
 import { importarCsv, previsualizarCsv } from "../actions";
 
-const PLANTILLA = "sku,nombre,categoria,precio,descripcion,existencia_tienda,existencia_linea\nHG-100,Licuadora de ejemplo,Hogar,349.00,Descripción de ejemplo,5,2\n";
+const PLANTILLA = "sku,nombre,categoria,precio,descripcion,existencia_puerto_barrios,existencia_mixco\nHG-100,Licuadora de ejemplo,Hogar,349.00,Descripción de ejemplo,5,2\n";
 const POR_PAGINA = 50;
 
 const columnas: Columna<FilaVistaPrevia>[] = [
@@ -28,7 +28,7 @@ const columnas: Columna<FilaVistaPrevia>[] = [
     ),
   },
   { clave: "precio", titulo: "Precio", render: (f) => (f.precioCentavos ? <span className="whitespace-nowrap">{formatQ(f.precioCentavos)}</span> : "—") },
-  { clave: "existencias", titulo: "Tienda / En línea", render: (f) => `${f.tienda} / ${f.enLinea}` },
+  { clave: "existencias", titulo: "Puerto Barrios / Mixco", render: (f) => `${f.tienda} / ${f.enLinea}` },
   {
     clave: "resultado",
     titulo: "Resultado",
@@ -103,7 +103,7 @@ export function Importador() {
       <section className="flex max-w-3xl flex-col gap-3 rounded-tarjeta border border-linea bg-superficie p-4">
         <h2 className="titulo-panel">1. Elija el archivo</h2>
         <p className="cuerpo text-texto-suave">
-          Columnas: <code className="cuerpo-fuerte">sku, nombre, categoria, precio, descripcion, existencia_tienda, existencia_linea</code>. Las obligatorias son sku, nombre y precio. Sirve el CSV de Excel con comas o con punto y coma.
+          Columnas: <code className="cuerpo-fuerte">sku, nombre, categoria, precio, descripcion, existencia_puerto_barrios, existencia_mixco</code>. Las obligatorias son sku, nombre y precio. Sirve el CSV de Excel con comas o con punto y coma.
         </p>
         <p className="cuerpo text-texto-suave">Si el SKU ya existe, el producto se actualiza (nombre, categoría, precio, descripción y existencias). Si no, se crea. Las categorías que falten se crean solas.</p>
         <div className="flex flex-wrap gap-2">

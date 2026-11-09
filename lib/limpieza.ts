@@ -1,4 +1,5 @@
 import type { PrismaClient } from "@/generated/prisma/client";
+import { TIENDA_MIXCO, TIENDA_PUERTO_BARRIOS } from "@/lib/tiendas";
 
 /**
  * Salir de la demostración: deja la base sin datos del negocio (conversaciones, contactos, catálogo, pedidos, pagos,
@@ -57,9 +58,9 @@ export async function limpiarDatosDemo(db: Cliente, o: { quitarUsuariosDemo?: bo
   await db.negocio.create({ data: { id: "negocio" } });
   await db.aiSettings.create({ data: { id: "ia" } });
   await db.ajustesEquipo.create({ data: { id: "equipo" } });
-  const fisica = await db.location.create({ data: { nombre: "Tienda física" } });
-  const linea = await db.location.create({ data: { nombre: "Tienda en línea" } });
-  await db.ajustesPedidos.create({ data: { id: "pedidos", ubicacionRecogerId: fisica.id, ubicacionEnvioId: linea.id } });
+  const puerto = await db.location.create({ data: TIENDA_PUERTO_BARRIOS });
+  const mixco = await db.location.create({ data: TIENDA_MIXCO });
+  await db.ajustesPedidos.create({ data: { id: "pedidos", ubicacionRecogerId: puerto.id, ubicacionEnvioId: mixco.id } });
 
   return { borrado, usuariosQuitados };
 }

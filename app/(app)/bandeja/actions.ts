@@ -3,7 +3,7 @@
 import { z } from "zod";
 import { MAX_BYTES, almacenamiento, extensionDeImagen } from "@/lib/almacenamiento";
 import { cargarConversacion, listarConversaciones } from "@/lib/bandeja";
-import type { AsesorMini, ContadoresLista, ConversacionDTO, Filtros, ItemLista, ProductoDTO } from "@/lib/bandeja-tipos";
+import type { AsesorMini, ContadoresLista, ConversacionDTO, Filtros, ItemLista, ProductoBusqueda } from "@/lib/bandeja-tipos";
 import { adaptador } from "@/lib/canales";
 import { armarCuerpo } from "@/lib/canales/plantillas-canal";
 import { CANALES, type PlantillaCanal } from "@/lib/canales/tipos";
@@ -53,7 +53,7 @@ export async function obtener(conversacionId: string): Promise<ConversacionDTO |
   return cargarConversacion(id.parse(conversacionId), u);
 }
 
-export async function buscarProductos(q: string): Promise<ProductoDTO[]> {
+export async function buscarProductos(q: string): Promise<ProductoBusqueda[]> {
   await requireUsuario();
   const busca = z.string().trim().max(60).parse(q);
   const filas = await db.product.findMany({

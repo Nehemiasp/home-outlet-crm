@@ -5,7 +5,7 @@ import { enviarMensaje } from "@/lib/mensajeria";
 import { formatTelefono } from "@/lib/utils";
 import { filtroCotizacion, puedeVerCotizacion, type Actor } from "@/lib/visibilidad";
 import type { EstadoPedido } from "@/generated/prisma/client";
-import { obtenerAjustesPedidos } from "./ajustes";
+import { obtenerAjustesPedidos, tiendaDeRecoger } from "./ajustes";
 import { configMensajes } from "./avisos";
 import { rellenar, textoResumen } from "./mensajes";
 import { aProductoPedido, clienteDelPanel, lineaDeSistema, prepararPedido, puedeEnviarPorCanal, type ActorPedidos } from "./pedidos";
@@ -23,9 +23,10 @@ const EN_CURSO: { notIn: EstadoPedido[] } = { notIn: ["cancelado", "vencido"] };
 
 /** El mensaje que recibe el cliente: las líneas y los totales, como el resumen del pedido, y el pie con la vigencia (editable en Ajustes). */
 export async function textoDeCotizacion(cotizacionId: string): Promise<string> {
-  const [c, negocio, cfg] = await Promise.all([db.cotizacion.findUniqueOrThrow({ where: { id: cotizacionId }, include: { lineas: { orderBy: { id: "asc" } } } }), obtenerNegocio(), configMensajes()]);
+  const c = await db.cotizacion.findUniqueOrThrow({ where: { id: cotizacionId }, include: { lineas: { orderBy: { id: "asc" } } } });
+  const [cfg, tienda] = await Promise.all([configMensajes(), c.entrega === "recoger" ? tiendaDeRecoger(c.recogerEnId) : null]);
   const pie = rellenar(cfg.cotizacion.texto, { codigo: c.codigo, vence: textoFecha(c.validaHasta) });
-  return textoResumen({ codigo: c.codigo, lineas: c.lineas, descuentoMonto: c.descuentoMonto, costoEnvio: c.costoEnvio, total: c.total, entrega: c.entrega, departamento: c.departamento, municipio: c.municipio, direccionTienda: negocio.direccion }, pie, "Cotización");
+  return textoResumen({ codigo: c.codigo, lineas: c.lineas, descuentoMonto: c.descuentoMonto, costoEnvio: c.costoEnvio, total: c.total, entrega: c.entrega, departamento: c.departamento, municipio: c.municipio, tienda }, pie, "Cotización");
 }
 
 /**
@@ -58,7 +59,7 @@ export async function enviarCotizacion(e: EntradaPedido, actor: ActorPedidos, mo
     return tx.cotizacion.create({
       data: {
         codigo: `COT-${String(siguienteCotizacion - 1).padStart(6, "0")}`, contactoId: conv.contactoId, conversacionId: conv.id, canal: conv.canal, creadoPorId: actor.id, validaHasta,
-        entrega: e.entrega, direccion: p.direccion, departamento: p.departamento, municipio: p.municipio, zona: p.zona?.nombre ?? null,
+        entrega: e.entrega, recogerEnId: p.recogerEnId, direccion: p.direccion, departamento: p.departamento, municipio: p.municipio, zona: p.zona?.nombre ?? null,
         subtotal: p.subtotal, descuentoMonto: p.descuentoMonto, descuentoMotivo: p.descuentoMotivo, costoEnvio: p.costoEnvio, total: p.total, notas: p.notas,
         lineas: { create: [...lineas.values()] },
       },
@@ -105,7 +106,7 @@ export async function cargarParaConvertir(cotizacionId: string, conversacionId: 
       pedidoId: null, conversacionId, cotizacionId: c.id,
       cliente: { nombre: c.contacto.nombre, telefono: c.contacto.telefono ? formatTelefono(c.contacto.telefono) : "", ...lugarGuardado(c.departamento ?? c.contacto.departamento, c.municipio ?? c.contacto.municipio) },
       lineas: lineas.map((l) => ({ productoId: l.productoId!, cantidad: l.cantidad, ubicacionId: null })),
-      entrega: c.entrega, direccion: dir ?? "", referencia: ref ?? "",
+      entrega: c.entrega, recogerEnId: c.recogerEnId, direccion: dir ?? "", referencia: ref ?? "",
       descuento: c.descuentoMonto > 0 ? { tipo: "monto", valor: (c.descuentoMonto / 100).toFixed(2) } : null,
       descuentoMotivo: c.descuentoMotivo ?? "", notas: c.notas ?? "", metodoPago: null,
     },
@@ -160,6 +161,8 @@ export type DetalleCotizacion = {
   notas: string | null;
   pedido: { id: string; codigo: string } | null;
   negocio: { nombre: string; direccion: string | null; horario: string | null };
+  /** La tienda donde recogería (solo con «recoger»). */
+  tienda: { nombre: string; direccion: string | null } | null;
   /** El mensaje tal como lo recibió (o lo recibiría) el cliente, para copiarlo otra vez. */
   texto: string;
 };
@@ -169,7 +172,7 @@ export async function detalleCotizacion(id: string, u: Actor): Promise<DetalleCo
   const [c, negocio, texto] = await Promise.all([
     db.cotizacion.findUniqueOrThrow({
       where: { id },
-      include: { lineas: { orderBy: { id: "asc" } }, contacto: { select: { id: true, nombre: true, telefono: true } }, creadoPor: { select: { nombre: true } }, pedidos: { where: { estado: EN_CURSO }, orderBy: { creada: "desc" }, take: 1, select: { id: true, codigo: true } } },
+      include: { lineas: { orderBy: { id: "asc" } }, contacto: { select: { id: true, nombre: true, telefono: true } }, creadoPor: { select: { nombre: true } }, recogerEn: { select: { nombre: true, direccion: true } }, pedidos: { where: { estado: EN_CURSO }, orderBy: { creada: "desc" }, take: 1, select: { id: true, codigo: true } } },
     }),
     obtenerNegocio(),
     textoDeCotizacion(id),
@@ -181,5 +184,6 @@ export async function detalleCotizacion(id: string, u: Actor): Promise<DetalleCo
     lineas: c.lineas.map((l) => ({ id: l.id, sku: l.sku, nombre: l.nombre, precio: l.precio, cantidad: l.cantidad })),
     subtotal: c.subtotal, descuentoMonto: c.descuentoMonto, costoEnvio: c.costoEnvio, total: c.total, notas: c.notas,
     pedido: c.pedidos[0] ?? null, negocio: { nombre: negocio.nombre, direccion: negocio.direccion, horario: negocio.horario }, texto,
+    tienda: c.entrega === "recoger" ? (c.recogerEn ?? (await tiendaDeRecoger(null))) : null,
   };
 }

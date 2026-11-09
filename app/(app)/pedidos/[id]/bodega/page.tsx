@@ -22,7 +22,7 @@ export default async function Bodega({ params }: { params: Promise<{ id: string 
 
       <header className="flex flex-col gap-1 border-b-2 border-carbon pb-3">
         <h1 className="titulo-pagina">Pedido {p.codigo}</h1>
-        <p className="cuerpo-fuerte">{p.entrega === "envio" ? "ENVÍO" : "RECOGER EN TIENDA"}</p>
+        <p className="cuerpo-fuerte">{p.entrega === "envio" ? "ENVÍO" : `RECOGER EN ${(p.tienda ?? "tienda").toUpperCase()}`}</p>
       </header>
 
       <section aria-label="Cliente" className="cuerpo flex flex-col gap-1">

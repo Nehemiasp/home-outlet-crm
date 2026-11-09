@@ -625,7 +625,7 @@ export function Guia() {
               <Burbuja tipo="entrante" texto="¿Tienen todavía la pantalla para carro?" hora="10:42" />
               <Burbuja tipo="saliente" texto="Buenos días. Déjeme confirmar la existencia." hora="10:44" estado="leido" autor="Agente de prueba" />
               <Burbuja tipo="nota" texto="Quedan 2 en bodega, confirmar con la tienda." hora="10:45" autor="Agente de prueba" />
-              <Burbuja tipo="producto" hora="10:46" estado="entregado" producto={{ nombre: "Pantalla para carro 9 pulgadas", sku: "EL-001", precioCentavos: 125000, existencia: 2, imagenUrl: "/placeholder/producto.svg" }} />
+              <Burbuja tipo="producto" hora="10:46" estado="entregado" producto={{ nombre: "Pantalla para carro 9 pulgadas", sku: "EL-001", precioCentavos: 125000, imagenUrl: "/placeholder/producto.svg" }} />
               <Burbuja tipo="saliente" texto="Este mensaje no salió." hora="10:47" estado="fallo" onReintentar={() => avisar("Reintentando envío")} />
               <Burbuja
                 tipo="saliente"

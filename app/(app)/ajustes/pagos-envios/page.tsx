@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { obtenerNegocio } from "@/lib/ajustes";
-import { db } from "@/lib/db";
-import { listarCuentas, listarZonas, obtenerAjustesPedidos } from "@/lib/pedidos/ajustes";
+import { listarCuentas, listarZonas, obtenerAjustesPedidos, tiendasActivas } from "@/lib/pedidos/ajustes";
 import { Cuentas } from "./cuentas";
 import { AjustesDePedidos } from "./pedidos";
 import { Mensajes } from "./mensajes";
@@ -16,7 +15,7 @@ export default async function Pagina() {
     obtenerAjustesPedidos(),
     listarCuentas(),
     listarZonas(),
-    db.location.findMany({ where: { activa: true }, orderBy: { nombre: "asc" }, select: { id: true, nombre: true } }),
+    tiendasActivas(),
     obtenerNegocio(),
     configMensajes(),
   ]);
@@ -43,7 +42,7 @@ export default async function Pagina() {
         }}
       />
       <Cuentas filas={cuentas.map((c) => ({ id: c.id, banco: c.banco, tipo: c.tipo, numero: c.numero, titular: c.titular, activa: c.activa }))} />
-      <Zonas filas={zonas} recoger={{ direccion: negocio.direccion, horario: negocio.horario }} />
+      <Zonas filas={zonas} tiendas={ubicaciones} horario={negocio.horario} cobraZona={!a.envioGratisSinContraEntrega} />
       <Mensajes inicial={mensajes} />
     </div>
   );

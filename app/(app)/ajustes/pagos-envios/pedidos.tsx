@@ -111,21 +111,21 @@ export function AjustesDePedidos({ inicial, ubicaciones, tarjetaConectada }: { i
 
       <section aria-labelledby="t-gratis" className="flex flex-col gap-3 rounded-tarjeta border border-linea bg-superficie p-4">
         <h2 id="t-gratis" className="titulo-panel">Costo del envío</h2>
-        <CampoTexto etiqueta="Envío con pago contra entrega (Q)" inputMode="decimal" autoComplete="off" maxLength={12} className="max-w-48" ayuda="Lo que se cobra por el envío cuando el cliente paga al recibir, sin importar la zona." value={d.costoContraEntrega} onChange={(e) => setD({ ...d, costoContraEntrega: e.target.value })} />
+        <CampoTexto etiqueta="Envío con pago contra entrega (Q)" inputMode="decimal" autoComplete="off" maxLength={12} className="max-w-48" ayuda="Lo que se cobra por el envío cuando el cliente paga al recibir, sin importar la zona ni el monto." value={d.costoContraEntrega} onChange={(e) => setD({ ...d, costoContraEntrega: e.target.value })} />
         <Interruptor etiqueta="Envío gratis con las demás formas de pago" activo={d.envioGratisSinContraEntrega} onCambio={(a) => setD({ ...d, envioGratisSinContraEntrega: a })} />
+        <Interruptor etiqueta={d.envioGratisSinContraEntrega ? "Solo a partir de un monto" : "Envío gratis a partir de un monto"} activo={d.envioGratis} onCambio={(a) => setD({ ...d, envioGratis: a })} />
+        {d.envioGratis && (
+          <CampoTexto etiqueta="Monto mínimo del subtotal (Q)" inputMode="decimal" autoComplete="off" maxLength={12} className="max-w-48" value={d.envioGratisDesde} onChange={(e) => setD({ ...d, envioGratisDesde: e.target.value })} />
+        )}
         <p className="meta text-texto-suave">
           {d.envioGratisSinContraEntrega
-            ? "Con transferencia, depósito o tarjeta el envío no se cobra. Las zonas siguen sirviendo para saber a dónde se entrega y en cuánto tiempo."
-            : "Con transferencia, depósito o tarjeta se cobra el costo de la zona de envío."}
+            ? d.envioGratis
+              ? `Con transferencia, depósito o tarjeta el envío es gratis desde Q${d.envioGratisDesde || "…"}; en compras menores cuesta Q${d.costoContraEntrega || "…"}, lo mismo que contra entrega. Las zonas dicen a dónde se entrega y en cuánto tiempo.`
+              : "Con transferencia, depósito o tarjeta el envío no se cobra. Las zonas siguen sirviendo para saber a dónde se entrega y en cuánto tiempo."
+            : d.envioGratis
+              ? `Con transferencia, depósito o tarjeta se cobra el costo de la zona de envío, y es gratis desde Q${d.envioGratisDesde || "…"}.`
+              : "Con transferencia, depósito o tarjeta se cobra el costo de la zona de envío."}
         </p>
-        {!d.envioGratisSinContraEntrega && (
-          <>
-            <Interruptor etiqueta="Envío gratis a partir de un monto" activo={d.envioGratis} onCambio={(a) => setD({ ...d, envioGratis: a })} />
-            {d.envioGratis && (
-              <CampoTexto etiqueta="Monto mínimo del subtotal (Q)" inputMode="decimal" autoComplete="off" maxLength={12} className="max-w-48" value={d.envioGratisDesde} onChange={(e) => setD({ ...d, envioGratisDesde: e.target.value })} />
-            )}
-          </>
-        )}
       </section>
 
       {error && (

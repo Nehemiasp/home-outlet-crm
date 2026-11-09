@@ -128,7 +128,7 @@ Indiquen también: ¿**envío gratis** a partir de qué monto? `[monto o «no ha
 Son preguntas rápidas; solo hay que elegir.
 
 1. **Inventario: ¿una sola bodega o dos?**
-   - **Separado:** lo que se recoge en tienda sale de «Tienda física» y lo que se envía sale de «Tienda en línea». Cada una tiene su propia cantidad.
+   - **Separado:** cada tienda (Puerto Barrios y Mixco) tiene su propia cantidad; lo que se recoge sale de la tienda donde lo recogen y lo que se envía sale de la tienda que se elija en Ajustes.
    - **Compartido:** todo se suma y se aparta del total.
    - Elección: `[separado / compartido]`
 
@@ -153,11 +153,11 @@ Son preguntas rápidas; solo hay que elegir.
 El sistema importa un archivo **CSV** (se puede guardar desde Excel con «Guardar como → CSV»). Columnas:
 
 ```
-sku, nombre, categoria, precio, descripcion, existencia_tienda, existencia_linea
+sku, nombre, categoria, precio, descripcion, existencia_puerto_barrios, existencia_mixco
 ```
 
 - **Obligatorias:** `sku` (código único del producto), `nombre` y `precio` (en quetzales, ej. 349.00).
-- `existencia_tienda` y `existencia_linea`: cuántas unidades hay en cada lugar.
+- `existencia_puerto_barrios` y `existencia_mixco`: cuántas unidades hay en cada tienda.
 - Las **fotos** se suben después, producto por producto, en el sistema (hasta 5 MB cada una). Si prefieren, nos las envían nombradas con el SKU y las cargamos nosotros.
 
 ### G. Equipo

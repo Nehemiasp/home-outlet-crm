@@ -41,9 +41,10 @@ describe("mensaje del resumen", () => {
   test("junta las líneas partidas por ubicación y arma el texto con totales y pie", () => {
     const lineas = [linea("a", "Pantalla Android", 95_000, 1), linea("a", "Pantalla Android", 95_000, 1), linea("b", "Cámara", 25_000, 1)];
     assert.deepEqual(agruparLineas(lineas).map((l) => [l.nombre, l.cantidad]), [["Pantalla Android", 2], ["Cámara", 1]]);
-    const t = textoResumen({ codigo: "HO-000123", lineas, descuentoMonto: 0, costoEnvio: 3_500, total: 218_500, entrega: "envio", municipio: "Morales", direccionTienda: null }, "Pie");
+    const t = textoResumen({ codigo: "HO-000123", lineas, descuentoMonto: 0, costoEnvio: 3_500, total: 218_500, entrega: "envio", municipio: "Morales", tienda: null }, "Pie");
     assert.equal(t, "Pedido HO-000123\n\n2 × Pantalla Android   Q1,900.00\n1 × Cámara   Q250.00\nEnvío a Morales   Q35.00\nTotal   Q2,185.00\n\nPie");
-    assert.match(textoResumen({ codigo: "X", lineas, descuentoMonto: 5_000, costoEnvio: 0, total: 1, entrega: "recoger", municipio: null, direccionTienda: "7a. avenida" }, "p"), /Descuento {3}-Q50\.00\nRecoger en tienda: 7a\. avenida/);
+    assert.match(textoResumen({ codigo: "X", lineas, descuentoMonto: 5_000, costoEnvio: 0, total: 1, entrega: "recoger", municipio: null, tienda: { nombre: "Tienda Mixco", direccion: "4 calle 11-47" } }, "p"), /Descuento {3}-Q50\.00\nRecoger en Tienda Mixco: 4 calle 11-47\n/);
+    assert.match(textoResumen({ codigo: "X", lineas, descuentoMonto: 0, costoEnvio: 0, total: 1, entrega: "recoger", municipio: null, tienda: null }, "p"), /\nRecoger en tienda\n/);
   });
 
   test("rellena las variables y deja vacías las que no se mandan", () => {
@@ -202,7 +203,7 @@ describe("crear y enviar pedidos (con base de datos)", () => {
     assert.ok(g.ok);
     const r = await enviarAlCliente(g.pedidoId, agente, { modo: "enviar", sobrePedido: false });
     assert.ok(r.ok);
-    assert.match(r.texto, new RegExp(`^Pedido ${g.codigo}\\n\\n3 × ${p.nombre.replace(/[-]/g, "\\-")}   Q300\\.00\\nRecoger en tienda`));
+    assert.match(r.texto, new RegExp(`^Pedido ${g.codigo}\\n\\n3 × ${p.nombre.replace(/[-]/g, "\\-")}   Q300\\.00\\nRecoger en PRUEBA-CR A\\n`)); // la tienda de Ajustes (sin dirección, solo el nombre)
     assert.match(r.texto, /PRUEBA-CR Banco · Monetaria 000-000000-0 · Home Outlet/);
     assert.match(r.texto, /Apartamos sus productos por 24 horas\./);
     assert.match(r.texto, /Envíenos la foto del comprobante por este chat/);
@@ -216,6 +217,34 @@ describe("crear y enviar pedidos (con base de datos)", () => {
 
     assert.equal((await enviarAlCliente(g.pedidoId, agente, { modo: "enviar", sobrePedido: false })).ok, false); // ya se envió
     assert.equal(await apartado(p.id, ubicA), 3); // y no se aparta dos veces
+  });
+
+  test("recoger en otra tienda: las líneas salen de ahí y el resumen lleva su dirección", async () => {
+    await db.location.update({ where: { id: ubicB }, data: { direccion: "PRUEBA-CR 4 calle 11-47" } });
+    const p = await nuevoProducto(0, 5);
+    const g = await guardarBorrador(base({ recogerEnId: ubicB, lineas: [{ productoId: p.id, cantidad: 2, ubicacionId: null }] }), agente);
+    assert.ok(g.ok);
+    const o = await db.order.findUniqueOrThrow({ where: { id: g.pedidoId }, include: { lineas: true } });
+    assert.equal(o.recogerEnId, ubicB);
+    assert.deepEqual(o.lineas.map((l) => l.ubicacionId), [ubicB]);
+    const r = await enviarAlCliente(g.pedidoId, agente, { modo: "copiado", sobrePedido: false });
+    assert.ok(r.ok);
+    assert.match(r.texto, /\nRecoger en PRUEBA-CR B: PRUEBA-CR 4 calle 11-47\n/);
+    assert.equal(await apartado(p.id, ubicB), 2);
+    assert.equal(await apartado(p.id, ubicA), 0);
+
+    // Con envío la tienda de recoger no se guarda.
+    const e = await guardarBorrador(base({ entrega: "envio", recogerEnId: ubicB, cliente: { nombre: "PRUEBA-CR cliente", telefono: "", departamento: "Petén", municipio: "Flores" }, direccion: "Calle 1" }), agente);
+    assert.ok(e.ok);
+    assert.equal((await db.order.findUniqueOrThrow({ where: { id: e.pedidoId } })).recogerEnId, null);
+  });
+
+  test("rechaza una tienda para recoger que no existe o está desactivada", async () => {
+    assert.equal((await previsualizar(base({ recogerEnId: "no-existe" }), agente)).ok, false);
+    await db.location.update({ where: { id: ubicB }, data: { activa: false } });
+    const r = await previsualizar(base({ recogerEnId: ubicB }), agente);
+    await db.location.update({ where: { id: ubicB }, data: { activa: true } });
+    assert.equal(r.ok, false);
   });
 
   test("sin canal o sin existencia: copiar y marcar como enviado, o frenar sin apartar", async () => {

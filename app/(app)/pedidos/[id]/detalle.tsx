@@ -369,7 +369,12 @@ export function Detalle({ inicial }: { inicial: PedidoConPermisos }) {
           <section aria-label="Entrega" className="flex flex-col gap-2 rounded-tarjeta border border-linea bg-superficie p-4">
             <h2 className="titulo-panel">Entrega</h2>
             {p.entrega === "recoger" ? (
-              <p className="cuerpo">Recoger en tienda</p>
+              <>
+                <p className="cuerpo">
+                  Recoger en <strong>{p.tienda?.nombre ?? "tienda"}</strong>
+                </p>
+                {p.tienda?.direccion && <p className="cuerpo text-texto-suave">{p.tienda.direccion}</p>}
+              </>
             ) : (
               <>
                 <p className="cuerpo">

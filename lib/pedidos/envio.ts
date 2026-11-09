@@ -37,8 +37,13 @@ type ReglaEnvio = { envioGratisDesde: number | null; costoContraEntrega: number;
 
 /**
  * El costo de envío según la forma de pago (lo pidió Home Outlet): con pago contra entrega, el costo fijo de Ajustes (Q35 de
- * fábrica); con las demás formas, gratis. Si el administrador apaga «envío gratis con las demás formas», vuelve el costo de la zona.
- * Sin forma de pago elegida todavía (un borrador), cuenta como las demás.
+ * fábrica); con las demás formas, gratis desde el monto mínimo (Q200 de fábrica; vacío = sin mínimo) y, por debajo, el mismo
+ * costo fijo. Si el administrador apaga «envío gratis con las demás formas», vuelve el costo de la zona (gratis desde el mínimo).
+ * Sin forma de pago elegida todavía (un borrador o una cotización), cuenta como las demás.
  */
 export const costoSegunPago = (aj: ReglaEnvio, zona: Pick<Zona, "costo">, subtotal: number, metodo: string | null | undefined) =>
-  metodo === "contra_entrega" ? aj.costoContraEntrega : aj.envioGratisSinContraEntrega ? 0 : costoEnvio(zona, subtotal, aj.envioGratisDesde);
+  metodo === "contra_entrega"
+    ? aj.costoContraEntrega
+    : aj.envioGratisSinContraEntrega
+      ? subtotal >= (aj.envioGratisDesde ?? 0) ? 0 : aj.costoContraEntrega
+      : costoEnvio(zona, subtotal, aj.envioGratisDesde);

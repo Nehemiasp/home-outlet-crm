@@ -84,10 +84,10 @@ export async function sembrarDemo(db: PrismaClient, equipo: { id: string; nombre
     switch (m) {
       case "precio": case "existencia":
         return { texto: `${p.nombre} cuesta ${q(p.precio)}. ${p.existencia > 0 ? `Tenemos ${p.existencia} unidades disponibles.` : "Por el momento no tiene existencia."}`, herramientas: ["buscar_productos"], consultado: [`Consultó: ${p.nombre}`], productos: [p.id] };
-      case "envio": return { texto: "Sí, enviamos a Morales, Los Amates y Santo Tomás de Castilla. El costo depende del municipio y del tamaño del producto.", herramientas: ["buscar_respuesta"], consultado: ["Consultó: preguntas frecuentes (¿Hacen envíos a Morales…?)"], productos: [] };
+      case "envio": return { texto: "Sí, enviamos a toda Guatemala. Con pago contra entrega el envío cuesta Q35; pagando antes por depósito o transferencia es gratis en compras de Q200 o más.", herramientas: ["buscar_respuesta"], consultado: ["Consultó: preguntas frecuentes (¿Hacen envíos a todo el país?)"], productos: [] };
       case "horario": return { texto: `Nuestro horario es: ${datosNegocio.horario}.`, herramientas: ["datos_negocio"], consultado: ["Consultó: datos del negocio"], productos: [] };
       case "garantia": return { texto: datosNegocio.garantia, herramientas: ["datos_negocio"], consultado: ["Consultó: datos del negocio"], productos: [] };
-      default: return { texto: "Hola, ¿en qué le puedo ayudar? Puedo consultar precios, existencias, horarios y envíos.", herramientas: [], consultado: [], productos: [] };
+      default: return { texto: "Hola, ¿en qué le puedo ayudar? Puedo consultar precios, horarios y envíos.", herramientas: [], consultado: [], productos: [] };
     }
   };
   const textoAsesor = (m: Motivo, p: Prod) => {
@@ -97,12 +97,12 @@ export async function sembrarDemo(db: PrismaClient, equipo: { id: string; nombre
       case "garantia": return "Con la factura se revisa sin problema. ¿Cuándo puede pasar por la tienda?";
       case "precio": return `${p.nombre} cuesta ${q(p.precio)}. Déjeme consultar con el encargado si podemos mejorar el precio.`;
       case "existencia": return `Sí, ${p.nombre} está en ${q(p.precio)}. ¿Le interesa?`;
-      case "envio": return "Enviamos a Morales, Los Amates y Santo Tomás. Le confirmo el costo según el producto.";
+      case "envio": return "Sí, enviamos a toda Guatemala. Es gratis pagando por transferencia o depósito en compras de Q200 o más; contra entrega cuesta Q35.";
       case "horario": return `Atendemos ${datosNegocio.horario}.`;
       default: return "Buenas, ¿en qué le puedo ayudar?";
     }
   };
-  const seguimientoCliente = () => elegir(["Ok, gracias", "¿Y en la tienda física hay?", "Perfecto, paso hoy", "¿Aceptan tarjeta?", "Muchas gracias", "¿Tienen factura?"]);
+  const seguimientoCliente = () => elegir(["Ok, gracias", "¿Y en la tienda de Mixco hay?", "Perfecto, paso hoy", "¿Aceptan tarjeta?", "Muchas gracias", "¿Tienen factura?"]);
 
   const abierto = (t: number) => estaAbierto(horarioSemanal, new Date(t));
   /** Cuándo responde una persona: pronto si la tienda está abierta; si no, al abrir (aprox. a las 8:00 locales). */
@@ -154,7 +154,7 @@ export async function sembrarDemo(db: PrismaClient, equipo: { id: string; nombre
       msj("entrante", "cliente", primerMensaje(motivo, prod), t0);
       if (asistido) {
         corrida("motivo", t0 + 1000, {});
-        msj("saliente", "asistente", "Hola, soy el asistente virtual de Home Outlet. Puedo ayudarle con precios, existencias, horarios y envíos. Si prefiere hablar con un asesor, escriba *asesor*.", t0 + 4000);
+        msj("saliente", "asistente", "Hola, soy el asistente virtual de Home Outlet. Puedo ayudarle con precios, horarios y envíos. Si prefiere hablar con un asesor, escriba *asesor*.", t0 + 4000);
         const t1 = t0 + 7000 + Math.floor(r() * 9000);
         if (derivar) {
           const run = corrida("respuesta", t1, { derivar: true, herramientas: ["pasar_a_asesor"] });

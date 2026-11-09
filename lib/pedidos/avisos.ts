@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { enviarMensaje } from "@/lib/mensajeria";
 import { textoCuentas } from "@/lib/plantillas";
 import { formatQ } from "@/lib/utils";
-import { obtenerAjustesPedidos } from "./ajustes";
+import { obtenerAjustesPedidos, tiendaDeRecoger } from "./ajustes";
 import { CLAVES_MENSAJE, MENSAJES, rellenar, textoHoras, type ClaveMensaje, type VariablesMensaje } from "./mensajes";
 import { puedeEnviarPorCanal } from "./pedidos";
 import { saldoDe } from "./totales";
@@ -42,9 +42,12 @@ export async function variablesDe(pedidoId: string, extra: VariablesMensaje = {}
     db.bankAccount.findMany({ where: { activa: true }, orderBy: [{ orden: "asc" }, { banco: "asc" }] }),
     resumenPagos(pedidoId),
   ]);
+  // Al recoger, {direccion} es la de la tienda donde recoge («Tienda Mixco, 4 calle 11-47…»); si no, la de Datos del negocio.
+  const tienda = o.entrega === "recoger" ? await tiendaDeRecoger(o.recogerEnId) : null;
+  const direccion = tienda ? [tienda.nombre, tienda.direccion].filter(Boolean).join(", ") : (negocio.direccion ?? "");
   return {
     codigo: o.codigo, total: formatQ(o.total), saldo: formatQ(pagos.saldo), cuentas: textoCuentas(cuentas), horas: textoHoras(aj.horasReserva),
-    direccion: negocio.direccion ?? "", horario: negocio.horario ?? "", guia: textoGuia(o.paqueteria, o.guia), ...extra,
+    direccion, horario: negocio.horario ?? "", guia: textoGuia(o.paqueteria, o.guia), ...extra,
   };
 }
 

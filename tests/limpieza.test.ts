@@ -79,7 +79,7 @@ describe("salir de la demostración (base de prueba aparte)", { timeout: 300_000
     assert.equal(pedidos.siguienteNumero, 1, "el primer pedido real será HO-000001");
     assert.equal(pedidos.prefijo, "HO-");
     assert.ok(pedidos.ubicacionRecogerId && pedidos.ubicacionEnvioId);
-    assert.deepEqual((await db.location.findMany({ orderBy: { nombre: "asc" } })).map((l) => l.nombre), ["Tienda en línea", "Tienda física"]);
+    assert.deepEqual((await db.location.findMany({ orderBy: { nombre: "asc" } })).map((l) => l.nombre), ["Tienda Mixco", "Tienda Puerto Barrios"]);
     const negocio = await db.negocio.findUniqueOrThrow({ where: { id: "negocio" } });
     assert.equal(negocio.direccion, null);
   });

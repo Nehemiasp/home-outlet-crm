@@ -1,5 +1,6 @@
 // Contenido de demostración de Pagos y envíos. Las cuentas llevan número de puros ceros: nunca un formato que parezca una cuenta real.
 import type { PrismaClient } from "../generated/prisma/client";
+import { TIENDA_MIXCO, TIENDA_PUERTO_BARRIOS } from "../lib/tiendas";
 
 // FICTICIO: hasta que lleguen los bancos y cuentas reales.
 const cuentas = [
@@ -10,10 +11,10 @@ const cuentas = [
 
 // FICTICIO: hasta que lleguen las zonas y los costos reales (centavos).
 const zonas = [
-  { nombre: "Puerto Barrios", departamentos: ["Izabal"], municipios: ["Puerto Barrios"], costo: 1500, tiempo: "Mismo día" },
+  { nombre: "Puerto Barrios", departamentos: ["Izabal"], municipios: ["Puerto Barrios"], costo: 1500, tiempo: "Mismo día (productos de la tienda de Puerto Barrios)" },
   { nombre: "Morales", departamentos: ["Izabal"], municipios: ["Morales"], costo: 3500, tiempo: "1 a 2 días" },
   { nombre: "Resto de Izabal", departamentos: ["Izabal"], municipios: [], costo: 4000, tiempo: "1 a 2 días" },
-  { nombre: "Departamento de Guatemala", departamentos: ["Guatemala"], municipios: [], costo: 4000, tiempo: "1 a 2 días" },
+  { nombre: "Departamento de Guatemala", departamentos: ["Guatemala"], municipios: [], costo: 4000, tiempo: "Mismo día (productos de la tienda de Mixco)" },
   { nombre: "Resto del país", departamentos: [], municipios: [], costo: 4500, tiempo: "2 a 4 días" },
 ] as const;
 
@@ -23,7 +24,7 @@ export async function sembrarPedidosBase(db: PrismaClient) {
   // FICTICIO: 24 horas de reserva, 0 % de descuento para agentes e inventario separado hasta que Home Outlet confirme.
   await db.ajustesPedidos.upsert({
     where: { id: "pedidos" },
-    create: { ubicacionRecogerId: por("Tienda física"), ubicacionEnvioId: por("Tienda en línea") },
+    create: { ubicacionRecogerId: por(TIENDA_PUERTO_BARRIOS.nombre), ubicacionEnvioId: por(TIENDA_MIXCO.nombre) },
     update: {},
   });
   await db.bankAccount.createMany({ data: cuentas.map((c, i) => ({ ...c, orden: i + 1 })) });

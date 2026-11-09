@@ -144,13 +144,13 @@ describe("adaptadores de Facebook e Instagram (Meta simulado)", () => {
       assert.deepEqual(cuerpoDe(llamadas[0]!).message, { text: "Mire este producto" });
     });
 
-    test("una tarjeta de producto manda la foto y luego el texto con nombre, precio y existencia, sin asteriscos", async () => {
+    test("una tarjeta de producto manda la foto y luego el texto con nombre y precio (sin existencia), sin asteriscos", async () => {
       simular(enviosOk);
       await envia(adaptadorFacebook, { type: "product", productId: productoId });
       const mensajes = llamadas.filter((l) => l.url.endsWith("me/messages")).map((l) => cuerpoDe(l).message);
       assert.equal(mensajes.length, 2);
       assert.ok(mensajes[0].attachment);
-      assert.match(mensajes[1].text, /Licuadora de prueba\nQ349\.00\n/);
+      assert.equal(mensajes[1].text, "Licuadora de prueba\nQ349.00");
       assert.equal(mensajes[1].text.includes("*"), false);
     });
 

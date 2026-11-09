@@ -17,7 +17,7 @@ export function FotoProducto({ url, className }: { url: string | null; className
   );
 }
 
-/** El nombre corto de una ubicación para el encabezado de columna: «Tienda física» → «Física». */
+/** El nombre corto de una ubicación para el encabezado de columna: «Tienda Mixco» → «Mixco». */
 export const columnaDeUbicacion = (nombre: string) => {
   const corto = nombre.replace(/^tienda\s+/i, "");
   return corto.charAt(0).toUpperCase() + corto.slice(1);

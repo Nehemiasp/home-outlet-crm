@@ -80,7 +80,7 @@ El **jefe de tienda** está pensado para quien dirige la operación diaria: ve y
 
 ### Quién atiende
 Arriba de cada conversación hay un selector **Quién atiende: Asistente / Asesor**.
-- Con **Asistente**, el asistente responde solo (precios, existencias, horarios, envíos, formas de pago, el estado del pedido del propio cliente).
+- Con **Asistente**, el asistente responde solo (precios, horarios, envíos, formas de pago, el estado del pedido del propio cliente). **No habla de existencias**: muestra el producto y su precio, y si el cliente pregunta si hay, le ofrece un asesor para hacer el pedido. La tarjeta de producto que recibe el cliente tampoco lleva existencia.
 - Pasa solo a una persona cuando el cliente la pide, manda una **imagen o audio**, dice que **ya pagó**, o quiere comprar o apartar. La conversación queda marcada **«Esperando asesor»**.
 - Cuando una persona escribe, el asistente se calla. Puede devolvérselo con **Asistente**.
 - El asistente **nunca crea pedidos ni confirma pagos**: eso siempre lo hace una persona.
@@ -122,7 +122,7 @@ El jefe de tienda y el administrador **no tienen estado**: ven el resumen del eq
 
 ## 5b. Despacho (bodega)
 
-Es la pantalla de inicio de **bodega** (el administrador y el jefe de tienda también la ven). Muestra los pedidos **ya pagados**, del más antiguo al más nuevo, en tres pestañas: **Por preparar**, **Preparando** y **Listos y enviados**. Cada tarjeta trae el cliente, a dónde va (o «Recoger en tienda»), la dirección y los productos con su cantidad y la ubicación de donde salen. **No lleva precios ni pagos.**
+Es la pantalla de inicio de **bodega** (el administrador y el jefe de tienda también la ven). Muestra los pedidos **ya pagados**, del más antiguo al más nuevo, en tres pestañas: **Por preparar**, **Preparando** y **Listos y enviados**. Cada tarjeta trae el cliente, a dónde va (o en qué tienda recoge), la dirección y los productos con su cantidad y la ubicación de donde salen. **No lleva precios ni pagos.**
 
 - **Hoja de bodega:** abre la hoja para imprimir y empacar (sin precios).
 - **Empezar a preparar:** el pedido pasa a «Preparando».
@@ -137,7 +137,7 @@ Bodega **no cancela** pedidos ni toca pagos. Si algo no cuadra (falta producto, 
 Desde la conversación: botón **Crear pedido** (se abre un panel).
 1. **Cliente:** nombre y teléfono (ya vienen de la ficha).
 2. **Productos:** busque en el catálogo y **Agregar**. Cada producto muestra su precio y «Disponible N · Apartado N».
-3. **Entrega:** **Recoger en tienda** o **Envío**. Con envío se elige el **Departamento**, luego el **Municipio** (la lista cambia según el departamento; sirve para toda Guatemala) y se escribe la **Dirección** y una referencia. La zona y el costo del envío se calculan solos según el lugar. Si el cliente ya dijo su municipio, viene elegido.
+3. **Entrega:** **Recoger en tienda** o **Envío**. Al recoger se elige **en cuál tienda** (Puerto Barrios o Mixco): los productos se apartan de esa tienda y el resumen que recibe el cliente lleva su dirección. Con envío se elige el **Departamento**, luego el **Municipio** (la lista cambia según el departamento; sirve para toda Guatemala) y se escribe la **Dirección** y una referencia. La zona y el costo del envío se calculan solos según el lugar. Si el cliente ya dijo su municipio, viene elegido.
 4. **Forma de pago**: pregúntele al cliente cómo quiere pagar y elíjalo (**Transferencia bancaria**, **Depósito bancario**, **Tarjeta de crédito o débito** o **Efectivo en la tienda**, según lo que el administrador haya activado). Es obligatorio para enviar el pedido; en un borrador puede quedar vacío. El efectivo solo aparece si el cliente recoge. Si hay una sola forma activa, ya viene elegida.
 5. **Descuento** (opcional): monto o porcentaje, con motivo. El agente tiene un límite; el jefe de tienda y el administrador no.
 6. **Notas del pedido**: solo las ve el equipo.
@@ -174,7 +174,8 @@ El cliente paga en la tienda al recoger. Cuando llegue, registre el pago (**Regi
 
 ### Pago contra entrega
 El cliente paga al recibir su pedido. Solo se puede elegir con **Envío**.
-- **El envío cuesta Q35** con contra entrega; con transferencia, depósito o tarjeta el envío es **gratis**. Los dos se cambian en **Ajustes → Pagos y envíos → Costo del envío**.
+- **El envío cuesta Q35** con contra entrega; con transferencia, depósito o tarjeta el envío es **gratis en compras de Q200 o más** (en compras menores cuesta Q35). Se cambian en **Ajustes → Pagos y envíos → Costo del envío**.
+- Para pedirle al cliente sus datos de entrega, escriba **/datos** en el chat: se inserta el mensaje con nombre de quien recibe, dirección, teléfono y forma de pago, y puede editarlo antes de enviarlo.
 - El cliente recibe el resumen con el total que pagará al recibir. El pedido **no vence**.
 - No hace falta esperar el pago: el pedido se puede **preparar** (en el detalle o en Despacho) y luego **enviar**. Al prepararlo se descuenta la existencia.
 - Al marcarlo como **entregado**, el cobro queda registrado y verificado a nombre de quien lo marcó.
@@ -224,7 +225,7 @@ Pestañas: **Por verificar**, **Pendientes de pago**, **En proceso**, **Entregad
 - **Bodega solo mira:** ve los productos y sus existencias, sin el botón «Ajustar» y sin crear, editar ni importar.
 - Todos ven los productos con su precio y existencias («En existencia», «Quedan N», «Agotado») y por ubicación, con «Disponible · Apartado».
 - **Jefe de tienda y administrador:** **Nuevo producto** (nombre, SKU, categoría, precio, descripción, fotos de hasta 5 MB en JPG, PNG o WebP) y edición de existencias por ubicación.
-- **Importar CSV** (jefe de tienda y administrador): archivo guardado desde Excel con las columnas `sku, nombre, categoria, precio, descripcion, existencia_tienda, existencia_linea`. Son obligatorias **sku, nombre y precio**. El sistema muestra una revisión antes de importar y marca las filas con errores.
+- **Importar CSV** (jefe de tienda y administrador): archivo guardado desde Excel con las columnas `sku, nombre, categoria, precio, descripcion, existencia_puerto_barrios, existencia_mixco` (sirven también los nombres de antes, `existencia_tienda` y `existencia_linea`). Son obligatorias **sku, nombre y precio**. El sistema muestra una revisión antes de importar y marca las filas con errores.
 
 ## 9. Reportes (jefe de tienda y administrador)
 
@@ -248,7 +249,7 @@ Al entrar, si aún faltan cosas para trabajar con datos reales, se abre **Primer
 | **Asistente** | Encendido, mensaje de bienvenida, canales donde responde, tope mensual de gasto, **Preguntas frecuentes** y una zona para **probar** al asistente |
 | **Canales** | Qué canales están conectados y qué falta de cada uno |
 | **Datos del negocio** | Nombre, dirección, horario semanal, y los textos de formas de pago, envíos y garantía que usa el asistente |
-| **Pagos y envíos** | Métodos de pago activos (son las opciones que se pueden elegir al crear un pedido; la tarjeta solo se puede activar si hay una pasarela conectada), prefijo y horas de reserva, días que vale una cotización, descuento máximo del agente, **paqueterías** (una por línea; se eligen al marcar un pedido como enviado), inventario separado o compartido, envío gratis, **cuentas bancarias**, **zonas de envío** (cada una cubre departamentos enteros o solo algunos municipios; la que no marca ninguno vale para «el resto del país») y los **mensajes** que se mandan al cliente (se pueden editar y apagar) |
+| **Pagos y envíos** | Métodos de pago activos (son las opciones que se pueden elegir al crear un pedido; la tarjeta solo se puede activar si hay una pasarela conectada), prefijo y horas de reserva, días que vale una cotización, descuento máximo del agente, **paqueterías** (una por línea; se eligen al marcar un pedido como enviado), inventario separado o compartido, envío gratis, **cuentas bancarias**, la **dirección de cada tienda** (la que recibe el cliente cuando recoge), **zonas de envío** (cada una cubre departamentos enteros o solo algunos municipios; la que no marca ninguno vale para «el resto del país»; dicen el tiempo de entrega, y no llevan costo mientras el envío lo ponga la forma de pago: Q35 contra entrega; con las demás, gratis desde Q200 y Q35 por debajo) y los **mensajes** que se mandan al cliente (se pueden editar y apagar) |
 
 **Importante al dar de baja a alguien:** *Desactivar* bloquea su entrada al instante y deja sin asignar sus conversaciones para que nadie quede esperando. Siempre debe quedar al menos un administrador activo.
 

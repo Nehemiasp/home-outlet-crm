@@ -23,6 +23,13 @@ describe("pago contra entrega: reglas", () => {
     assert.equal(costoSegunPago({ ...regla, envioGratisSinContraEntrega: false }, zona, 10_000, "transferencia"), 2500);
     assert.equal(costoSegunPago({ ...regla, envioGratisSinContraEntrega: false, envioGratisDesde: 5_000 }, zona, 10_000, "deposito"), 0);
     assert.equal(costoSegunPago({ ...regla, envioGratisDesde: 5_000 }, zona, 10_000, "contra_entrega"), 3500); // el fijo no depende del monto
+    // Gratis desde Q200 con las demás formas; por debajo, el mismo costo fijo.
+    const desde200 = { ...regla, envioGratisDesde: 20_000 };
+    for (const m of ["transferencia", "deposito", "tarjeta", null]) {
+      assert.equal(costoSegunPago(desde200, zona, 19_999, m), 3500);
+      assert.equal(costoSegunPago(desde200, zona, 20_000, m), 0);
+    }
+    assert.equal(costoSegunPago(desde200, zona, 50_000, "contra_entrega"), 3500);
   });
 
   test("solo con envío, y se puede preparar sin pago previo", () => {

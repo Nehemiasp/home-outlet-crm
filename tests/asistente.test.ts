@@ -26,17 +26,17 @@ async function turno(texto: string, previo: MensajeIa[] = []) {
 }
 
 describe("asistente simulado: respuestas", () => {
-  test("precio de un producto que existe, y que no tiene existencia", async () => {
+  test("precio de un producto: solo el producto y el precio, nunca la existencia (aunque no tenga)", async () => {
     const r = await turno("¿Cuánto cuesta la pantalla para carro?");
     assert.match(r.texto!, /Pantalla para carro 9 pulgadas cuesta Q1,250\.00/);
-    assert.match(r.texto!, /no tiene existencia/);
+    assert.doesNotMatch(r.texto!, /existencia|unidad|agotad/i);
     assert.ok(r.herramientas.includes("buscar_productos"));
     assert.equal(r.derivar, undefined);
   });
-  test("producto con existencia", async () => {
+  test("«¿hay…?»: el producto y el precio, sin decir cuántas hay", async () => {
     const r = await turno("¿Hay audífonos inalámbricos?");
     assert.match(r.texto!, /Audífonos inalámbricos cuesta Q199\.00/);
-    assert.match(r.texto!, /unidades disponibles/);
+    assert.doesNotMatch(r.texto!, /existencia|unidad|disponible/i);
   });
   test("producto que no existe: lo dice y no inventa", async () => {
     const r = await turno("¿Cuánto cuesta el unicornio dorado?");
@@ -46,15 +46,16 @@ describe("asistente simulado: respuestas", () => {
   test("horario, ubicación, envíos, pagos y garantía salen de los datos del negocio", async () => {
     assert.match((await turno("¿Cuál es el horario?")).texto!, /Lunes a sábado/);
     assert.match((await turno("¿Dónde están ubicados?")).texto!, /7a\. avenida/);
-    assert.match((await turno("¿Hacen envíos a Morales?")).texto!, /Morales/);
+    assert.match((await turno("¿Hacen envíos a Morales?")).texto!, /toda Guatemala/);
     assert.match((await turno("¿Aceptan tarjeta?")).texto!, /tarjeta/i);
     assert.match((await turno("¿Tienen garantía?")).texto!, /garantía/i);
   });
-  test("pregunta encadenada: precio y luego la tienda física", async () => {
+  test("pregunta encadenada: precio y luego «¿en la tienda física hay?»: el producto y el precio, sin existencia, y ofrece un asesor", async () => {
     const primera = await turno("¿Cuánto cuesta la bocina bluetooth?");
     const r = await turno("¿y en la tienda física hay?", [{ role: "user", content: "¿Cuánto cuesta la bocina bluetooth?" }, { role: "assistant", content: primera.texto! }]);
-    assert.match(r.texto!, /Bocina bluetooth portátil/);
-    assert.match(r.texto!, /tienda física/);
+    assert.match(r.texto!, /Bocina bluetooth portátil cuesta Q249\.00/);
+    assert.match(r.texto!, /asesor/);
+    assert.doesNotMatch(r.texto!, /existencia|unidad|queda/i);
     assert.ok(r.herramientas.includes("ver_producto"));
   });
   test("responde en inglés si le escriben en inglés", async () => {
@@ -105,7 +106,7 @@ describe("atención en la conversación (con base de datos)", () => {
     process.env.CHANNELS_ENABLED = "simulado";
     bienvenidaOriginal = (await db.aiSettings.findUniqueOrThrow({ where: { id: "ia" } })).bienvenida;
     // la prueba no puede depender del saludo que el negocio haya escrito en Ajustes: se usa uno conocido y al final se devuelve el suyo
-    await db.aiSettings.update({ where: { id: "ia" }, data: { encendido: true, modo: "siempre", canales: ["simulado", "whatsapp", "tiktok", "instagram", "facebook"], limiteRespuestas: 6, bienvenida: "Hola, soy el asistente virtual de Home Outlet. Puedo ayudarle con precios, existencias, horarios y envíos." } });
+    await db.aiSettings.update({ where: { id: "ia" }, data: { encendido: true, modo: "siempre", canales: ["simulado", "whatsapp", "tiktok", "instagram", "facebook"], limiteRespuestas: 6, bienvenida: "Hola, soy el asistente virtual de Home Outlet. Puedo ayudarle con precios, horarios y envíos." } });
   });
   after(async () => {
     await db.aiSettings.update({ where: { id: "ia" }, data: { bienvenida: bienvenidaOriginal } });

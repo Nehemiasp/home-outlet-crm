@@ -73,7 +73,8 @@ const lee = (res?: { content: string }) => {
     return undefined;
   }
 };
-const unidades = (n: number, en: boolean) => (en ? `We have ${n} in stock.` : n === 1 ? "Queda 1 unidad." : `Tenemos ${n} unidades disponibles.`);
+// Sin existencia (ver herramientas.ts): ante «¿hay?», el producto, el precio y la oferta de un asesor para hacer el pedido.
+const ofrecerAsesor = (en: boolean) => (en ? "Would you like me to connect you with an agent to place your order?" : "¿Desea que le comunique con un asesor para hacer su pedido?");
 const primeras = (t: string, n = 2) => (t.match(/[^.!?]+[.!?]+/g) ?? [t]).slice(0, n).join(" ").trim();
 
 /** Nombre del último producto del que se habló: una tarjeta enviada o un "X cuesta …" del asistente. */
@@ -111,7 +112,7 @@ function decidir(system: string, messages: MensajeIa[]): { text?: string; toolCa
   const previoAsistente = messages.slice(0, ultimoDelCliente.i).filter((m) => m.role === "assistant").at(-1)?.content ?? "";
   const intento = clasificar(pregunta, previoAsistente);
   const sinDatos = en ? "I don't have that information. Would you like me to connect you with an agent?" : "No tengo ese dato registrado. ¿Desea que le comunique con un asesor?";
-  const fueraDeTema = en ? "I can only help with Home Outlet products, stock, prices, hours, shipping and payment methods." : "Solo puedo ayudarle con productos, existencias, precios, horarios, envíos y formas de pago de Home Outlet.";
+  const fueraDeTema = en ? "I can only help with Home Outlet products, prices, hours, shipping and payment methods." : "Solo puedo ayudarle con productos, precios, horarios, envíos y formas de pago de Home Outlet.";
 
   switch (intento.tipo) {
     case "derivar":
@@ -171,7 +172,7 @@ Envíe una foto del comprobante por este chat.` };
       return { text: en ? "You're welcome. Anything else I can help you with?" : "Con gusto. ¿Le ayudo con algo más?" };
 
     case "saludo":
-      return { text: en ? "Hello! I can check prices, stock, hours and shipping for you." : "Hola, ¿en qué le puedo ayudar? Puedo consultar precios, existencias, horarios y envíos." };
+      return { text: en ? "Hello! I can check prices, hours and shipping for you." : "Hola, ¿en qué le puedo ayudar? Puedo consultar precios, horarios y envíos." };
 
     case "horario": {
       if (!hizo("datos_negocio")) return ahora({ toolCalls: [llamada("datos_negocio", {})] });
@@ -184,7 +185,7 @@ Envíe una foto del comprobante por este chat.` };
       if (!hizo("datos_negocio")) return ahora({ toolCalls: [llamada("datos_negocio", {})] });
       const d = de("datos_negocio");
       if (!d?.direccion) return { text: sinDatos };
-      return { text: en ? `You can find us at: ${d.direccion}` : `Nos encontramos en: ${d.direccion}` };
+      return { text: en ? `You can find us at:\n${d.direccion}` : `Aquí nos encuentra:\n${d.direccion}` };
     }
 
     case "pagos":
@@ -216,13 +217,7 @@ Envíe una foto del comprobante por este chat.` };
       if (!lista?.[0]) return { text: sinDatos };
       if (!hizo("ver_producto")) return ahora({ toolCalls: [llamada("ver_producto", { id: lista[0].id })] });
       const p = de("ver_producto");
-      const ex = (p?.existencias ?? {}) as Record<string, number>;
-      if (ex.Total !== undefined) return { text: ex.Total > 0 ? (en ? `${p.nombre}: ${ex.Total} in stock, the same inventory for both stores.` : `${p.nombre}: ${ex.Total === 1 ? "queda 1 unidad" : `hay ${ex.Total} unidades`}, el inventario es el mismo en las dos tiendas.`) : en ? `${p.nombre} is out of stock.` : `${p.nombre} no tiene existencia.` };
-      const pideLinea = /linea/.test(normalizar(pregunta));
-      const clave = Object.keys(ex).find((k) => normalizar(k).includes(pideLinea ? "linea" : "fisica"));
-      const n = clave ? ex[clave]! : 0;
-      const donde = pideLinea ? (en ? "online" : "en la tienda en línea") : en ? "in the physical store" : "en la tienda física";
-      return { text: n > 0 ? (en ? `${p.nombre}: ${n} in stock ${donde}.` : `${p.nombre}: ${n === 1 ? "queda 1 unidad" : `hay ${n} unidades`} ${donde}.`) : en ? `${p.nombre} is out of stock ${donde}.` : `${p.nombre} no tiene existencia ${donde}.` };
+      return { text: en ? `${p.nombre} costs ${p.precio}. ${ofrecerAsesor(en)}` : `${p.nombre} cuesta ${p.precio}. ${ofrecerAsesor(en)}` };
     }
 
     case "producto": {
@@ -233,7 +228,7 @@ Envíe una foto del comprobante por este chat.` };
       const previo = sinNombre ? ultimoProductoMencionado(messages.slice(0, ultimoDelCliente.i)) : undefined;
       if (sinNombre && !previo) return { text: en ? "Which product would you like to see? Tell me its name." : "¿Cuál producto le gustaría ver? Dígame el nombre." };
       if (!hizo("buscar_productos")) return ahora({ toolCalls: [llamada("buscar_productos", { texto: previo ?? pregunta })] });
-      const lista = de("buscar_productos") as { id: string; nombre: string; precio: string; existencia_total: number }[] | undefined;
+      const lista = de("buscar_productos") as { id: string; nombre: string; precio: string }[] | undefined;
       if (!lista?.length) {
         if (!hizo("buscar_respuesta")) return ahora({ toolCalls: [llamada("buscar_respuesta", { pregunta })] });
         const f = de("buscar_respuesta");
@@ -244,8 +239,7 @@ Envíe una foto del comprobante por este chat.` };
       if (lista.length === 1 || pideFoto) {
         const p = lista[0]!;
         if (pideFoto && !hizo("enviar_producto")) return ahora({ toolCalls: [llamada("enviar_producto", { id: p.id })] });
-        const ex = p.existencia_total > 0 ? unidades(p.existencia_total, en) : en ? "It is currently out of stock." : "Por el momento no tiene existencia.";
-        return { text: en ? `${p.nombre} costs ${p.precio}. ${ex}` : `${p.nombre} cuesta ${p.precio}. ${ex}` };
+        return { text: en ? `${p.nombre} costs ${p.precio}.` : `${p.nombre} cuesta ${p.precio}.` };
       }
       const tres = lista.slice(0, 3).map((p) => `${p.nombre} (${p.precio})`);
       const unidos = tres.length === 3 ? `${tres[0]}, ${tres[1]} ${en ? "and" : "y"} ${tres[2]}` : tres.join(en ? " and " : " y ");

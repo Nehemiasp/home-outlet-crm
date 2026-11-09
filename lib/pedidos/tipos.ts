@@ -19,6 +19,8 @@ export type EntradaPedido = {
   cliente: { nombre: string; telefono: string; departamento: string; municipio: string };
   lineas: { productoId: string; cantidad: number; ubicacionId: string | null }[];
   entrega: "recoger" | "envio";
+  /** La tienda donde recoge el cliente (solo con «recoger»). Vacío = la de Ajustes. Las líneas salen de ahí si no dicen otra cosa. */
+  recogerEnId?: string | null;
   direccion: string;
   referencia: string;
   descuento: { tipo: "monto" | "porcentaje"; valor: string } | null;
@@ -50,7 +52,8 @@ export type DatosPanelPedido = {
   sinLimites: boolean;
   descuentoMaxAgente: number;
   inventario: "separado" | "compartido";
-  ubicaciones: { id: string; nombre: string }[];
+  /** Las tiendas activas, Puerto Barrios primero. */
+  ubicaciones: { id: string; nombre: string; direccion: string | null }[];
   ubicacionPorEntrega: { recoger: string | null; envio: string | null };
   envioGratisDesde: number | null;
   /** Formas de pago que se pueden elegir (las activas en Ajustes; la tarjeta solo si hay pasarela). El efectivo se filtra según la entrega. */

@@ -105,7 +105,7 @@ export function ListaDespacho({ paqueterias }: { paqueterias: string[] }) {
                     {p.codigo} · {p.cliente}
                   </p>
                   <p className="meta text-texto-suave">
-                    {p.entrega === "envio" ? `Envío a ${p.lugar}` : "Recoger en tienda"}
+                    {p.entrega === "envio" ? `Envío a ${p.lugar}` : `Recoger en ${p.tienda ?? "tienda"}`}
                     {p.telefono ? ` · ${formatTelefono(p.telefono)}` : ""}
                   </p>
                 </div>

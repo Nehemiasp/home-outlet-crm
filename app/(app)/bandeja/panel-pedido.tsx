@@ -40,6 +40,7 @@ export function PanelPedido({ abierto, onCerrar, conversacionId, puedeEnviar, on
   const [cliente, setCliente] = useState({ nombre: "", telefono: "", departamento: "", municipio: "" });
   const [lineas, setLineas] = useState<Linea[]>([]);
   const [entrega, setEntrega] = useState<"recoger" | "envio">("recoger");
+  const [recogerEn, setRecogerEn] = useState<string | null>(null); // null = la tienda de Ajustes
   const [metodoPago, setMetodoPago] = useState<TipoPago | null>(null);
   const [direccion, setDireccion] = useState("");
   const [referencia, setReferencia] = useState("");
@@ -62,6 +63,7 @@ export function PanelPedido({ abierto, onCerrar, conversacionId, puedeEnviar, on
     setCliente(d.contacto);
     setLineas([]);
     setEntrega("recoger");
+    setRecogerEn(null);
     setMetodoPago(d.metodosPago.length === 1 ? d.metodosPago[0]!.id : null); // con una sola opción no hay nada que elegir
     setDireccion("");
     setReferencia("");
@@ -109,11 +111,11 @@ export function PanelPedido({ abierto, onCerrar, conversacionId, puedeEnviar, on
     () => ({
       pedidoId, conversacionId, cliente, cotizacionId: cotizacion?.id ?? null,
       lineas: lineas.map((l) => ({ productoId: l.p.id, cantidad: l.cantidad, ubicacionId: l.ubicacionId })),
-      entrega, direccion, referencia, metodoPago,
+      entrega, recogerEnId: entrega === "recoger" ? recogerEn : null, direccion, referencia, metodoPago,
       descuento: descValor.trim() ? { tipo: descTipo, valor: descValor } : null,
       descuentoMotivo: descMotivo, notas,
     }),
-    [pedidoId, conversacionId, cliente, cotizacion, lineas, entrega, direccion, referencia, metodoPago, descTipo, descValor, descMotivo, notas],
+    [pedidoId, conversacionId, cliente, cotizacion, lineas, entrega, recogerEn, direccion, referencia, metodoPago, descTipo, descValor, descMotivo, notas],
   );
 
   // El resumen lo calcula el servidor: el navegador solo manda lo que eligió la persona.
@@ -155,6 +157,7 @@ export function PanelPedido({ abierto, onCerrar, conversacionId, puedeEnviar, on
     setCliente(e.cliente);
     setLineas(e.lineas.map((l, i) => ({ p: productos[i]!, cantidad: l.cantidad, ubicacionId: l.ubicacionId })));
     setEntrega(e.entrega);
+    setRecogerEn(e.recogerEnId ?? null);
     setMetodoPago(e.metodoPago ?? null);
     setDireccion(e.direccion);
     setReferencia(e.referencia);
@@ -242,7 +245,8 @@ export function PanelPedido({ abierto, onCerrar, conversacionId, puedeEnviar, on
 
   const sugeridos = datos?.sugeridos ?? [];
   const mostrados = busqueda.trim() ? resultados : sugeridos.length ? sugeridos : resultados;
-  const ubicacionDeLinea = (l: Linea) => l.ubicacionId ?? datos?.ubicacionPorEntrega[entrega] ?? null;
+  const tiendaRecoger = recogerEn ?? datos?.ubicacionPorEntrega.recoger ?? null;
+  const ubicacionDeLinea = (l: Linea) => l.ubicacionId ?? (entrega === "recoger" ? tiendaRecoger : datos?.ubicacionPorEntrega.envio) ?? null;
   const formas = (datos?.metodosPago ?? []).filter((m) => compatibleConEntrega(m.id, entrega)); // el efectivo solo si el cliente recoge
   const bloqueado = !vista || !!errorVista || lineas.length === 0 || !metodoPago || (vista.sinExistencia && !(datos?.sinLimites && sobrePedido));
 
@@ -421,6 +425,15 @@ export function PanelPedido({ abierto, onCerrar, conversacionId, puedeEnviar, on
                 </label>
               ))}
             </div>
+            {entrega === "recoger" && datos && datos.ubicaciones.length > 1 && (
+              <Selector
+                etiqueta="Recoger en"
+                opciones={datos.ubicaciones.map((u) => ({ valor: u.id, texto: u.nombre }))}
+                value={tiendaRecoger ?? ""}
+                onCambio={setRecogerEn}
+                ayuda={datos.ubicaciones.find((u) => u.id === tiendaRecoger)?.direccion ?? undefined}
+              />
+            )}
             {entrega === "envio" && (
               <>
                 <div className="grid gap-3 sm:grid-cols-2">

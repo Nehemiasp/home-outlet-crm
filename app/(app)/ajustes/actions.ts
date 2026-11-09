@@ -195,6 +195,14 @@ export async function borrarZonaEnvio(zonaId: string): Promise<Resultado> {
   return pedidos.borrarZona(id.parse(zonaId), u);
 }
 
+export async function guardarDireccionTienda(ubicacionId: string, direccion: string): Promise<Resultado> {
+  const u = await admin();
+  if (!u) return SOLO_ADMIN;
+  const p = z.object({ ubicacionId: id, direccion: z.string().max(400) }).safeParse({ ubicacionId, direccion });
+  if (!p.success) return fallo("Revise la dirección de la tienda.");
+  return pedidos.guardarDireccionTienda(p.data.ubicacionId, p.data.direccion, u);
+}
+
 /* ── Asistente ── */
 const ajustesIa = z.object({
   encendido: z.boolean(),

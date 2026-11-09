@@ -77,14 +77,12 @@ async function imagenParaEnviar(url: string, soloPdf = false): Promise<{ id: str
   return id ? { id } : null;
 }
 
-/** Tarjeta de producto en texto: nombre, precio y existencia. */
+/** Tarjeta de producto en texto: nombre y precio. Sin existencia: Home Outlet no lleva el inventario al día y no se le promete al cliente. */
 export async function leyendaDeProducto(productId: string) {
   const { db } = await import("@/lib/db"); // se carga al usarlo para que las pruebas de firma no necesiten la base
-  const p = await db.product.findUnique({ where: { id: productId }, include: { stock: true } });
+  const p = await db.product.findUnique({ where: { id: productId } });
   if (!p) throw new Error("El producto ya no existe.");
-  const disponible = p.stock.reduce((s, x) => s + Math.max(0, x.cantidad - x.apartado), 0);
-  const existencia = disponible === 0 ? "Sin existencia por ahora" : disponible <= 3 ? `Quedan ${disponible}` : "En existencia";
-  return { texto: `*${p.nombre}*\n${formatQ(p.precio)}\n${existencia}`, imagen: p.imagenes[0] ?? null };
+  return { texto: `*${p.nombre}*\n${formatQ(p.precio)}`, imagen: p.imagenes[0] ?? null };
 }
 
 /* ── Plantillas aprobadas (fuera de la ventana de 24 horas son lo único que se puede enviar) ── */

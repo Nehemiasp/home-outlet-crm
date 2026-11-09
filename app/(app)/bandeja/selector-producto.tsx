@@ -6,14 +6,14 @@ import { EstadoVacio } from "@/components/ui/estados";
 import { InsigniaExistencia } from "@/components/ui/etiquetas";
 import { Boton, Buscador } from "@/components/ui/form";
 import { Modal } from "@/components/ui/estructura";
-import type { ProductoDTO } from "@/lib/bandeja-tipos";
+import type { ProductoBusqueda, ProductoDTO } from "@/lib/bandeja-tipos";
 import { formatQ } from "@/lib/utils";
 import { buscarProductos } from "./actions";
 
 /** Buscador del catálogo: elegir un producto lo manda al cliente como tarjeta. */
 export function SelectorProducto({ abierto, onCerrar, onElegir }: { abierto: boolean; onCerrar: () => void; onElegir: (p: ProductoDTO) => void }) {
   const [busqueda, setBusqueda] = useState("");
-  const [resultados, setResultados] = useState<ProductoDTO[]>();
+  const [resultados, setResultados] = useState<ProductoBusqueda[]>();
 
   useEffect(() => {
     if (!abierto) return;

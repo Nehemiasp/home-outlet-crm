@@ -17,10 +17,11 @@ export async function buscarConocimiento(pregunta: string, max = 3): Promise<Res
       const enRespuesta = new Set(palabras(i.respuesta));
       // Pesa más coincidir con la pregunta que con el texto de la respuesta.
       const puntos = enPregunta.filter((p) => buscadas.has(p)).length * 2 + [...buscadas].filter((p) => enRespuesta.has(p)).length;
-      return { i, puntos };
+      return { i, puntos, sobran: enPregunta.filter((p) => !buscadas.has(p)).length };
     })
     .filter((x) => x.puntos >= 2)
-    .sort((a, b) => b.puntos - a.puntos)
+    // En un empate gana la pregunta con menos palabras que no se buscaron («¿Cuánto cuesta el envío?» antes que una larga sobre garantías que también dice «envío»).
+    .sort((a, b) => b.puntos - a.puntos || a.sobran - b.sobran)
     .slice(0, max)
     .map(({ i }) => ({ pregunta: i.pregunta, respuesta: i.respuesta, categoria: i.categoria }));
 }

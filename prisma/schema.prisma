@@ -334,14 +334,18 @@ model Product {
   lineasCotizacion CotizacionLinea[]
 }
 
+// Cada tienda: Puerto Barrios y Mixco. La dirección sale en el resumen cuando el cliente recoge ahí.
 model Location {
-  id             String           @id @default(cuid())
-  nombre         String           @unique
-  activa         Boolean          @default(true)
-  stock          Stock[]
-  lineas         OrderItem[]
-  ajustesRecoger AjustesPedidos[] @relation("UbicacionRecoger")
-  ajustesEnvio   AjustesPedidos[] @relation("UbicacionEnvio")
+  id                String           @id @default(cuid())
+  nombre            String           @unique
+  direccion         String?
+  activa            Boolean          @default(true)
+  stock             Stock[]
+  lineas            OrderItem[]
+  ajustesRecoger    AjustesPedidos[] @relation("UbicacionRecoger")
+  ajustesEnvio      AjustesPedidos[] @relation("UbicacionEnvio")
+  pedidosRecoger    Order[]          @relation("PedidoRecoger")
+  cotizacionRecoger Cotizacion[]     @relation("CotizacionRecoger")
 }
 
 // Existencias por ubicación. Disponible = cantidad − apartado (lib/pedidos/existencias.ts).
@@ -402,7 +406,7 @@ model AiSettings {
   encendido             Boolean       @default(true)
   canales               Canal[]       @default([whatsapp, tiktok, instagram, facebook, simulado])
   modo                  ModoAsistente @default(siempre)
-  bienvenida            String        @default("Hola, soy el asistente virtual de Home Outlet. Puedo ayudarle con precios, existencias, horarios y envíos. Si prefiere hablar con un asesor, escriba *asesor*.")
+  bienvenida            String        @default("Hola, soy el asistente virtual de Home Outlet. Puedo ayudarle con precios, horarios y envíos. Si prefiere hablar con un asesor, escriba *asesor*.")
   limiteRespuestas      Int           @default(6)
   presupuestoMensualUsd Float?
 }
@@ -540,6 +544,8 @@ model Order {
   cobrosTarjeta CobroTarjeta[]
   cotizacionId  String? // la cotización de la que salió: sus precios se respetan (ver lib/pedidos/cotizaciones.ts)
   cotizacion    Cotizacion?    @relation(fields: [cotizacionId], references: [id], onDelete: SetNull)
+  recogerEnId   String? // la tienda donde recoge (solo con entrega «recoger»); vacío = la de Ajustes
+  recogerEn     Location?      @relation("PedidoRecoger", fields: [recogerEnId], references: [id], onDelete: SetNull)
 
   @@index([estado, creada])
   @@index([contactoId])
@@ -601,6 +607,8 @@ model Cotizacion {
   creadoPor    User?             @relation("CotizacionCreador", fields: [creadoPorId], references: [id], onDelete: SetNull)
   lineas       CotizacionLinea[]
   pedidos      Order[]
+  recogerEnId  String? // igual que en el pedido
+  recogerEn    Location?         @relation("CotizacionRecoger", fields: [recogerEnId], references: [id], onDelete: SetNull)
 
   @@index([creada])
   @@index([estado, validaHasta])
@@ -698,7 +706,7 @@ model AjustesPedidos {
   descuentoMaxAgente          Int            @default(0) // porcentaje que un agente puede dar sin un admin
   inventario                  ModoInventario @default(separado)
   metodos                     TipoPago[]     @default([transferencia, deposito, contra_entrega])
-  envioGratisDesde            Int? // centavos; vacío = desactivado
+  envioGratisDesde            Int?           @default(20000) // centavos; vacío = sin mínimo. Con «gratis con las demás formas», desde aquí no se cobra (Q200 de fábrica)
   costoContraEntrega          Int            @default(3500) // centavos: lo que cuesta el envío con pago contra entrega
   envioGratisSinContraEntrega Boolean        @default(true) // con las demás formas de pago el envío es gratis (no se cobra el costo de la zona)
   ubicacionRecogerId          String?
