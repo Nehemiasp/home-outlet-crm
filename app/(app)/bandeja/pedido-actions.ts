@@ -4,7 +4,8 @@ import { z } from "zod";
 import * as pedidos from "@/lib/pedidos/pedidos";
 import type { DatosPanelPedido, EntradaPedido, ProductoPedido, ResultadoPedido, VistaPedido } from "@/lib/pedidos/tipos";
 import { requireUsuario } from "@/lib/session";
-import { puedeVerConversacion, puedeVerPedido } from "@/lib/visibilidad";
+import * as cotizaciones from "@/lib/pedidos/cotizaciones";
+import { puedeVerConversacion, puedeVerCotizacion, puedeVerPedido } from "@/lib/visibilidad";
 import type { Rol } from "@/lib/permisos";
 
 const id = z.string().min(1).max(40);
@@ -20,6 +21,7 @@ const entrada = z.object({
   descuentoMotivo: z.string().max(400),
   notas: z.string().max(1000),
   metodoPago: z.enum(["transferencia", "deposito", "efectivo_en_tienda", "tarjeta"]).nullish(),
+  cotizacionId: id.nullish(),
 });
 
 async function actor() {
@@ -28,9 +30,9 @@ async function actor() {
 }
 const invalido = { ok: false, error: "Revise los datos del pedido." } as const;
 const noExiste = { ok: false, error: "La conversación no existe." } as const;
-/** La conversación (y el borrador, si lo hay) tienen que ser de quien los pide. */
-async function ve(u: { id: string; rol: Rol }, conversacionId: string, pedidoId?: string | null) {
-  return (await puedeVerConversacion(u, conversacionId)) && (!pedidoId || (await puedeVerPedido(u, pedidoId)));
+/** La conversación (y el borrador o la cotización, si los hay) tienen que ser de quien los pide. */
+async function ve(u: { id: string; rol: Rol }, conversacionId: string, pedidoId?: string | null, cotizacionId?: string | null) {
+  return (await puedeVerConversacion(u, conversacionId)) && (!pedidoId || (await puedeVerPedido(u, pedidoId))) && (!cotizacionId || (await puedeVerCotizacion(u, cotizacionId)));
 }
 
 export async function abrirPanelPedido(conversacionId: string): Promise<ResultadoPedido<{ datos: DatosPanelPedido }>> {
@@ -48,7 +50,7 @@ export async function previsualizarPedido(e: EntradaPedido): Promise<ResultadoPe
   const a = await actor();
   const p = entrada.safeParse(e);
   if (!p.success) return invalido;
-  if (!(await ve(a, p.data.conversacionId, p.data.pedidoId))) return noExiste;
+  if (!(await ve(a, p.data.conversacionId, p.data.pedidoId, p.data.cotizacionId))) return noExiste;
   return pedidos.previsualizar(p.data, a);
 }
 
@@ -56,7 +58,7 @@ export async function guardarBorradorPedido(e: EntradaPedido): Promise<Resultado
   const a = await actor();
   const p = entrada.safeParse(e);
   if (!p.success) return invalido;
-  if (!(await ve(a, p.data.conversacionId, p.data.pedidoId))) return noExiste;
+  if (!(await ve(a, p.data.conversacionId, p.data.pedidoId, p.data.cotizacionId))) return noExiste;
   return pedidos.guardarBorrador(p.data, a);
 }
 
@@ -77,9 +79,25 @@ export async function enviarPedido(e: EntradaPedido, modo: "enviar" | "copiado",
   const a = await actor();
   const p = entrada.safeParse(e);
   if (!p.success) return invalido;
-  if (!(await ve(a, p.data.conversacionId, p.data.pedidoId))) return noExiste;
+  if (!(await ve(a, p.data.conversacionId, p.data.pedidoId, p.data.cotizacionId))) return noExiste;
   const g = await pedidos.guardarBorrador(p.data, a);
   if (!g.ok) return g;
   const r = await pedidos.enviarAlCliente(g.pedidoId, a, { modo: z.enum(["enviar", "copiado"]).parse(modo), sobrePedido });
   return r.ok ? { ok: true, texto: r.texto, codigo: g.codigo, pedidoId: g.pedidoId } : r;
+}
+
+/** Lo que hay en el panel, como cotización: no aparta ni pide forma de pago. */
+export async function enviarCotizacionPedido(e: EntradaPedido, modo: "enviar" | "copiado"): Promise<ResultadoPedido<{ texto: string; codigo: string; cotizacionId: string }>> {
+  const a = await actor();
+  const p = entrada.safeParse(e);
+  if (!p.success) return invalido;
+  if (!(await ve(a, p.data.conversacionId, p.data.pedidoId, p.data.cotizacionId))) return noExiste;
+  return cotizaciones.enviarCotizacion(p.data, a, z.enum(["enviar", "copiado"]).parse(modo));
+}
+
+/** La cotización cargada en el panel para hacer el pedido con sus precios. */
+export async function cargarCotizacionParaPedido(cotizacionId: string, conversacionId: string) {
+  const u = await requireUsuario();
+  if (!(await ve(u, id.parse(conversacionId), null, id.parse(cotizacionId)))) return { ok: false as const, error: "La cotización no existe en esta conversación." };
+  return cotizaciones.cargarParaConvertir(id.parse(cotizacionId), id.parse(conversacionId));
 }

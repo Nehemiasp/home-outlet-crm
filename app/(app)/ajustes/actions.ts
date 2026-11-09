@@ -133,6 +133,7 @@ export async function guardarNegocio(entrada: z.input<typeof negocio>): Promise<
 const ajustesPedidos = z.object({
   prefijo: z.string().max(10),
   horasReserva: z.number().int(),
+  diasCotizacion: z.number().int(),
   descuentoMaxAgente: z.number().int(),
   inventario: z.enum(["separado", "compartido"]),
   metodos: z.array(z.string().max(30)).max(10),

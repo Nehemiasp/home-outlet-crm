@@ -1,7 +1,7 @@
 import type { Channel } from "@/lib/canales/tipos";
 import { db } from "@/lib/db";
 import type { EstadoPedido, Prisma, TipoPago } from "@/generated/prisma/client";
-import { filtroPedido, redactarDuplicados, type Actor, type DuplicadoVisible } from "@/lib/visibilidad";
+import { filtroCotizacion, filtroPedido, redactarDuplicados, type Actor, type DuplicadoVisible } from "@/lib/visibilidad";
 import { nombreMetodo } from "./metodos";
 import { buscarDuplicados } from "./pagos";
 import { estadoDePago, saldoDe, type EstadoPagoVista } from "./totales";
@@ -50,14 +50,15 @@ const FECHA = /^\d{4}-\d{2}-\d{2}$/;
 const inicioDia = (f: string) => new Date(`${f}T00:00:00-06:00`);
 const finDia = (f: string) => new Date(`${f}T23:59:59.999-06:00`);
 
-/** Cuántos pedidos hay en cada pestaña con contador (sin importar la búsqueda ni los filtros). */
-export type ContadoresPedidos = { porVerificar: number; pendientes: number; enProceso: number };
+/** Cuántos pedidos hay en cada pestaña con contador (sin importar la búsqueda ni los filtros), y las cotizaciones vigentes. */
+export type ContadoresPedidos = { porVerificar: number; pendientes: number; enProceso: number; cotizaciones: number };
 
 export async function contarVistas(u: Actor): Promise<ContadoresPedidos> {
   const visible = await filtroPedido(u);
   const contar = (v: Vista) => db.order.count({ where: { estado: { in: [...ESTADOS_DE_VISTA[v]!] }, ...visible } });
-  const [porVerificar, pendientes, enProceso] = await Promise.all([contar("por-verificar"), contar("pendientes"), contar("en-proceso")]);
-  return { porVerificar, pendientes, enProceso };
+  const vigentes = async () => db.cotizacion.count({ where: { estado: "enviada", validaHasta: { gte: new Date() }, ...(await filtroCotizacion(u)) } });
+  const [porVerificar, pendientes, enProceso, cotizaciones] = await Promise.all([contar("por-verificar"), contar("pendientes"), contar("en-proceso"), vigentes()]);
+  return { porVerificar, pendientes, enProceso, cotizaciones };
 }
 
 export async function listarPedidos(f: FiltrosPedidos, u: Actor): Promise<{ items: FilaPedido[]; hayMas: boolean; contadores: ContadoresPedidos }> {

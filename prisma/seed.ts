@@ -70,6 +70,7 @@ async function main() {
   await db.orderEvent.deleteMany();
   await db.orderItem.deleteMany();
   await db.order.deleteMany();
+  await db.cotizacion.deleteMany(); // sus líneas se borran con ella
   await db.ajustesPedidos.deleteMany();
   await db.bankAccount.deleteMany();
   await db.shippingZone.deleteMany();

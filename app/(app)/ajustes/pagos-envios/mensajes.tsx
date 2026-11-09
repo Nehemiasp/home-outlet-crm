@@ -8,7 +8,7 @@ import type { ConfigMensajes } from "@/lib/pedidos/avisos";
 import { CLAVES_MENSAJE, MENSAJES } from "@/lib/pedidos/mensajes";
 import { guardarMensajesPedidos } from "../actions";
 
-const VARIABLES = ["codigo", "total", "saldo", "cuentas", "direccion", "horario", "guia", "horas", "motivo"];
+const VARIABLES = ["codigo", "total", "saldo", "cuentas", "direccion", "horario", "guia", "horas", "motivo", "vence"];
 
 /** Lo que se le manda al cliente en cada paso del pedido: se puede editar y apagar uno por uno. */
 export function Mensajes({ inicial }: { inicial: ConfigMensajes }) {

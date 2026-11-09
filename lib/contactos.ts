@@ -106,6 +106,7 @@ export async function unirContactos(conservarId: string, unirId: string, actor: 
     await tx.channelIdentity.updateMany({ where: { contactoId: b.id }, data: { contactoId: a.id } });
     await tx.conversation.updateMany({ where: { contactoId: b.id }, data: { contactoId: a.id } });
     await tx.order.updateMany({ where: { contactoId: b.id }, data: { contactoId: a.id } });
+    await tx.cotizacion.updateMany({ where: { contactoId: b.id }, data: { contactoId: a.id } });
     // El teléfono es único: se libera en el contacto que desaparece antes de pasárselo al que se queda.
     if (!a.telefono && b.telefono) await tx.contact.update({ where: { id: b.id }, data: { telefono: null } });
     await tx.contact.update({

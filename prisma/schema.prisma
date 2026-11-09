@@ -140,6 +140,7 @@ model User {
   notas            Note[]
   actividad        ActivityLog[]
   pedidosCreados   Order[]               @relation("PedidoCreador")
+  cotizaciones     Cotizacion[]          @relation("CotizacionCreador")
   pagosRegistrados Payment[]             @relation("PagoRegistrador")
   pagosVerificados Payment[]             @relation("PagoVerificador")
   eventosPedido    OrderEvent[]
@@ -195,7 +196,8 @@ model Contact {
   conversaciones Conversation[]
   etiquetas      Tag[]
 
-  pedidos Order[]
+  pedidos      Order[]
+  cotizaciones Cotizacion[]
 }
 
 model ChannelIdentity {
@@ -226,13 +228,14 @@ model Conversation {
   /// El asesor que la devolvió a la cola: no se le vuelve a asignar en el siguiente reparto.
   excluirAsesorId      String?
 
-  contacto  Contact               @relation(fields: [contactoId], references: [id], onDelete: Cascade)
-  asignadaA User?                 @relation(fields: [asignadaAId], references: [id])
-  mensajes  Message[]
-  notas     Note[]
-  resumenes ConversationSummary[]
-  aiRuns    AiRun[]
-  pedidos   Order[]
+  contacto     Contact               @relation(fields: [contactoId], references: [id], onDelete: Cascade)
+  asignadaA    User?                 @relation(fields: [asignadaAId], references: [id])
+  mensajes     Message[]
+  notas        Note[]
+  resumenes    ConversationSummary[]
+  aiRuns       AiRun[]
+  pedidos      Order[]
+  cotizaciones Cotizacion[]
 
   @@index([estado, lastMessageAt])
   @@index([atendidaPor, esperandoAsesorDesde])
@@ -307,10 +310,11 @@ model Product {
   activo      Boolean  @default(true)
   creado      DateTime @default(now())
 
-  categoria Category?   @relation(fields: [categoriaId], references: [id])
-  stock     Stock[]
-  mensajes  Message[]
-  lineas    OrderItem[]
+  categoria        Category?         @relation(fields: [categoriaId], references: [id])
+  stock            Stock[]
+  mensajes         Message[]
+  lineas           OrderItem[]
+  lineasCotizacion CotizacionLinea[]
 }
 
 model Location {
@@ -513,11 +517,14 @@ model Order {
   mensajes      Message[]
   metodoPago    TipoPago? // la forma de pago que pidió el cliente y se eligió al crear el pedido (los anteriores no la tienen)
   cobrosTarjeta CobroTarjeta[]
+  cotizacionId  String? // la cotización de la que salió: sus precios se respetan (ver lib/pedidos/cotizaciones.ts)
+  cotizacion    Cotizacion?    @relation(fields: [cotizacionId], references: [id], onDelete: SetNull)
 
   @@index([estado, creada])
   @@index([contactoId])
   @@index([conversacionId])
   @@index([estado, reservadoHasta])
+  @@index([cotizacionId])
 }
 
 // Nombre y precio se copian al hacer el pedido: un cambio posterior en el catálogo no altera pedidos ya hechos.
@@ -537,6 +544,63 @@ model OrderItem {
 
   @@index([pedidoId])
   @@index([productoId])
+}
+
+enum EstadoCotizacion {
+  enviada // vale hasta `validaHasta`; pasada esa fecha se muestra como vencida (no hace falta una tarea que la cambie)
+  aceptada // se convirtió en un pedido que ya se envió al cliente
+}
+
+// Precios que se le dan al cliente por unos días, sin apartar existencias. Si acepta, se convierte en un pedido que respeta esos precios.
+// Montos en centavos, calculados en el servidor igual que los del pedido. Lleva su propio consecutivo (COT-000001).
+model Cotizacion {
+  id              String           @id @default(cuid())
+  codigo          String           @unique
+  contactoId      String
+  conversacionId  String?
+  canal           Canal
+  estado          EstadoCotizacion @default(enviada)
+  subtotal        Int
+  descuentoMonto  Int              @default(0)
+  descuentoMotivo String?
+  costoEnvio      Int              @default(0)
+  total           Int
+  entrega         Entrega          @default(recoger)
+  direccion       String?
+  municipio       String?
+  departamento    String?
+  zona            String?
+  notas           String? // solo las ve el equipo: no salen en el mensaje ni en la versión para imprimir
+  creadoPorId     String?
+  validaHasta     DateTime
+  creada          DateTime         @default(now())
+
+  contacto     Contact           @relation(fields: [contactoId], references: [id])
+  conversacion Conversation?     @relation(fields: [conversacionId], references: [id], onDelete: SetNull)
+  creadoPor    User?             @relation("CotizacionCreador", fields: [creadoPorId], references: [id], onDelete: SetNull)
+  lineas       CotizacionLinea[]
+  pedidos      Order[]
+
+  @@index([creada])
+  @@index([estado, validaHasta])
+  @@index([contactoId])
+  @@index([conversacionId])
+}
+
+// Como en el pedido, nombre y precio se copian: un cambio en el catálogo no altera la cotización ya enviada.
+model CotizacionLinea {
+  id           String  @id @default(cuid())
+  cotizacionId String
+  productoId   String?
+  sku          String
+  nombre       String
+  precio       Int
+  cantidad     Int
+
+  cotizacion Cotizacion @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
+  producto   Product?   @relation(fields: [productoId], references: [id], onDelete: SetNull)
+
+  @@index([cotizacionId])
 }
 
 model Payment {
@@ -606,17 +670,19 @@ model ShippingZone {
 
 // Una sola fila.
 model AjustesPedidos {
-  id                 String         @id @default("pedidos")
-  prefijo            String         @default("HO-")
-  siguienteNumero    Int            @default(1)
-  horasReserva       Int            @default(24)
-  descuentoMaxAgente Int            @default(0) // porcentaje que un agente puede dar sin un admin
-  inventario         ModoInventario @default(separado)
-  metodos            TipoPago[]     @default([transferencia, deposito])
-  envioGratisDesde   Int? // centavos; vacío = desactivado
-  ubicacionRecogerId String?
-  ubicacionEnvioId   String?
-  mensajes           Json? // textos editados de lo que se le manda al cliente: { clave: { activo, texto } }
+  id                  String         @id @default("pedidos")
+  prefijo             String         @default("HO-")
+  siguienteNumero     Int            @default(1)
+  horasReserva        Int            @default(24)
+  descuentoMaxAgente  Int            @default(0) // porcentaje que un agente puede dar sin un admin
+  inventario          ModoInventario @default(separado)
+  metodos             TipoPago[]     @default([transferencia, deposito])
+  envioGratisDesde    Int? // centavos; vacío = desactivado
+  ubicacionRecogerId  String?
+  ubicacionEnvioId    String?
+  mensajes            Json? // textos editados de lo que se le manda al cliente: { clave: { activo, texto } }
+  diasCotizacion      Int            @default(3) // cuántos días vale una cotización (hasta el final del último día, hora de Guatemala)
+  siguienteCotizacion Int            @default(1)
 
   ubicacionRecoger Location? @relation("UbicacionRecoger", fields: [ubicacionRecogerId], references: [id], onDelete: SetNull)
   ubicacionEnvio   Location? @relation("UbicacionEnvio", fields: [ubicacionEnvioId], references: [id], onDelete: SetNull)

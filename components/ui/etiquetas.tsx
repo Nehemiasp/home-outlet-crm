@@ -219,6 +219,22 @@ const ESTADO_PEDIDO = {
 export type EstadoPedidoVista = keyof typeof ESTADO_PEDIDO;
 export const textoEstadoPedido = (e: EstadoPedidoVista) => ESTADO_PEDIDO[e][1];
 
+/* ── Cotización: vigente (todavía vale su precio), aceptada (ya es un pedido) o vencida ── */
+const ESTADO_COTIZACION = {
+  vigente: ["info", "Vigente", Clock],
+  aceptada: ["exito", "Aceptada", CircleCheck],
+  vencida: ["neutro", "Vencida", TimerOff],
+} as const satisfies Record<string, readonly [TonoEstado, string, LucideIcon]>;
+
+export function InsigniaCotizacion({ estado }: { estado: keyof typeof ESTADO_COTIZACION }) {
+  const [tono, texto, icono] = ESTADO_COTIZACION[estado];
+  return (
+    <Insignia estado={tono} icono={icono}>
+      {texto}
+    </Insignia>
+  );
+}
+
 export function InsigniaEstado({ estado }: { estado: EstadoPedidoVista }) {
   const [tono, texto, icono] = ESTADO_PEDIDO[estado];
   return (

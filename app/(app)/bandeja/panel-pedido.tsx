@@ -1,9 +1,9 @@
 "use client";
 
-import { Minus, Plus, ShoppingCart, Trash2 } from "lucide-react";
+import { FileText, Minus, Plus, ShoppingCart, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { Insignia } from "@/components/ui/etiquetas";
+import { Insignia, InsigniaCotizacion } from "@/components/ui/etiquetas";
 import { AreaTexto, Boton, Buscador, Casilla, CampoTexto, Selector } from "@/components/ui/form";
 import { PanelLateral } from "@/components/ui/estructura";
 import { useToast } from "@/components/ui/toast";
@@ -13,7 +13,9 @@ import { compatibleConEntrega } from "@/lib/pedidos/metodos";
 import type { DatosPanelPedido, EntradaPedido, ProductoPedido, VistaPedido } from "@/lib/pedidos/tipos";
 import { DEPARTAMENTOS, municipiosDe } from "@/lib/guatemala";
 import { formatQ } from "@/lib/utils";
-import { abrirPanelPedido, buscarProductosPedido, cargarBorradorPedido, enviarPedido, guardarBorradorPedido, previsualizarPedido } from "./pedido-actions";
+import { abrirPanelPedido, buscarProductosPedido, cargarBorradorPedido, cargarCotizacionParaPedido, enviarCotizacionPedido, enviarPedido, guardarBorradorPedido, previsualizarPedido } from "./pedido-actions";
+
+const fechaCorta = (iso: string) => new Date(iso).toLocaleDateString("es-GT", { day: "numeric", month: "short", timeZone: "America/Guatemala" });
 
 type Linea = { p: ProductoPedido; cantidad: number; ubicacionId: string | null };
 
@@ -24,13 +26,17 @@ function textoDisponible(l: Linea, datos: DatosPanelPedido, ubicacion: string | 
   return `Disponible ${u?.disponible ?? 0} · Apartado ${u?.apartado ?? 0}`;
 }
 
-export function PanelPedido({ abierto, onCerrar, conversacionId, puedeEnviar, onCambio }: { abierto: boolean; onCerrar: () => void; conversacionId: string; puedeEnviar: boolean; onCambio: () => void }) {
+/** `convertir`: al abrir, carga esa cotización para hacer el pedido (viene de «Convertir en pedido» en Pedidos → Cotizaciones). */
+export function PanelPedido({ abierto, onCerrar, conversacionId, puedeEnviar, onCambio, convertir }: { abierto: boolean; onCerrar: () => void; conversacionId: string; puedeEnviar: boolean; onCambio: () => void; convertir?: string | null }) {
   const avisar = useToast();
   const [datos, setDatos] = useState<DatosPanelPedido | null>(null);
   const [vistaPanel, setVistaPanel] = useState<"intro" | "form" | "copiado">("form");
   const [textoCopiable, setTextoCopiable] = useState("");
+  const [copiadoDe, setCopiadoDe] = useState<"pedido" | "cotizacion">("pedido");
 
   const [pedidoId, setPedidoId] = useState<string | null>(null);
+  // El pedido que sale de una cotización la lleva ligada: el servidor respeta sus precios.
+  const [cotizacion, setCotizacion] = useState<{ id: string; codigo: string; nota: string | null } | null>(null);
   const [cliente, setCliente] = useState({ nombre: "", telefono: "", departamento: "", municipio: "" });
   const [lineas, setLineas] = useState<Linea[]>([]);
   const [entrega, setEntrega] = useState<"recoger" | "envio">("recoger");
@@ -52,6 +58,7 @@ export function PanelPedido({ abierto, onCerrar, conversacionId, puedeEnviar, on
 
   const reiniciar = (d: DatosPanelPedido) => {
     setPedidoId(null);
+    setCotizacion(null);
     setCliente(d.contacto);
     setLineas([]);
     setEntrega("recoger");
@@ -78,13 +85,14 @@ export function PanelPedido({ abierto, onCerrar, conversacionId, puedeEnviar, on
       if (!r.ok) return avisar(r.error, "error");
       setDatos(r.datos);
       reiniciar(r.datos);
-      setVistaPanel(r.datos.abiertos.length ? "intro" : "form");
+      if (convertir) void convertirCotizacion(convertir);
+      else setVistaPanel(r.datos.abiertos.length || r.datos.cotizaciones.length ? "intro" : "form");
     });
     return () => {
       vigente = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [abierto, conversacionId]);
+  }, [abierto, conversacionId, convertir]);
 
   // Buscador del catálogo
   useEffect(() => {
@@ -99,13 +107,13 @@ export function PanelPedido({ abierto, onCerrar, conversacionId, puedeEnviar, on
 
   const entrada = useMemo<EntradaPedido>(
     () => ({
-      pedidoId, conversacionId, cliente,
+      pedidoId, conversacionId, cliente, cotizacionId: cotizacion?.id ?? null,
       lineas: lineas.map((l) => ({ productoId: l.p.id, cantidad: l.cantidad, ubicacionId: l.ubicacionId })),
       entrega, direccion, referencia, metodoPago,
       descuento: descValor.trim() ? { tipo: descTipo, valor: descValor } : null,
       descuentoMotivo: descMotivo, notas,
     }),
-    [pedidoId, conversacionId, cliente, lineas, entrega, direccion, referencia, metodoPago, descTipo, descValor, descMotivo, notas],
+    [pedidoId, conversacionId, cliente, cotizacion, lineas, entrega, direccion, referencia, metodoPago, descTipo, descValor, descMotivo, notas],
   );
 
   // El resumen lo calcula el servidor: el navegador solo manda lo que eligió la persona.
@@ -141,13 +149,11 @@ export function PanelPedido({ abierto, onCerrar, conversacionId, puedeEnviar, on
   const cambiar = (i: number, cambio: Partial<Linea>) => setLineas((ls) => ls.map((l, k) => (k === i ? { ...l, ...cambio } : l)));
   const quitar = (i: number) => setLineas((ls) => ls.filter((_, k) => k !== i));
 
-  const continuarBorrador = async (id: string) => {
-    const r = await cargarBorradorPedido(id, conversacionId);
-    if (!r.ok) return avisar(r.error, "error");
-    const e = r.entrada;
+  /** Llena el formulario con lo guardado (un borrador o una cotización). */
+  const llenar = (e: EntradaPedido, productos: ProductoPedido[]) => {
     setPedidoId(e.pedidoId);
     setCliente(e.cliente);
-    setLineas(e.lineas.map((l, i) => ({ p: r.productos[i]!, cantidad: l.cantidad, ubicacionId: l.ubicacionId })));
+    setLineas(e.lineas.map((l, i) => ({ p: productos[i]!, cantidad: l.cantidad, ubicacionId: l.ubicacionId })));
     setEntrega(e.entrega);
     setMetodoPago(e.metodoPago ?? null);
     setDireccion(e.direccion);
@@ -157,6 +163,24 @@ export function PanelPedido({ abierto, onCerrar, conversacionId, puedeEnviar, on
     setDescMotivo(e.descuentoMotivo);
     setNotas(e.notas);
     setVistaPanel("form");
+  };
+
+  const convertirCotizacion = async (id: string) => {
+    const r = await cargarCotizacionParaPedido(id, conversacionId);
+    if (!r.ok) {
+      avisar(r.error, "error");
+      return setVistaPanel("form");
+    }
+    setCotizacion({ id, codigo: r.cotizacion, nota: r.aviso });
+    llenar(r.entrada, r.productos);
+  };
+
+  const continuarBorrador = async (id: string) => {
+    const r = await cargarBorradorPedido(id, conversacionId);
+    if (!r.ok) return avisar(r.error, "error");
+    const e = r.entrada;
+    setCotizacion(e.cotizacionId && r.cotizacion ? { id: e.cotizacionId, codigo: r.cotizacion, nota: null } : null);
+    llenar(e, r.productos);
   };
 
   const guardar = async () => {
@@ -185,14 +209,35 @@ export function PanelPedido({ abierto, onCerrar, conversacionId, puedeEnviar, on
       avisar(`Pedido ${r.codigo} enviado al cliente`);
       return onCerrar();
     }
-    setTextoCopiable(r.texto);
+    void mostrarParaCopiar(r.texto, "pedido");
+  };
+
+  const mostrarParaCopiar = async (texto: string, de: "pedido" | "cotizacion") => {
+    setTextoCopiable(texto);
+    setCopiadoDe(de);
     setVistaPanel("copiado");
     try {
-      await navigator.clipboard.writeText(r.texto);
+      await navigator.clipboard.writeText(texto);
       avisar("Mensaje copiado");
     } catch {
       /* el texto queda a la vista para copiarlo a mano */
     }
+  };
+
+  /** Lo armado, como cotización: el cliente recibe precios y vigencia; no se aparta nada ni se pide forma de pago. */
+  const cotizar = async () => {
+    setTrabajando(true);
+    setError("");
+    const modo = puedeEnviar ? "enviar" : "copiado";
+    const r = await enviarCotizacionPedido(entrada, modo);
+    setTrabajando(false);
+    onCambio();
+    if (!r.ok) return setError(r.error);
+    if (modo === "enviar") {
+      avisar(`Cotización ${r.codigo} enviada al cliente`);
+      return onCerrar();
+    }
+    void mostrarParaCopiar(r.texto, "cotizacion");
   };
 
   const sugeridos = datos?.sugeridos ?? [];
@@ -207,8 +252,8 @@ export function PanelPedido({ abierto, onCerrar, conversacionId, puedeEnviar, on
         <p className="cuerpo text-texto-suave">Cargando…</p>
       ) : vistaPanel === "intro" ? (
         <div className="flex flex-col gap-4">
-          <p className="cuerpo">Esta conversación ya tiene {datos.abiertos.length === 1 ? "un pedido abierto" : "pedidos abiertos"}:</p>
-          <ul className="flex flex-col divide-y divide-linea rounded-tarjeta border border-linea">
+          {datos.abiertos.length > 0 && <p className="cuerpo">Esta conversación ya tiene {datos.abiertos.length === 1 ? "un pedido abierto" : "pedidos abiertos"}:</p>}
+          <ul className={datos.abiertos.length ? "flex flex-col divide-y divide-linea rounded-tarjeta border border-linea" : "hidden"}>
             {datos.abiertos.map((a) => (
               <li key={a.id} className="flex flex-wrap items-center gap-2 p-3">
                 <div className="min-w-0 flex-1">
@@ -229,14 +274,36 @@ export function PanelPedido({ abierto, onCerrar, conversacionId, puedeEnviar, on
               </li>
             ))}
           </ul>
+          {datos.cotizaciones.length > 0 && (
+            <>
+              <p className="cuerpo">{datos.cotizaciones.length === 1 ? "Cotización que se puede convertir en pedido:" : "Cotizaciones que se pueden convertir en pedido:"}</p>
+              <ul className="flex flex-col divide-y divide-linea rounded-tarjeta border border-linea">
+                {datos.cotizaciones.map((c) => (
+                  <li key={c.id} className="flex flex-wrap items-center gap-2 p-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="cuerpo-fuerte flex flex-wrap items-center gap-2">
+                        {c.codigo} <InsigniaCotizacion estado={c.estado} />
+                      </p>
+                      <p className="meta text-texto-suave">
+                        {formatQ(c.total)} · {c.estado === "vencida" ? "venció" : "vale hasta"} el {fechaCorta(c.validaHasta)}
+                      </p>
+                    </div>
+                    <Boton tamano="sm" variante="secundario" onClick={() => void convertirCotizacion(c.id)}>
+                      Convertir en pedido
+                    </Boton>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
           <Boton variante="secundario" onClick={() => setVistaPanel("form")}>
-            Crear otro pedido
+            {datos.abiertos.length ? "Crear otro pedido" : "Crear pedido nuevo"}
           </Boton>
         </div>
       ) : vistaPanel === "copiado" ? (
         <div className="flex flex-col gap-4">
           <p className="cuerpo">
-            El pedido quedó apartado y marcado como enviado. Pegue este mensaje en {puedeEnviar ? "el chat" : "la conversación del canal"} del cliente:
+            {copiadoDe === "cotizacion" ? "La cotización quedó guardada y marcada como enviada." : "El pedido quedó apartado y marcado como enviado."} Pegue este mensaje en {puedeEnviar ? "el chat" : "la conversación del canal"} del cliente:
           </p>
           <textarea readOnly value={textoCopiable} aria-label="Mensaje para el cliente" rows={14} className="cuerpo w-full resize-none rounded-campo border border-texto-suave p-3" onFocus={(e) => e.currentTarget.select()} />
           <div className="flex justify-end gap-2">
@@ -251,6 +318,12 @@ export function PanelPedido({ abierto, onCerrar, conversacionId, puedeEnviar, on
         </div>
       ) : (
         <div className="flex flex-col gap-6">
+          {cotizacion && (
+            <div className="flex flex-col gap-1 rounded-campo bg-fondo p-3">
+              <p className="cuerpo-fuerte">Pedido desde la cotización {cotizacion.codigo}</p>
+              <p className="meta text-texto-suave">{cotizacion.nota ?? "Lleva los precios cotizados. Elija la forma de pago y envíelo al cliente."}</p>
+            </div>
+          )}
           <section aria-label="Cliente" className="flex flex-col gap-3">
             <h3 className="cuerpo-fuerte">Cliente</h3>
             <CampoTexto etiqueta="Nombre" autoComplete="off" maxLength={80} value={cliente.nombre} onChange={(e) => setCliente({ ...cliente, nombre: e.target.value })} />
@@ -269,7 +342,8 @@ export function PanelPedido({ abierto, onCerrar, conversacionId, puedeEnviar, on
                       <div className="min-w-0 flex-1">
                         <p className="cuerpo-fuerte">{l.p.nombre}</p>
                         <p className="meta text-texto-suave">
-                          {formatQ(l.p.precioCentavos)} · {textoDisponible(l, datos, ubicacionDeLinea(l))}
+                          {/* el precio que calculó el servidor: con una cotización vigente puede ser el cotizado, no el del catálogo */}
+                          {formatQ(vista?.lineas.find((v) => v.productoId === l.p.id)?.precio ?? l.p.precioCentavos)} · {textoDisponible(l, datos, ubicacionDeLinea(l))}
                         </p>
                       </div>
                       <Boton variante="fantasma" tamano="sm" aria-label={`Quitar ${l.p.nombre}`} onClick={() => quitar(i)}>
@@ -460,11 +534,21 @@ export function PanelPedido({ abierto, onCerrar, conversacionId, puedeEnviar, on
               {error}
             </p>
           )}
-          <div className="sticky bottom-0 -mx-4 -mb-4 flex flex-wrap justify-end gap-2 border-t border-linea bg-superficie p-4">
-            <Boton variante="secundario" onClick={guardar} disabled={trabajando || lineas.length === 0}>
-              Guardar borrador
-            </Boton>
-            <Boton onClick={enviar} cargando={trabajando} disabled={bloqueado}>
+          {/* Arriba las dos acciones de apoyo, lado a lado; abajo, a todo lo ancho, la principal: enviar el pedido. */}
+          <div className="sticky bottom-0 -mx-4 -mb-4 flex flex-col gap-2 border-t border-linea bg-superficie p-4">
+            <div className={cotizacion ? "grid" : "grid grid-cols-2 gap-2"}>
+              {/* En un teléfono angosto el texto puede partirse en dos líneas: centrado y sin que el ícono se encoja. */}
+              <Boton variante="secundario" onClick={guardar} disabled={trabajando || lineas.length === 0} className="text-center leading-tight">
+                Guardar borrador
+              </Boton>
+              {!cotizacion && (
+                <Boton variante="secundario" onClick={cotizar} disabled={trabajando || !vista || !!errorVista || lineas.length === 0} className="text-center leading-tight">
+                  <FileText className="size-4 shrink-0" aria-hidden />
+                  {puedeEnviar ? "Enviar cotización" : "Copiar cotización"}
+                </Boton>
+              )}
+            </div>
+            <Boton onClick={enviar} cargando={trabajando} disabled={bloqueado} className="h-12 w-full">
               <ShoppingCart className="size-4" aria-hidden />
               {puedeEnviar ? "Enviar al cliente" : "Copiar mensaje y marcar como enviado"}
             </Boton>

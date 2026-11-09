@@ -1,8 +1,8 @@
 import { textoLugar } from "@/lib/guatemala";
 import { formatQ } from "@/lib/utils";
 
-export type ClaveMensaje = "resumen" | "comprobante_recibido" | "pago_confirmado" | "pago_parcial" | "pago_rechazado" | "listo_para_recoger" | "enviado" | "vencido" | "por_vencer" | "enlace_tarjeta" | "resumen_tarjeta" | "resumen_efectivo";
-export type VariablesMensaje = Partial<Record<"codigo" | "total" | "saldo" | "cuentas" | "direccion" | "horario" | "guia" | "horas" | "motivo" | "enlace", string>>;
+export type ClaveMensaje = "resumen" | "comprobante_recibido" | "pago_confirmado" | "pago_parcial" | "pago_rechazado" | "listo_para_recoger" | "enviado" | "vencido" | "por_vencer" | "enlace_tarjeta" | "resumen_tarjeta" | "resumen_efectivo" | "cotizacion";
+export type VariablesMensaje = Partial<Record<"codigo" | "total" | "saldo" | "cuentas" | "direccion" | "horario" | "guia" | "horas" | "motivo" | "enlace" | "vence", string>>;
 
 /**
  * Textos de fábrica de lo que se le manda al cliente. Cada uno se puede editar y apagar en Ajustes → Pagos y envíos → Mensajes.
@@ -67,6 +67,11 @@ export const MENSAJES: Record<ClaveMensaje, { titulo: string; texto: string; act
     texto: "Puede pagar el saldo de su pedido {codigo} ({saldo}) con tarjeta de crédito o débito en este enlace seguro:\n{enlace}\n\nLe confirmamos por este chat en cuanto se acredite el pago. 🧡",
     activo: true,
   },
+  cotizacion: {
+    titulo: "Cotización (texto al pie)",
+    texto: "⏰ Estos precios valen hasta el {vence}.\n\n📌 Tome en cuenta:\n• Los productos no quedan apartados hasta que confirme su pedido.\n• Cuando quiera hacerlo, respóndanos por este chat y lo preparamos. 🧡",
+    activo: true,
+  },
   por_vencer: {
     titulo: "Reserva por vencer (2 horas antes)",
     texto: "⏰ Le recordamos que su pedido {codigo} vence en 2 horas.\nTotal: {total}\n\nPuede pagar a:\n{cuentas}\n\nSi ya pagó, envíenos el comprobante por este chat. 🧡",
@@ -78,7 +83,7 @@ export const CLAVES_MENSAJE = Object.keys(MENSAJES) as ClaveMensaje[];
 
 /** Reemplaza {variables}. Las que no se conocen se dejan tal cual para que se note el error. */
 export function rellenar(texto: string, v: VariablesMensaje) {
-  return texto.replace(/\{(codigo|total|saldo|cuentas|direccion|horario|guia|horas|motivo|enlace)\}/g, (_, k: keyof VariablesMensaje) => v[k] ?? "").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+  return texto.replace(/\{(codigo|total|saldo|cuentas|direccion|horario|guia|horas|motivo|enlace|vence)\}/g, (_, k: keyof VariablesMensaje) => v[k] ?? "").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
 export const textoHoras = (h: number) => (h === 1 ? "1 hora" : `${h} horas`);
@@ -109,11 +114,11 @@ export type DatosResumen = {
   direccionTienda: string | null;
 };
 
-/** El mensaje que recibe el cliente al enviar el pedido: las líneas, los totales y el pie con las cuentas. */
-export function textoResumen(d: DatosResumen, pie: string) {
+/** El mensaje que recibe el cliente al enviar el pedido (o la cotización): las líneas, los totales y el pie con las cuentas o la vigencia. */
+export function textoResumen(d: DatosResumen, pie: string, encabezado: "Pedido" | "Cotización" = "Pedido") {
   const filas = agruparLineas(d.lineas).map((l) => `${l.cantidad} × ${l.nombre}   ${formatQ(l.precio * l.cantidad)}`);
   if (d.descuentoMonto > 0) filas.push(`Descuento   -${formatQ(d.descuentoMonto)}`);
   filas.push(d.entrega === "envio" ? `Envío a ${textoLugar(d.municipio, d.departamento) || "su municipio"}   ${d.costoEnvio === 0 ? "Gratis" : formatQ(d.costoEnvio)}` : `Recoger en tienda${d.direccionTienda ? `: ${d.direccionTienda}` : ""}`);
   filas.push(`Total   ${formatQ(d.total)}`);
-  return `Pedido ${d.codigo}\n\n${filas.join("\n")}\n\n${pie}`;
+  return `${encabezado} ${d.codigo}\n\n${filas.join("\n")}\n\n${pie}`;
 }

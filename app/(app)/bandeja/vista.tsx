@@ -27,7 +27,8 @@ import { SelectorProducto } from "./selector-producto";
 const NOMBRE_ESTADO = { abierta: "Abierta", pendiente: "Pendiente", cerrada: "Cerrada" } as const;
 const TIPOS_SIN_VISTA: Record<string, string> = { audio: "Audio", video: "Video", document: "Documento", location: "Ubicación", unsupported: "Mensaje" };
 
-export function Vista({ inicial }: { inicial: ConversacionDTO }) {
+/** `cotizacion`: abre el panel de pedido con esa cotización cargada (enlace «Convertir en pedido» de Pedidos → Cotizaciones). */
+export function Vista({ inicial, cotizacion }: { inicial: ConversacionDTO; cotizacion?: string | null }) {
   const avisar = useToast();
   const router = useRouter();
   const { datos, refrescar } = useActualizacion(`conv-${inicial.id}`, () => obtener(inicial.id), 4000);
@@ -36,7 +37,8 @@ export function Vista({ inicial }: { inicial: ConversacionDTO }) {
   const [ficha, setFicha] = useState(false);
   const [confirmarCierre, setConfirmarCierre] = useState(false);
   const [productos, setProductos] = useState(false);
-  const [pedido, setPedido] = useState(false);
+  const [pedido, setPedido] = useState(!!cotizacion);
+  const [convertir, setConvertir] = useState(cotizacion ?? null);
   const [devolver, setDevolver] = useState(false);
   const [asignando, setAsignando] = useState<"cerrado" | "abierto" | "ocupado">("cerrado");
   const [devolviendo, setDevolviendo] = useState(false);
@@ -288,7 +290,18 @@ export function Vista({ inicial }: { inicial: ConversacionDTO }) {
         onQuitar={c.asignadaA ? () => void alAsignar(null) : undefined}
       />
       <ModalDevolver abierto={devolver} ocupado={devolviendo} onCerrar={() => setDevolver(false)} onDevolver={(m) => void alDevolver(m)} />
-      <PanelPedido abierto={pedido} onCerrar={() => setPedido(false)} conversacionId={c.id} puedeEnviar={!bloqueo} onCambio={refrescar} />
+      <PanelPedido
+        abierto={pedido}
+        onCerrar={() => {
+          setPedido(false);
+          if (convertir) window.history.replaceState(null, "", `/bandeja/${c.id}`); // al volver a abrir el panel ya no carga la cotización
+          setConvertir(null);
+        }}
+        conversacionId={c.id}
+        puedeEnviar={!bloqueo}
+        onCambio={refrescar}
+        convertir={convertir}
+      />
       <ComprobanteModal imagen={comprobante} onCerrar={() => setComprobante(null)} c={c} onRegistrado={refrescar} />
       <ModalPlantillas abierto={plantillas.abierta} onCerrar={() => setPlantillas({ abierta: false })} plantillas={plantillas.lista} error={plantillas.error} enviando={plantillas.enviando} onEnviar={(p, v) => void alElegirPlantilla(p, v)} />
       <SelectorProducto abierto={productos} onCerrar={() => setProductos(false)} onElegir={alElegirProducto} />

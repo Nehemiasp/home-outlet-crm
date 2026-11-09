@@ -29,6 +29,7 @@ export default async function Pagina() {
         inicial={{
           prefijo: a.prefijo,
           horasReserva: String(a.horasReserva),
+          diasCotizacion: String(a.diasCotizacion),
           descuentoMaxAgente: String(a.descuentoMaxAgente),
           inventario: a.inventario,
           metodos: a.metodos,

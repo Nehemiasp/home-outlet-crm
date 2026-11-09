@@ -18,6 +18,7 @@ import { cambiarEstado } from "./flujo";
 import { compatibleConEntrega, METODOS, nombreMetodo } from "./metodos";
 import { rellenar, textoHoras, textoResumen } from "./mensajes";
 import { calcularTotales, saldoDe, type Descuento } from "./totales";
+import { estadoDeCotizacion } from "./vigencia";
 import type { DatosPanelPedido, EntradaPedido, ProductoPedido, ResultadoPedido, VistaPedido } from "./tipos";
 import type { Rol } from "@/lib/permisos";
 import { veTodo } from "@/lib/permisos";
@@ -75,8 +76,30 @@ async function sugeridosDe(conversacionId: string): Promise<ProductoPedido[]> {
   return ids.flatMap((id) => filas.filter((p) => p.id === id).map(aProductoPedido));
 }
 
+/* ── Precios de una cotización que se convierte en pedido ── */
+
+/**
+ * Los precios que el pedido debe respetar porque sale de una cotización: los de la cotización mientras estaba vigente (si el
+ * catálogo bajó después, el más bajo). Un pedido ya ligado conserva esos precios si se creó antes de que la cotización venciera,
+ * aunque se termine de armar después; si se crea con la cotización vencida, usa los precios de hoy y lo avisa.
+ */
+async function preciosDeCotizacion(e: EntradaPedido): Promise<{ ok: true; precios: Map<string, number> | null; aviso: string | null } | { ok: false; error: string }> {
+  if (!e.cotizacionId) return { ok: true, precios: null, aviso: null };
+  const c = await db.cotizacion.findUnique({ where: { id: e.cotizacionId }, include: { lineas: true } });
+  if (!c || c.conversacionId !== e.conversacionId) return fallo("La cotización no existe en esta conversación.");
+  const ligado = e.pedidoId ? await db.order.findFirst({ where: { id: e.pedidoId, cotizacionId: c.id }, select: { creada: true } }) : null;
+  if (!ligado && c.estado === "aceptada") return fallo(`La cotización ${c.codigo} ya se convirtió en pedido.`);
+  const desde = ligado?.creada ?? new Date();
+  if (desde > c.validaHasta) return { ok: true, precios: null, aviso: `La cotización ${c.codigo} ya venció: el pedido lleva los precios de hoy.` };
+  const precios = new Map<string, number>();
+  for (const l of c.lineas) if (l.productoId && !precios.has(l.productoId)) precios.set(l.productoId, l.precio);
+  return { ok: true, precios, aviso: null };
+}
+
 /* ── Validar y calcular (siempre en el servidor) ── */
 async function preparar(e: EntradaPedido, actor: ActorPedidos) {
+  const cotizados = await preciosDeCotizacion(e);
+  if (!cotizados.ok) return cotizados;
   const aj = await obtenerAjustesPedidos();
   const ubicaciones = await db.location.findMany({ where: { activa: true }, select: { id: true } });
   const activas = new Set(ubicaciones.map((u) => u.id));
@@ -103,7 +126,8 @@ async function preparar(e: EntradaPedido, actor: ActorPedidos) {
 
   const lineas = lineasEntrada.map((l) => {
     const p = por.get(l.productoId)!;
-    return { productoId: p.id, sku: p.sku, nombre: p.nombre, precio: p.precio, cantidad: l.cantidad, ubicacionId: l.ubicacionId };
+    const cotizado = cotizados.precios?.get(p.id);
+    return { productoId: p.id, sku: p.sku, nombre: p.nombre, precio: cotizado === undefined ? p.precio : Math.min(cotizado, p.precio), cantidad: l.cantidad, ubicacionId: l.ubicacionId };
   });
   const subtotal = lineas.reduce((t, l) => t + l.precio * l.cantidad, 0);
 
@@ -123,6 +147,7 @@ async function preparar(e: EntradaPedido, actor: ActorPedidos) {
     }
   }
   const sinExistencia = avisos.length > 0;
+  if (cotizados.aviso) avisos.push(cotizados.aviso); // va después: no es falta de existencia
 
   // Entrega
   // El lugar de entrega se elige de la lista oficial (departamento y, dentro de él, municipio). Para recoger en tienda no hace falta: se guarda solo si viene completo.
@@ -195,22 +220,33 @@ export async function previsualizar(e: EntradaPedido, actor: ActorPedidos): Prom
   };
 }
 
+/**
+ * Nombre y teléfono del cliente como quedarán en el contacto (el panel deja corregirlos). Lo usan el pedido y la cotización.
+ * El teléfono no puede ser el de otro contacto.
+ */
+export async function clienteDelPanel(e: EntradaPedido, contactoId: string): Promise<{ ok: true; nombre: string; telefono?: string } | { ok: false; error: string }> {
+  const nombre = e.cliente.nombre.trim();
+  if (!nombre) return fallo("Escriba el nombre del cliente.");
+  if (nombre.length > 80) return fallo("El nombre del cliente pasa de 80 caracteres.");
+  if (!e.cliente.telefono.trim()) return { ok: true, nombre };
+  const t = normalizarTelefono(e.cliente.telefono);
+  if (!t) return fallo("El teléfono no es válido. Use 8 dígitos, por ejemplo 5555 1234.");
+  const otro = await db.contact.findUnique({ where: { telefono: t }, select: { id: true, nombre: true } });
+  if (otro && otro.id !== contactoId) return fallo(`Ese teléfono ya pertenece a ${otro.nombre}.`);
+  return { ok: true, nombre, telefono: t };
+}
+
+/** Lo validado y calculado de lo que armó la persona en el panel (también sirve para la cotización). */
+export const prepararPedido = preparar;
+
 /* ── Guardar borrador ── */
 export async function guardarBorrador(e: EntradaPedido, actor: ActorPedidos): Promise<ResultadoPedido<{ pedidoId: string; codigo: string }>> {
   const conv = await db.conversation.findUnique({ where: { id: e.conversacionId }, select: { id: true, contactoId: true, canal: true } });
   if (!conv) return fallo("La conversación no existe.");
 
-  const nombre = e.cliente.nombre.trim();
-  if (!nombre) return fallo("Escriba el nombre del cliente.");
-  if (nombre.length > 80) return fallo("El nombre del cliente pasa de 80 caracteres.");
-  let telefono: string | undefined;
-  if (e.cliente.telefono.trim()) {
-    const t = normalizarTelefono(e.cliente.telefono);
-    if (!t) return fallo("El teléfono no es válido. Use 8 dígitos, por ejemplo 5555 1234.");
-    const otro = await db.contact.findUnique({ where: { telefono: t }, select: { id: true, nombre: true } });
-    if (otro && otro.id !== conv.contactoId) return fallo(`Ese teléfono ya pertenece a ${otro.nombre}.`);
-    telefono = t;
-  }
+  const cliente = await clienteDelPanel(e, conv.contactoId);
+  if (!cliente.ok) return cliente;
+  const { nombre, telefono } = cliente;
 
   const p = await preparar(e, actor);
   if (!p.ok) return p;
@@ -233,13 +269,18 @@ export async function guardarBorrador(e: EntradaPedido, actor: ActorPedidos): Pr
       await tx.order.update({ where: { id: e.pedidoId }, data: { ...datos, lineas: { create: lineas } } });
       return { ok: true as const, pedidoId: e.pedidoId, codigo: o.codigo, nuevo: false };
     }
+    // Una cotización da para un solo pedido: si ya tiene uno en curso, se continúa ese (o se descarta para empezar otro).
+    if (e.cotizacionId) {
+      const otro = await tx.order.findFirst({ where: { cotizacionId: e.cotizacionId, estado: { notIn: ["cancelado", "vencido"] } }, select: { codigo: true } });
+      if (otro) return fallo(`Esta cotización ya tiene el pedido ${otro.codigo}.`);
+    }
     await actualizarContacto();
     const aj = await obtenerAjustesPedidos(tx);
     const { siguienteNumero } = await tx.ajustesPedidos.update({ where: { id: "pedidos" }, data: { siguienteNumero: { increment: 1 } }, select: { siguienteNumero: true } });
     const codigo = `${aj.prefijo}${String(siguienteNumero - 1).padStart(6, "0")}`;
     const o = await tx.order.create({
       data: {
-        codigo, contactoId: conv.contactoId, conversacionId: conv.id, canal: conv.canal, creadoPorId: actor.id, ...datos,
+        codigo, contactoId: conv.contactoId, conversacionId: conv.id, canal: conv.canal, creadoPorId: actor.id, cotizacionId: e.cotizacionId ?? null, ...datos,
         lineas: { create: lineas },
         eventos: { create: { aEstado: "borrador", usuarioId: actor.id, nota: "Pedido creado" } },
       },
@@ -251,8 +292,8 @@ export async function guardarBorrador(e: EntradaPedido, actor: ActorPedidos): Pr
   return { ok: true, pedidoId: r.pedidoId, codigo: r.codigo };
 }
 
-export async function cargarBorrador(pedidoId: string, conversacionId: string): Promise<ResultadoPedido<{ entrada: EntradaPedido; productos: ProductoPedido[] }>> {
-  const o = await db.order.findUnique({ where: { id: pedidoId }, include: { lineas: { orderBy: { id: "asc" } }, contacto: true } });
+export async function cargarBorrador(pedidoId: string, conversacionId: string): Promise<ResultadoPedido<{ entrada: EntradaPedido; productos: ProductoPedido[]; cotizacion: string | null }>> {
+  const o = await db.order.findUnique({ where: { id: pedidoId }, include: { lineas: { orderBy: { id: "asc" } }, contacto: true, cotizacion: { select: { codigo: true } } } });
   if (!o || o.conversacionId !== conversacionId) return fallo("El pedido no existe en esta conversación.");
   if (o.estado !== "borrador") return fallo("Este pedido ya se envió y no se puede editar aquí.");
   const ids = o.lineas.flatMap((l) => (l.productoId ? [l.productoId] : []));
@@ -261,9 +302,10 @@ export async function cargarBorrador(pedidoId: string, conversacionId: string): 
   const [dir, ref] = (o.direccion ?? "").split(/\. Referencia: /);
   return {
     ok: true,
+    cotizacion: o.cotizacion?.codigo ?? null,
     productos: lineas.map((l) => aProductoPedido(filas.find((p) => p.id === l.productoId)!)),
     entrada: {
-      pedidoId: o.id, conversacionId,
+      pedidoId: o.id, conversacionId, cotizacionId: o.cotizacionId,
       cliente: { nombre: o.contacto.nombre, telefono: o.contacto.telefono ? formatTelefono(o.contacto.telefono) : "", ...lugarGuardado(o.departamento ?? o.contacto.departamento, o.municipio ?? o.contacto.municipio) },
       lineas: lineas.map((l) => ({ productoId: l.productoId!, cantidad: l.cantidad, ubicacionId: l.ubicacionId })),
       entrega: o.entrega, direccion: dir ?? "", referencia: ref ?? "",
@@ -323,7 +365,7 @@ export async function puedeEnviarPorCanal(conversacionId: string) {
  * Con modo «copiado» no lo manda: devuelve el texto para copiarlo y deja constancia de que salió fuera del sistema.
  */
 export async function enviarAlCliente(pedidoId: string, actor: ActorPedidos, o: { modo: "enviar" | "copiado"; sobrePedido: boolean }): Promise<ResultadoPedido<{ texto: string }>> {
-  const pedido = await db.order.findUnique({ where: { id: pedidoId }, select: { estado: true, conversacionId: true, codigo: true, metodoPago: true, entrega: true, total: true } });
+  const pedido = await db.order.findUnique({ where: { id: pedidoId }, select: { estado: true, conversacionId: true, codigo: true, metodoPago: true, entrega: true, total: true, cotizacionId: true } });
   if (!pedido?.conversacionId) return fallo("El pedido no existe o no tiene conversación.");
   if (pedido.estado !== "borrador") return fallo("Este pedido ya se envió.");
   if (!pedido.metodoPago) return fallo("Elija la forma de pago del pedido antes de enviarlo al cliente.");
@@ -342,6 +384,7 @@ export async function enviarAlCliente(pedidoId: string, actor: ActorPedidos, o: 
     await cancelarCobrosAbiertos(pedidoId); // no quedó apartado: el enlace no debe quedar vivo
     return r;
   }
+  if (pedido.cotizacionId) await db.cotizacion.update({ where: { id: pedido.cotizacionId }, data: { estado: "aceptada" } }); // el cliente aceptó: ya es un pedido
   const texto = await construirResumen(pedidoId);
   await log(actor, "enviar_pedido", "Order", pedidoId, { codigo: pedido.codigo, modo: o.modo });
 
@@ -358,11 +401,17 @@ export async function enviarAlCliente(pedidoId: string, actor: ActorPedidos, o: 
 export async function datosPanel(conversacionId: string, actor: ActorPedidos): Promise<ResultadoPedido<{ datos: DatosPanelPedido }>> {
   const conv = await db.conversation.findUnique({ where: { id: conversacionId }, include: { contacto: true } });
   if (!conv) return fallo("La conversación no existe.");
-  const [aj, ubicaciones, zonas, abiertos, sugeridos] = await Promise.all([
+  const ahora = new Date();
+  const [aj, ubicaciones, zonas, abiertos, cotizaciones, sugeridos] = await Promise.all([
     obtenerAjustesPedidos(),
     db.location.findMany({ where: { activa: true }, orderBy: { nombre: "asc" }, select: { id: true, nombre: true } }),
     listarZonas(),
     db.order.findMany({ where: { conversacionId, estado: { in: [...ABIERTOS] } }, orderBy: { creada: "desc" }, select: { id: true, codigo: true, estado: true, total: true, entrega: true } }),
+    // Las que todavía se pueden convertir: sin pedido en curso, vigentes o vencidas hace menos de una semana (se convierten con los precios de hoy).
+    db.cotizacion.findMany({
+      where: { conversacionId, estado: "enviada", validaHasta: { gte: new Date(ahora.getTime() - 7 * 86_400_000) }, pedidos: { none: { estado: { notIn: ["cancelado", "vencido"] } } } },
+      orderBy: { creada: "desc" }, take: 5, select: { id: true, codigo: true, total: true, estado: true, validaHasta: true },
+    }),
     sugeridosDe(conversacionId),
   ]);
   return {
@@ -378,6 +427,7 @@ export async function datosPanel(conversacionId: string, actor: ActorPedidos): P
       metodosPago: METODOS.filter((m) => m.disponible && aj.metodos.includes(m.id) && (m.id !== "tarjeta" || !!pasarela())).map((m) => ({ id: m.id, nombre: m.nombre })),
       zonas: zonas.filter((z) => z.activa).map((z) => ({ nombre: z.nombre, departamentos: z.departamentos, municipios: z.municipios, costo: z.costo, tiempo: z.tiempo })),
       abiertos,
+      cotizaciones: cotizaciones.map((c) => ({ id: c.id, codigo: c.codigo, total: c.total, validaHasta: c.validaHasta.toISOString(), estado: estadoDeCotizacion(c, ahora) })),
       sugeridos,
     },
   };

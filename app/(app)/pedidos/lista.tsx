@@ -18,6 +18,7 @@ import { listar, obtener, rechazar, verificar, type PedidoConPermisos } from "./
 import { AvisoCopiar } from "./[id]/aviso-copiar";
 import { Verificacion } from "./[id]/verificacion";
 import { NOMBRE_CORTO } from "@/lib/pedidos/metodos";
+import { ListaCotizaciones } from "./cotizaciones";
 
 const POR_PAGINA = 30;
 const fecha = (iso: string) => new Date(iso).toLocaleString("es-GT", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "America/Guatemala" });
@@ -30,10 +31,14 @@ const VACIO: Record<Vista, { titulo: string; descripcion: string }> = {
   todos: { titulo: "Todavía no hay pedidos", descripcion: "Cree uno desde una conversación con el botón «Crear pedido»." },
 };
 
-export function ListaPedidos({ vistaInicial, puedeVerificar, veTodo, asesores }: { vistaInicial: Vista; puedeVerificar: boolean; veTodo: boolean; asesores: { id: string; nombre: string }[] }) {
+/** La pestaña «Cotizaciones» no es una vista de pedidos: tiene su propia lista (./cotizaciones.tsx). */
+export type Pestana = Vista | "cotizaciones";
+
+export function ListaPedidos({ vistaInicial, puedeVerificar, veTodo, asesores }: { vistaInicial: Pestana; puedeVerificar: boolean; veTodo: boolean; asesores: { id: string; nombre: string }[] }) {
   const router = useRouter();
   const avisar = useToast();
-  const [vista, setVista] = useState<Vista>(vistaInicial);
+  const [vista, setVista] = useState<Pestana>(vistaInicial);
+  const enCotizaciones = vista === "cotizaciones";
   const [canal, setCanal] = useState<FiltrosPedidos["canal"]>("todos");
   const [entrega, setEntrega] = useState<FiltrosPedidos["entrega"]>("todas");
   const [asesor, setAsesor] = useState("todos");
@@ -50,14 +55,15 @@ export function ListaPedidos({ vistaInicial, puedeVerificar, veTodo, asesores }:
     return () => clearTimeout(t);
   }, [busqueda]);
 
-  const filtros: FiltrosPedidos = { q, vista, canal, asesor, entrega, desde, hasta, limite };
+  // En «Cotizaciones» la consulta de pedidos solo sirve para los contadores de las pestañas: se pide una fila.
+  const filtros: FiltrosPedidos = { q, vista: enCotizaciones ? "todos" : vista, canal, asesor, entrega, desde, hasta, limite: enCotizaciones ? 1 : limite };
   const { datos, fallo, refrescar } = useActualizacion(JSON.stringify(filtros), () => listar(filtros), 10_000);
   const cambiar = <T,>(poner: (v: T) => void) => (v: T) => {
     poner(v);
     setLimite(POR_PAGINA);
   };
   const cambiarVista = (v: string) => {
-    setVista(v as Vista);
+    setVista(v as Pestana);
     setLimite(POR_PAGINA);
     // La vista va en la dirección para poder compartirla y para que el aviso de la barra lateral enlace directo.
     window.history.replaceState(null, "", `/pedidos?vista=${v}`);
@@ -94,10 +100,12 @@ export function ListaPedidos({ vistaInicial, puedeVerificar, veTodo, asesores }:
             { id: "en-proceso", texto: "En proceso", contador: c?.enProceso },
             { id: "entregados", texto: "Entregados" },
             { id: "todos", texto: "Todos" },
+            { id: "cotizaciones", texto: "Cotizaciones", contador: c?.cotizaciones },
           ]}
         />
         <div className="flex max-w-full min-w-0 items-end gap-2 pb-2">
-          <Buscador valor={busqueda} onCambio={cambiar(setBusqueda)} etiqueta="Buscar pedidos" placeholder="Código, nombre o teléfono" className="w-72 min-w-0 shrink" />
+          <Buscador valor={busqueda} onCambio={cambiar(setBusqueda)} etiqueta={enCotizaciones ? "Buscar cotizaciones" : "Buscar pedidos"} placeholder="Código, nombre o teléfono" className="w-72 min-w-0 shrink" />
+          {!enCotizaciones && (
           <BotonFiltros
             activos={activos}
             onLimpiar={() => {
@@ -122,11 +130,14 @@ export function ListaPedidos({ vistaInicial, puedeVerificar, veTodo, asesores }:
             <CampoTexto etiqueta="Desde" type="date" value={desde} max={hasta || undefined} onChange={(e) => cambiar(setDesde)(e.target.value)} />
             <CampoTexto etiqueta="Hasta" type="date" value={hasta} min={desde || undefined} onChange={(e) => cambiar(setHasta)(e.target.value)} />
           </BotonFiltros>
+          )}
         </div>
       </div>
 
-      <div role="region" aria-label="Lista de pedidos" aria-live="polite">
-        {!datos && fallo ? (
+      <div role="region" aria-label={enCotizaciones ? "Lista de cotizaciones" : "Lista de pedidos"} aria-live="polite">
+        {vista === "cotizaciones" ? (
+          <ListaCotizaciones q={q} />
+        ) : !datos && fallo ? (
           <EstadoVacio icono={WifiOff} titulo="No pudimos cargar los pedidos" descripcion="Revise su conexión. Se volverá a intentar solo." accion={<Boton variante="secundario" onClick={refrescar}>Reintentar</Boton>} />
         ) : !datos ? (
           <div className="flex flex-col gap-2" aria-label="Cargando">

@@ -31,6 +31,11 @@ export async function filtroPedido(u: Actor): Promise<Prisma.OrderWhereInput> {
   return (await restringido(u)) ? { conversacion: { asignadaAId: u.id } } : {};
 }
 
+/** Una cotización se ve igual que un pedido: por la conversación asignada al asesor. */
+export async function filtroCotizacion(u: Actor): Promise<Prisma.CotizacionWhereInput> {
+  return (await restringido(u)) ? { conversacion: { asignadaAId: u.id } } : {};
+}
+
 export async function puedeVerConversacion(u: Actor, id: string) {
   return (await db.conversation.count({ where: { id, ...(await filtroConversacion(u)) } })) > 0;
 }
@@ -39,6 +44,9 @@ export async function puedeVerContacto(u: Actor, id: string) {
 }
 export async function puedeVerPedido(u: Actor, id: string) {
   return (await db.order.count({ where: { id, ...(await filtroPedido(u)) } })) > 0;
+}
+export async function puedeVerCotizacion(u: Actor, id: string) {
+  return (await db.cotizacion.count({ where: { id, ...(await filtroCotizacion(u)) } })) > 0;
 }
 export async function puedeVerMensaje(u: Actor, id: string) {
   return (await db.message.count({ where: { id, conversacion: await filtroConversacion(u) } })) > 0;

@@ -10,6 +10,7 @@ import type { ResultadoAviso } from "@/lib/pedidos/avisos";
 import { CANALES } from "@/lib/canales/tipos";
 import { cargarPedido, contarPorVerificar, listarPedidos, VISTAS, type ContadoresPedidos, type DetallePedido, type FilaPedido, type FiltrosPedidos } from "@/lib/pedidos/consultas";
 import { ESTADOS } from "@/lib/pedidos/estados";
+import { listarCotizaciones, type FilaCotizacion } from "@/lib/pedidos/cotizaciones";
 import { avanzarPedido, guardarGuia } from "@/lib/pedidos/gestion";
 import { vencerReservas } from "@/lib/pedidos/vencimiento";
 import { crearEnlaceDePago, tarjetaActiva } from "@/lib/pagos-tarjeta/cobros";
@@ -116,7 +117,13 @@ export async function listar(f: FiltrosPedidos): Promise<{ items: FilaPedido[]; 
   return listarPedidos(filtros.parse(f), u);
 }
 
-export type PedidoConPermisos = { pedido: DetallePedido; puedeVerificar: boolean; puedeCancelar: boolean; sinLimites: boolean; metodos: { id: string; nombre: string }[]; bancos: string[]; tarjeta: boolean; formasPago: { id: string; nombre: string }[] };
+/** La pestaña «Cotizaciones»: no lleva los filtros de pedidos, solo la búsqueda. */
+export async function listarCotizacionesDePedidos(f: { q: string; limite: number }): Promise<{ items: FilaCotizacion[]; hayMas: boolean }> {
+  const u = await requireUsuario();
+  return listarCotizaciones(z.object({ q: z.string().max(100), limite: z.number().int().min(1).max(500) }).parse(f), u);
+}
+
+export type PedidoConPermisos ={ pedido: DetallePedido; puedeVerificar: boolean; puedeCancelar: boolean; sinLimites: boolean; metodos: { id: string; nombre: string }[]; bancos: string[]; tarjeta: boolean; formasPago: { id: string; nombre: string }[] };
 
 export async function obtener(pedidoId: string): Promise<PedidoConPermisos | null> {
   const a = await actor();

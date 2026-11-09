@@ -265,10 +265,12 @@ describe("pedidos (con base de datos)", () => {
   });
 
   test("ajustes: valida el prefijo, el descuento y que la tarjeta no se pueda encender sin pasarela", async () => {
-    const base = { prefijo: "HO-", horasReserva: 24, descuentoMaxAgente: 0, inventario: "separado" as const, metodos: ["transferencia", "deposito"], envioGratisDesde: "", ubicacionRecogerId: ubicA, ubicacionEnvioId: ubicB };
+    const base = { prefijo: "HO-", horasReserva: 24, diasCotizacion: 3, descuentoMaxAgente: 0, inventario: "separado" as const, metodos: ["transferencia", "deposito"], envioGratisDesde: "", ubicacionRecogerId: ubicA, ubicacionEnvioId: ubicB };
     assert.equal((await guardarAjustesPedidos({ ...base, prefijo: "ho pedidos" }, actor)).ok, false);
     assert.equal((await guardarAjustesPedidos({ ...base, descuentoMaxAgente: 101 }, actor)).ok, false);
     assert.equal((await guardarAjustesPedidos({ ...base, horasReserva: 0 }, actor)).ok, false);
+    assert.equal((await guardarAjustesPedidos({ ...base, diasCotizacion: 0 }, actor)).ok, false);
+    assert.equal((await guardarAjustesPedidos({ ...base, diasCotizacion: 31 }, actor)).ok, false);
     const pasarelaAntes = process.env.PASARELA; // la tarjeta solo se puede encender con una pasarela conectada: aquí no hay ninguna
     delete process.env.PASARELA;
     assert.equal((await guardarAjustesPedidos({ ...base, metodos: ["transferencia", "tarjeta"] }, actor)).ok, false);

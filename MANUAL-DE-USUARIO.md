@@ -183,8 +183,18 @@ La hoja **Bodega** (imprimible, sin precios) sirve para empacar.
 ### Cancelar
 **Cancelar pedido** libera lo apartado. Un agente solo cancela los pedidos que creó y mientras no tengan un pago verificado; el jefe de tienda y el administrador, cualquiera (si ya estaba pagado, se devuelve la existencia).
 
+### Cotizaciones
+Cuando el cliente pide precios pero todavía no compra, arme todo en **Crear pedido** (productos, entrega y descuento) y pulse **Enviar cotización**. No hace falta elegir la forma de pago ni que alcance la existencia.
+- El cliente recibe los productos, los precios, el envío, el total y hasta qué día valen (**3 días** de fábrica, hasta el final del último día; el administrador lo cambia en **Ajustes → Pagos y envíos**).
+- La cotización **no aparta productos**: quedan apartados solo cuando se hace el pedido.
+- Si el cliente acepta, en la conversación abra **Crear pedido → Convertir en pedido** (o, en la cotización, **Convertir en pedido**). El pedido sale con lo cotizado y **respeta los precios** aunque el catálogo haya subido (si bajó, lleva el precio más bajo). Elija la forma de pago y envíelo como siempre. La cotización pasa a **Aceptada**.
+- Si ya venció, se puede convertir igual, pero con los precios de hoy (el sistema lo avisa). Pasada la fecha se ve como **Vencida**; no se le manda nada al cliente.
+- Cada cotización tiene su página (**Pedidos → Cotizaciones**) con **Imprimir o guardar PDF** (para clientes que piden un documento formal) y **Copiar mensaje** para mandarla otra vez.
+
+Si el canal no permite enviar, el botón dice **Copiar cotización**: la guarda y le da el texto para mandarlo por otro medio.
+
 ### La lista de pedidos
-Pestañas: **Por verificar**, **Pendientes de pago**, **En proceso**, **Entregados** y **Todos**; con búsqueda y filtros por estado, canal, fechas y entrega.
+Pestañas: **Por verificar**, **Pendientes de pago**, **En proceso**, **Entregados**, **Todos** y **Cotizaciones**; con búsqueda y filtros por estado, canal, fechas y entrega (en Cotizaciones, solo la búsqueda).
 
 ## 7. Contactos
 

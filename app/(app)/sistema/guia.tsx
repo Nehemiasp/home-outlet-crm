@@ -5,7 +5,7 @@ import type { CSSProperties } from "react";
 import { useMemo, useState } from "react";
 import { Burbuja, Compositor, EstadoEntrega, ItemConversacion, SeparadorDia, type Entrega } from "@/components/ui/conversacion";
 import { EstadoVacio, Esqueleto, EsqueletoConversacion } from "@/components/ui/estados";
-import { Avatar, AvatarAsistente, AvatarConCanal, ContadorNoLeidos, IconoCanal, Insignia, InsigniaAtencion, InsigniaCanal, InsigniaConversacion, InsigniaEstado, InsigniaEtiqueta, InsigniaExistencia, InsigniaPago, LogoCanal, nombreCanal, tonos, tonosEstado, type Tono, type TonoEstado } from "@/components/ui/etiquetas";
+import { Avatar, AvatarAsistente, AvatarConCanal, ContadorNoLeidos, IconoCanal, Insignia, InsigniaAtencion, InsigniaCanal, InsigniaConversacion, InsigniaCotizacion, InsigniaEstado, InsigniaEtiqueta, InsigniaExistencia, InsigniaPago, LogoCanal, nombreCanal, tonos, tonosEstado, type Tono, type TonoEstado } from "@/components/ui/etiquetas";
 import { ListaCompras } from "@/components/ui/pedidos";
 import { AvisoInactividad, CodigosRespaldo, QrSegundoFactor } from "@/components/ui/seguridad";
 import { AreaTexto, Boton, BotonIcono, Buscador, CampoTexto, Casilla, ControlSegmentado, GrupoCasillas, Interruptor, Selector } from "@/components/ui/form";
@@ -514,7 +514,7 @@ export function Guia() {
               <FotoProducto url={null} className="size-12 rounded-campo" />
             </div>
           </Bloque>
-          <Bloque titulo="Pedidos: una sola insignia de estado (InsigniaEstado), estado del pago y bloque «Compras»">
+          <Bloque titulo="Pedidos: una sola insignia de estado (InsigniaEstado), estado del pago, estado de la cotización (InsigniaCotizacion) y bloque «Compras»">
             <div className="flex flex-wrap gap-2">
               {(["borrador", "pendiente_pago", "en_revision", "pagado", "preparando", "listo_para_recoger", "enviado", "entregado", "cancelado", "vencido"] as const).map((e) => (
                 <InsigniaEstado key={e} estado={e} />
@@ -523,6 +523,11 @@ export function Guia() {
             <div className="mt-3 flex flex-wrap gap-2">
               {(["sin_pago", "en_revision", "parcial", "pagado", "rechazado"] as const).map((e) => (
                 <InsigniaPago key={e} estado={e} />
+              ))}
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2" aria-label="Estados de la cotización">
+              {(["vigente", "aceptada", "vencida"] as const).map((e) => (
+                <InsigniaCotizacion key={e} estado={e} />
               ))}
             </div>
             <div className="mt-4 max-w-md">

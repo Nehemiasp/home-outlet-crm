@@ -26,6 +26,8 @@ export type EntradaPedido = {
   notas: string;
   /** La forma de pago que pidió el cliente. Opcional en un borrador; obligatoria para enviarlo. */
   metodoPago?: TipoPago | null;
+  /** Al convertir una cotización en pedido: sus precios se respetan si sigue vigente (ver lib/pedidos/cotizaciones.ts). */
+  cotizacionId?: string | null;
 };
 
 export type VistaPedido = {
@@ -55,7 +57,12 @@ export type DatosPanelPedido = {
   metodosPago: { id: TipoPago; nombre: string }[];
   zonas: { nombre: string; departamentos: string[]; municipios: string[]; costo: number; tiempo: string }[];
   abiertos: AbiertoPedido[];
+  /** Cotizaciones de la conversación que todavía no se convirtieron en pedido (vigentes o vencidas hace poco). */
+  cotizaciones: CotizacionAbierta[];
   sugeridos: ProductoPedido[];
 };
+
+export type EstadoCotizacionVista = "vigente" | "aceptada" | "vencida";
+export type CotizacionAbierta = { id: string; codigo: string; total: number; validaHasta: string; estado: EstadoCotizacionVista };
 
 export type ResultadoPedido<T = object> = ({ ok: true } & T) | { ok: false; error: string };

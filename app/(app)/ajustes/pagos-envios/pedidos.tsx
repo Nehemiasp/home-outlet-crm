@@ -10,6 +10,7 @@ import { guardarAjustesDePedidos } from "../actions";
 type Datos = {
   prefijo: string;
   horasReserva: string;
+  diasCotizacion: string;
   descuentoMaxAgente: string;
   inventario: "separado" | "compartido";
   metodos: string[];
@@ -37,6 +38,7 @@ export function AjustesDePedidos({ inicial, ubicaciones, tarjetaConectada }: { i
     const r = await guardarAjustesDePedidos({
       prefijo: d.prefijo,
       horasReserva: Number(d.horasReserva),
+      diasCotizacion: Number(d.diasCotizacion),
       descuentoMaxAgente: Number(d.descuentoMaxAgente),
       inventario: d.inventario,
       metodos: d.metodos,
@@ -66,9 +68,10 @@ export function AjustesDePedidos({ inicial, ubicaciones, tarjetaConectada }: { i
 
       <section aria-labelledby="t-pedidos" className="flex flex-col gap-4 rounded-tarjeta border border-linea bg-superficie p-4">
         <h2 id="t-pedidos" className="titulo-panel">Pedidos</h2>
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2">
           <CampoTexto etiqueta="Prefijo del código" autoComplete="off" maxLength={6} ayuda="Por ejemplo HO-000123. Los pedidos ya creados no cambian." value={d.prefijo} onChange={(e) => setD({ ...d, prefijo: e.target.value })} />
           <CampoTexto etiqueta="Horas de reserva sin pago" inputMode="numeric" maxLength={3} ayuda="Pasado ese tiempo el pedido vence y libera las unidades." value={d.horasReserva} onChange={(e) => setD({ ...d, horasReserva: e.target.value.replace(/\D/g, "") })} />
+          <CampoTexto etiqueta="Días que vale una cotización" inputMode="numeric" maxLength={2} ayuda="Hasta el final del último día. La cotización no aparta productos." value={d.diasCotizacion} onChange={(e) => setD({ ...d, diasCotizacion: e.target.value.replace(/\D/g, "") })} />
           <CampoTexto etiqueta="Descuento máximo del agente (%)" inputMode="numeric" maxLength={3} ayuda="Más que eso lo autoriza un administrador o un jefe de tienda (ellos no tienen tope). 0 = sin descuentos." value={d.descuentoMaxAgente} onChange={(e) => setD({ ...d, descuentoMaxAgente: e.target.value.replace(/\D/g, "") })} />
         </div>
       </section>
