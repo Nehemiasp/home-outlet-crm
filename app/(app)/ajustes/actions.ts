@@ -134,6 +134,7 @@ const ajustesPedidos = z.object({
   prefijo: z.string().max(10),
   horasReserva: z.number().int(),
   diasCotizacion: z.number().int(),
+  paqueterias: z.array(z.string().max(60)).max(20),
   descuentoMaxAgente: z.number().int(),
   inventario: z.enum(["separado", "compartido"]),
   metodos: z.array(z.string().max(30)).max(10),

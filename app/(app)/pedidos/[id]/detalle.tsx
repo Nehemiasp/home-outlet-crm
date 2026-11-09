@@ -14,7 +14,8 @@ import { siguientes } from "@/lib/pedidos/estados";
 import type { ResultadoAviso } from "@/lib/pedidos/avisos";
 import { useActualizacion } from "@/lib/tiempo-real";
 import { formatQ, formatTelefono } from "@/lib/utils";
-import { actualizarGuia, avanzar, cambiarFormaPago, enviarEnlaceTarjeta, obtener, rechazar, verificar, type PedidoConPermisos } from "../actions";
+import { actualizarGuia, avanzar, cambiarFormaPago, enviarEnlaceTarjeta, marcarComoEnviado, obtener, rechazar, verificar, type PedidoConPermisos } from "../actions";
+import { AvisoGuiaManual, EnlaceGuia, ModalEnviado, type DatosEnvioForm } from "@/components/ui/envio";
 import { nombreMetodo } from "@/lib/pedidos/metodos";
 import { EnlaceDuplicado } from "@/components/ui/pedidos";
 import { SubirComprobante } from "./subir-comprobante";
@@ -26,7 +27,7 @@ const soloFecha = (iso: string) => new Date(iso).toLocaleDateString("es-GT", { d
 export function Detalle({ inicial }: { inicial: PedidoConPermisos }) {
   const avisar = useToast();
   const { datos, refrescar } = useActualizacion(`pedido-${inicial.pedido.id}`, () => obtener(inicial.pedido.id), 6000);
-  const { pedido: p, puedeVerificar, puedeCancelar, sinLimites, metodos, bancos, tarjeta, formasPago } = datos ?? inicial;
+  const { pedido: p, puedeVerificar, puedeCancelar, sinLimites, metodos, bancos, tarjeta, formasPago, paqueterias } = datos ?? inicial;
 
   const [verPago, setVerPago] = useState<string | null>(null);
   const [subir, setSubir] = useState(false);
@@ -35,6 +36,8 @@ export function Detalle({ inicial }: { inicial: PedidoConPermisos }) {
   const [reactivar, setReactivar] = useState(false);
   const [sobrePedido, setSobrePedido] = useState(false);
   const [guia, setGuia] = useState(p.guia ?? "");
+  const [errorEnvio, setErrorEnvio] = useState("");
+  const [guiaManual, setGuiaManual] = useState<{ url: string; nombre: string } | null>(null);
   const [copiar, setCopiar] = useState<string | null>(null);
   const [trabajando, setTrabajando] = useState(false);
   useEffect(() => setGuia(p.guia ?? ""), [p.guia]);
@@ -46,15 +49,32 @@ export function Detalle({ inicial }: { inicial: PedidoConPermisos }) {
     refrescar();
   };
 
-  const cambio = async (a: Parameters<typeof avanzar>[1], ok: string, g = "", sobre = false) => {
+  const cambio = async (a: Parameters<typeof avanzar>[1], ok: string, sobre = false) => {
     setTrabajando(true);
-    const r = await avanzar(p.id, a, g, sobre);
+    const r = await avanzar(p.id, a, sobre);
     setTrabajando(false);
     if (!r.ok) return avisar(r.error, "error");
     avisar(ok);
-    setEnviar(false);
     setCancelar(false);
     setReactivar(false);
+    tras(r.aviso);
+  };
+
+  /** «Marcar como enviado»: va como formulario porque lleva el archivo de la guía. */
+  const enviarPedido = async (d: DatosEnvioForm) => {
+    setTrabajando(true);
+    setErrorEnvio("");
+    const datos = new FormData();
+    datos.set("pedidoId", p.id);
+    datos.set("paqueteria", d.paqueteria);
+    datos.set("guia", d.guia);
+    if (d.archivo) datos.set("archivo", d.archivo);
+    const r = await marcarComoEnviado(datos);
+    setTrabajando(false);
+    if (!r.ok) return setErrorEnvio(r.error);
+    avisar("Pedido enviado");
+    setEnviar(false);
+    if (r.guia?.estado === "manual") setGuiaManual(r.guia);
     tras(r.aviso);
   };
 
@@ -108,7 +128,7 @@ export function Detalle({ inicial }: { inicial: PedidoConPermisos }) {
       : sig.includes("preparando")
         ? { texto: "Marcar como preparando", accion: () => void cambio("preparando", "Pedido en preparación") }
         : sig.includes("enviado")
-          ? { texto: "Marcar como enviado", accion: () => setEnviar(true) }
+          ? { texto: "Marcar como enviado", accion: () => (setErrorEnvio(""), setEnviar(true)) }
           : sig.includes("listo_para_recoger")
             ? { texto: "Marcar como listo para recoger", accion: () => void cambio("listo_para_recoger", "Pedido listo para recoger") }
             : sig.includes("entregado")
@@ -375,6 +395,8 @@ export function Detalle({ inicial }: { inicial: PedidoConPermisos }) {
                   </form>
                 )}
                 {p.guia && !["pagado", "preparando", "enviado"].includes(p.estado) && <p className="cuerpo">Guía: {p.guia}</p>}
+                {p.paqueteria && <p className="cuerpo">Paquetería: {p.paqueteria}</p>}
+                {p.guiaArchivo && <EnlaceGuia guia={p.guiaArchivo} />}
               </>
             )}
             {p.notas && (
@@ -412,25 +434,18 @@ export function Detalle({ inicial }: { inicial: PedidoConPermisos }) {
       />
       <SubirComprobante abierto={subir} onCerrar={() => setSubir(false)} pedido={p} metodos={metodos} bancos={bancos} onRegistrado={(aviso) => { setSubir(false); tras(aviso); }} />
 
-      <Modal abierto={enviar} onCerrar={() => setEnviar(false)} titulo="Marcar como enviado">
-        <form
-          className="flex flex-col gap-4"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void cambio("enviado", "Pedido enviado", guia);
-          }}
-        >
-          <CampoTexto etiqueta="Número de guía" required autoComplete="off" maxLength={60} ayuda="Se manda al cliente en el aviso. Si la entrega es propia, escriba por ejemplo «Entrega propia»." value={guia} onChange={(e) => setGuia(e.target.value)} />
-          <div className="flex justify-end gap-2">
-            <Boton variante="secundario" onClick={() => setEnviar(false)}>
-              Cancelar
-            </Boton>
-            <Boton type="submit" cargando={trabajando}>
-              Marcar como enviado
-            </Boton>
-          </div>
-        </form>
-      </Modal>
+      <ModalEnviado
+        abierto={enviar}
+        codigo={p.codigo}
+        paqueterias={paqueterias}
+        guiaActual={{ paqueteria: p.paqueteria, guia: p.guia }}
+        archivoActual={p.guiaArchivo?.nombre}
+        trabajando={trabajando}
+        error={errorEnvio}
+        onCerrar={() => setEnviar(false)}
+        onConfirmar={(d) => void enviarPedido(d)}
+      />
+      <AvisoGuiaManual guia={guiaManual} onCerrar={() => setGuiaManual(null)} />
 
       <Modal abierto={reactivar} onCerrar={() => setReactivar(false)} titulo="Reactivar pedido">
         <p className="cuerpo mb-4">Se vuelven a apartar las existencias y empieza de nuevo el tiempo de reserva. Si ya no alcanzan, no se reactiva.</p>
@@ -439,7 +454,7 @@ export function Detalle({ inicial }: { inicial: PedidoConPermisos }) {
           <Boton variante="secundario" onClick={() => setReactivar(false)}>
             Cancelar
           </Boton>
-          <Boton cargando={trabajando} onClick={() => void cambio("pendiente_pago", "Pedido reactivado", "", sobrePedido)}>
+          <Boton cargando={trabajando} onClick={() => void cambio("pendiente_pago", "Pedido reactivado", sobrePedido)}>
             Reactivar pedido
           </Boton>
         </div>

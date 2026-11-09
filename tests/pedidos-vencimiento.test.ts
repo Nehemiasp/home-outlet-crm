@@ -7,7 +7,9 @@ import { db } from "@/lib/db";
 import { puedeCancelarPedido, puedeDescontar, puedeSobrePedido, puedeVerificarPagos } from "@/lib/permisos";
 import { obtenerAjustesPedidos } from "@/lib/pedidos/ajustes";
 import { cambiarEstado } from "@/lib/pedidos/flujo";
-import { avanzarPedido } from "@/lib/pedidos/gestion";
+import { avanzarPedido, marcarEnviado } from "@/lib/pedidos/gestion";
+import { unlink } from "node:fs/promises";
+import path from "node:path";
 import { vencerReservas } from "@/lib/pedidos/vencimiento";
 import type { Rol } from "@/lib/permisos";
 
@@ -154,7 +156,7 @@ describe("vencimiento de reservas y avisos de estado (con base de datos)", () =>
     assert.ok((await db.order.findUniqueOrThrow({ where: { id: o.id } })).reservadoHasta!.getTime() > Date.now() + 23 * HORA);
   });
 
-  test("avisos de «listo para recoger» y «enviado» (con guía) salen por el canal", async () => {
+  test("avisos de «listo para recoger» y «enviado» (con paquetería, guía y el archivo de la guía) salen por el canal", async () => {
     const recoger = await pedido(new Date(Date.now() + HORA));
     await db.order.update({ where: { id: recoger.id }, data: { estado: "preparando" } });
     const r = await avanzarPedido(recoger.id, "listo_para_recoger", agente);
@@ -164,16 +166,25 @@ describe("vencimiento de reservas y avisos de estado (con base de datos)", () =>
     const envio = await pedido(new Date(Date.now() + HORA), { entrega: "envio" });
     await db.order.update({ where: { id: envio.id }, data: { estado: "preparando" } });
     assert.equal((await avanzarPedido(envio.id, "listo_para_recoger", agente)).ok, false); // un envío no se «recoge»
-    const sinGuia = await avanzarPedido(envio.id, "enviado", agente);
-    assert.ok(!sinGuia.ok && /número de guía/i.test(sinGuia.error)); // sin guía no se marca como enviado
-    assert.equal((await avanzarPedido(envio.id, "enviado", agente, { guia: "   " })).ok, false);
+    const directo = await avanzarPedido(envio.id, "enviado", agente);
+    assert.ok(!directo.ok && /cómo sale/i.test(directo.error)); // «enviado» solo entra por marcarEnviado, que valida la guía
+    const png = new File([Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(24)])], "guía forza.png", { type: "image/png" });
+    const sinGuia = await marcarEnviado(envio.id, agente, { paqueteria: "Forza", guia: "   ", archivo: png });
+    assert.ok(!sinGuia.ok && /número de guía/i.test(sinGuia.error));
+    const sinArchivo = await marcarEnviado(envio.id, agente, { paqueteria: "Forza", guia: "GT123456", archivo: null });
+    assert.ok(!sinArchivo.ok && /Adjunte la guía/.test(sinArchivo.error));
     assert.equal(await estado(envio.id), "preparando");
-    const e = await avanzarPedido(envio.id, "enviado", agente, { guia: "GT123456" });
-    assert.ok(e.ok);
-    const aviso = (await mensajes(envio.id)).at(-1)!.texto!;
-    assert.match(aviso, new RegExp(`¡Su pedido ${envio.codigo} va en camino!`));
-    assert.match(aviso, /Número de guía: GT123456/);
-    assert.equal((await db.order.findUniqueOrThrow({ where: { id: envio.id } })).guia, "GT123456");
+    const e = await marcarEnviado(envio.id, agente, { paqueteria: "Forza", guia: "GT123456", archivo: png });
+    assert.ok(e.ok && e.guia?.estado === "enviada", JSON.stringify(e));
+    const o = await db.order.findUniqueOrThrow({ where: { id: envio.id } });
+    assert.deepEqual([o.guia, o.paqueteria, o.guiaArchivoNombre], ["GT123456", "Forza", "guía forza.png"]);
+    const [aviso, archivo] = (await mensajes(envio.id)).slice(-2); // primero el aviso, después la guía
+    assert.match(aviso!.texto!, new RegExp(`¡Su pedido ${envio.codigo} va en camino!`));
+    assert.match(aviso!.texto!, /Paquetería: Forza\nNúmero de guía: GT123456/);
+    assert.deepEqual([archivo!.tipo, archivo!.archivoUrl], ["image", o.guiaArchivoUrl]);
+    const evento = await db.orderEvent.findFirstOrThrow({ where: { pedidoId: envio.id, aEstado: "enviado" } });
+    assert.deepEqual([evento.usuarioId, evento.nota], [agente.id, "Por Forza · guía GT123456 · guía adjunta: guía forza.png"]);
+    await unlink(path.join(process.cwd(), "uploads", o.guiaArchivoUrl!.replace("/api/archivos/", ""))).catch(() => {});
   });
 
   test("cancelar: un agente solo lo que creó; no puede pedir pasos de pago a mano; el admin cancela y libera", async () => {

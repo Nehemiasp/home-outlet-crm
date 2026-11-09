@@ -13,7 +13,10 @@ export interface InboundMessage {
 }
 
 export interface OutboundMessage {
-  type: "text" | "image" | "product" | "template";
+  /** «document»: un PDF del sistema (por ahora, la guía de la paquetería). Solo lo mandan los canales con `enviaDocumentos`. */
+  type: "text" | "image" | "product" | "template" | "document";
+  /** El nombre con que el cliente recibe el documento. */
+  filename?: string;
   /** En una plantilla, el texto ya armado con sus variables: es lo que se guarda y se ve en la conversación. */
   text?: string;
   mediaUrl?: string;
@@ -39,6 +42,11 @@ export interface StatusUpdate {
 export interface ChannelAdapter {
   channel: Channel;
   send(to: string, message: OutboundMessage): Promise<{ externalMessageId: string }>;
+  /**
+   * ¿Puede mandar documentos (PDF)? WhatsApp sí (su API los acepta; probado solo contra Meta simulado). En Facebook, Instagram y
+   * TikTok no está verificado: ahí un PDF no se intenta y la persona lo manda a mano.
+   */
+  enviaDocumentos?: boolean;
   canSendFreeForm(conversation: { lastInboundAt: Date | null }): boolean; // ventana de respuesta
   /** Cuántos mensajes seguidos se pueden mandar sin que el cliente vuelva a escribir (TikTok: 10). Sin valor, no hay tope. */
   maxSalientes?: number;

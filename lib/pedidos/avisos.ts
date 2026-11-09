@@ -30,6 +30,9 @@ export async function resumenPagos(pedidoId: string) {
   return { total: o.total, verificado, enRevision: suma("en_revision"), saldo: saldoDe(o.total, verificado) };
 }
 
+/** Lo que dice {guia} en el aviso de envío: la paquetería y el número; en una entrega propia, nada. */
+export const textoGuia = (paqueteria: string | null, guia: string | null) => (!guia ? "" : paqueteria ? `Paquetería: ${paqueteria}\nNúmero de guía: ${guia}` : `Número de guía: ${guia}`);
+
 /** Las variables de un pedido para rellenar los mensajes. */
 export async function variablesDe(pedidoId: string, extra: VariablesMensaje = {}): Promise<VariablesMensaje> {
   const [o, aj, negocio, cuentas, pagos] = await Promise.all([
@@ -41,7 +44,7 @@ export async function variablesDe(pedidoId: string, extra: VariablesMensaje = {}
   ]);
   return {
     codigo: o.codigo, total: formatQ(o.total), saldo: formatQ(pagos.saldo), cuentas: textoCuentas(cuentas), horas: textoHoras(aj.horasReserva),
-    direccion: negocio.direccion ?? "", horario: negocio.horario ?? "", guia: o.guia ? `Número de guía: ${o.guia}` : "", ...extra,
+    direccion: negocio.direccion ?? "", horario: negocio.horario ?? "", guia: textoGuia(o.paqueteria, o.guia), ...extra,
   };
 }
 

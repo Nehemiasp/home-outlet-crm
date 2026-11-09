@@ -254,7 +254,7 @@ describe("pago con tarjeta de un pedido (con base de datos)", () => {
 
   test("encender la tarjeta en Ajustes exige una pasarela conectada", async () => {
     const a = await obtenerAjustesPedidos();
-    const entrada = { prefijo: a.prefijo, horasReserva: a.horasReserva, diasCotizacion: a.diasCotizacion, descuentoMaxAgente: a.descuentoMaxAgente, inventario: a.inventario, metodos: ["transferencia", "tarjeta"], envioGratisDesde: "", ubicacionRecogerId: a.ubicacionRecogerId, ubicacionEnvioId: a.ubicacionEnvioId };
+    const entrada = { prefijo: a.prefijo, horasReserva: a.horasReserva, diasCotizacion: a.diasCotizacion, paqueterias: a.paqueterias, descuentoMaxAgente: a.descuentoMaxAgente, inventario: a.inventario, metodos: ["transferencia", "tarjeta"], envioGratisDesde: "", ubicacionRecogerId: a.ubicacionRecogerId, ubicacionEnvioId: a.ubicacionEnvioId };
     delete process.env.PASARELA;
     const sin = await guardarAjustesPedidos(entrada, admin);
     assert.ok(!sin.ok && /pasarela de pago/.test(sin.error));

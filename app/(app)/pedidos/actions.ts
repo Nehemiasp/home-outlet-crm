@@ -11,7 +11,8 @@ import { CANALES } from "@/lib/canales/tipos";
 import { cargarPedido, contarPorVerificar, listarPedidos, VISTAS, type ContadoresPedidos, type DetallePedido, type FilaPedido, type FiltrosPedidos } from "@/lib/pedidos/consultas";
 import { ESTADOS } from "@/lib/pedidos/estados";
 import { listarCotizaciones, type FilaCotizacion } from "@/lib/pedidos/cotizaciones";
-import { avanzarPedido, guardarGuia } from "@/lib/pedidos/gestion";
+import { avanzarPedido, guardarGuia, marcarEnviado } from "@/lib/pedidos/gestion";
+import { envioDeFormulario } from "@/lib/pedidos/formulario-envio";
 import { vencerReservas } from "@/lib/pedidos/vencimiento";
 import { crearEnlaceDePago, tarjetaActiva } from "@/lib/pagos-tarjeta/cobros";
 import { cambiarFormaDePago } from "@/lib/pedidos/pedidos";
@@ -123,7 +124,7 @@ export async function listarCotizacionesDePedidos(f: { q: string; limite: number
   return listarCotizaciones(z.object({ q: z.string().max(100), limite: z.number().int().min(1).max(500) }).parse(f), u);
 }
 
-export type PedidoConPermisos ={ pedido: DetallePedido; puedeVerificar: boolean; puedeCancelar: boolean; sinLimites: boolean; metodos: { id: string; nombre: string }[]; bancos: string[]; tarjeta: boolean; formasPago: { id: string; nombre: string }[] };
+export type PedidoConPermisos ={ pedido: DetallePedido; puedeVerificar: boolean; puedeCancelar: boolean; sinLimites: boolean; metodos: { id: string; nombre: string }[]; bancos: string[]; tarjeta: boolean; formasPago: { id: string; nombre: string }[]; paqueterias: string[] };
 
 export async function obtener(pedidoId: string): Promise<PedidoConPermisos | null> {
   const a = await actor();
@@ -139,6 +140,7 @@ export async function obtener(pedidoId: string): Promise<PedidoConPermisos | nul
     metodos: METODOS.filter((m) => aj.metodos.includes(m.id)).map((m) => ({ id: m.id, nombre: m.nombre })),
     bancos: [...new Set(cuentas.map((c) => c.banco))],
     tarjeta: await tarjetaActiva(),
+    paqueterias: aj.paqueterias,
     // a qué formas de pago se puede cambiar: las activas (la tarjeta, solo con pasarela) que sirven para esa entrega
     formasPago: METODOS.filter((m) => m.disponible && aj.metodos.includes(m.id) && (m.id !== "tarjeta" || !!pasarela()) && compatibleConEntrega(m.id, pedido.entrega)).map((m) => ({ id: m.id, nombre: m.nombre })),
   };
@@ -151,10 +153,19 @@ export async function enviarEnlaceTarjeta(pedidoId: string) {
   return crearEnlaceDePago(id.parse(pedidoId), a);
 }
 
-export async function avanzar(pedidoId: string, a: string, guia: string, sobrePedido: boolean) {
+export async function avanzar(pedidoId: string, a: string, sobrePedido: boolean) {
   const quien = await actor();
   if (!(await puedeVerPedido(quien, id.parse(pedidoId)))) return NO_EXISTE;
-  return avanzarPedido(id.parse(pedidoId), z.enum(ESTADOS).parse(a), quien, { guia: z.string().max(100).parse(guia), sobrePedido });
+  return avanzarPedido(id.parse(pedidoId), z.enum(ESTADOS).parse(a), quien, { sobrePedido });
+}
+
+/** «Marcar como enviado»: llega como formulario porque trae el archivo de la guía. `paqueteria` vacía = entrega propia. */
+export async function marcarComoEnviado(datos: FormData) {
+  const quien = await actor();
+  const p = envioDeFormulario(datos);
+  if (!p) return fallo("Revise los datos del envío.");
+  if (!(await puedeVerPedido(quien, p.pedidoId))) return NO_EXISTE;
+  return marcarEnviado(p.pedidoId, quien, p.envio);
 }
 
 export async function actualizarGuia(pedidoId: string, guia: string) {

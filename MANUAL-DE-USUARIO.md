@@ -125,7 +125,7 @@ Es la pantalla de inicio de **bodega** (el administrador y el jefe de tienda tam
 
 - **Hoja de bodega:** abre la hoja para imprimir y empacar (sin precios).
 - **Empezar a preparar:** el pedido pasa a «Preparando».
-- **Listo para recoger / Marcar como enviado:** pide confirmar porque **se le avisa al cliente por el chat**. Al enviar **hay que escribir el número de guía** (es obligatorio; si la entrega es propia, escriba por ejemplo «Entrega propia»).
+- **Listo para recoger / Marcar como enviado:** pide confirmar porque **se le avisa al cliente por el chat**. Al enviar se elige **cómo sale** (ver «Marcar como enviado» en la sección 6). Bodega también sube la guía de la paquetería y la puede abrir desde aquí.
 - **Marcar como entregado:** cierra el pedido.
 
 Bodega **no cancela** pedidos ni toca pagos. Si algo no cuadra (falta producto, el cliente cambió algo), avise al jefe de tienda. Cada paso queda registrado con el nombre de quien lo dio.
@@ -177,7 +177,14 @@ Mientras el pedido siga **pendiente de pago**, en el detalle use **Cambiar forma
 ### Estados de un pedido
 **Borrador → Pendiente de pago → Pago en revisión → Pagado → Preparando → Listo para recoger / Enviado → Entregado.** También **Cancelado** y **Vencido**.
 
-Dentro del pedido, el botón principal siempre es el siguiente paso: **Marcar como preparando**, **Marcar como listo para recoger** (avisa al cliente), **Marcar como enviado** (**exige** el número de **guía**, que se le manda al cliente; en una entrega propia escriba, por ejemplo, «Entrega propia») y **Marcar como entregado**.
+Dentro del pedido, el botón principal siempre es el siguiente paso: **Marcar como preparando**, **Marcar como listo para recoger** (avisa al cliente), **Marcar como enviado** (ver abajo) y **Marcar como entregado**.
+
+### Marcar como enviado
+En la ventana se elige **¿Cómo sale?**:
+- **Entrega propia** (la lleva alguien de la tienda): no pide guía ni archivo.
+- **Una paquetería** (Forza, Cargo Expreso, Guatex… la lista la arma el administrador en **Ajustes → Pagos y envíos**): **exige** el **número de guía** y la **guía de la paquetería adjunta**, una foto o un PDF (JPG, PNG, WebP o PDF de hasta 5 MB). Sin el archivo no se puede marcar como enviado.
+
+Al cliente le llegan dos mensajes: el aviso «¡Su pedido va en camino!» con la paquetería y el número de guía, y después el archivo de la guía. Por WhatsApp el PDF sale como documento. Si el canal no deja enviar (pasó la ventana, no está conectado o no acepta PDF, como Facebook, Instagram y TikTok), el pedido queda igual **enviado** con la guía guardada y el sistema le ofrece **Descargar guía** para mandarla a mano. La guía adjunta se ve en el detalle del pedido y en Despacho, y el historial dice quién marcó el envío y cuándo.
 La hoja **Bodega** (imprimible, sin precios) sirve para empacar.
 
 ### Cancelar
@@ -232,7 +239,7 @@ Al entrar, si aún faltan cosas para trabajar con datos reales, se abre **Primer
 | **Asistente** | Encendido, mensaje de bienvenida, canales donde responde, tope mensual de gasto, **Preguntas frecuentes** y una zona para **probar** al asistente |
 | **Canales** | Qué canales están conectados y qué falta de cada uno |
 | **Datos del negocio** | Nombre, dirección, horario semanal, y los textos de formas de pago, envíos y garantía que usa el asistente |
-| **Pagos y envíos** | Métodos de pago activos (son las opciones que se pueden elegir al crear un pedido; la tarjeta solo se puede activar si hay una pasarela conectada), prefijo y horas de reserva, descuento máximo del agente, inventario separado o compartido, envío gratis, **cuentas bancarias**, **zonas de envío** (cada una cubre departamentos enteros o solo algunos municipios; la que no marca ninguno vale para «el resto del país») y los **mensajes** que se mandan al cliente (se pueden editar y apagar) |
+| **Pagos y envíos** | Métodos de pago activos (son las opciones que se pueden elegir al crear un pedido; la tarjeta solo se puede activar si hay una pasarela conectada), prefijo y horas de reserva, días que vale una cotización, descuento máximo del agente, **paqueterías** (una por línea; se eligen al marcar un pedido como enviado), inventario separado o compartido, envío gratis, **cuentas bancarias**, **zonas de envío** (cada una cubre departamentos enteros o solo algunos municipios; la que no marca ninguno vale para «el resto del país») y los **mensajes** que se mandan al cliente (se pueden editar y apagar) |
 
 **Importante al dar de baja a alguien:** *Desactivar* bloquea su entrada al instante y deja sin asignar sus conversaciones para que nadie quede esperando. Siempre debe quedar al menos un administrador activo.
 

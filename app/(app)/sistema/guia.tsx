@@ -8,6 +8,7 @@ import { EstadoVacio, Esqueleto, EsqueletoConversacion } from "@/components/ui/e
 import { Avatar, AvatarAsistente, AvatarConCanal, ContadorNoLeidos, IconoCanal, Insignia, InsigniaAtencion, InsigniaCanal, InsigniaConversacion, InsigniaCotizacion, InsigniaEstado, InsigniaEtiqueta, InsigniaExistencia, InsigniaPago, LogoCanal, nombreCanal, tonos, tonosEstado, type Tono, type TonoEstado } from "@/components/ui/etiquetas";
 import { ListaCompras } from "@/components/ui/pedidos";
 import { AvisoInactividad, CodigosRespaldo, QrSegundoFactor } from "@/components/ui/seguridad";
+import { AvisoGuiaManual, EnlaceGuia, ModalEnviado } from "@/components/ui/envio";
 import { AreaTexto, Boton, BotonIcono, Buscador, CampoTexto, Casilla, ControlSegmentado, GrupoCasillas, Interruptor, Selector } from "@/components/ui/form";
 import { ControlDisponibilidad, InsigniaDisponibilidad, ModalPausaLarga } from "@/components/ui/disponibilidad";
 import { ModalAsignar, ModalDevolver, ResumenEquipo, TablaEquipo } from "@/components/ui/equipo";
@@ -163,6 +164,8 @@ export function Guia() {
   const [cargando, setCargando] = useState(false);
   const [pausaLarga, setPausaLarga] = useState(false);
   const [inactividad, setInactividad] = useState(false);
+  const [enviado, setEnviado] = useState(false);
+  const [guiaManual, setGuiaManual] = useState(false);
   const [devolver, setDevolver] = useState(false);
   const [asignar, setAsignar] = useState(false);
   const [plantillas, setPlantillas] = useState(false);
@@ -514,7 +517,7 @@ export function Guia() {
               <FotoProducto url={null} className="size-12 rounded-campo" />
             </div>
           </Bloque>
-          <Bloque titulo="Pedidos: una sola insignia de estado (InsigniaEstado), estado del pago, estado de la cotización (InsigniaCotizacion) y bloque «Compras»">
+          <Bloque titulo="Pedidos: una sola insignia de estado (InsigniaEstado), estado del pago, estado de la cotización (InsigniaCotizacion), envío con guía (ModalEnviado) y bloque «Compras»">
             <div className="flex flex-wrap gap-2">
               {(["borrador", "pendiente_pago", "en_revision", "pagado", "preparando", "listo_para_recoger", "enviado", "entregado", "cancelado", "vencido"] as const).map((e) => (
                 <InsigniaEstado key={e} estado={e} />
@@ -529,6 +532,15 @@ export function Guia() {
               {(["vigente", "aceptada", "vencida"] as const).map((e) => (
                 <InsigniaCotizacion key={e} estado={e} />
               ))}
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-2" aria-label="Envío con guía">
+              <Boton variante="secundario" tamano="sm" onClick={() => setEnviado(true)}>
+                Ver «Marcar como enviado»
+              </Boton>
+              <Boton variante="secundario" tamano="sm" onClick={() => setGuiaManual(true)}>
+                Ver «Mande la guía a mano»
+              </Boton>
+              <EnlaceGuia guia={{ url: "#", nombre: "guia-forza-123.pdf" }} />
             </div>
             <div className="mt-4 max-w-md">
               <ListaCompras
@@ -966,6 +978,8 @@ export function Guia() {
         onQuitar={() => (setAsignar(false), avisar("Asignación quitada"))}
       />
       <ModalDevolver abierto={devolver} onCerrar={() => setDevolver(false)} onDevolver={() => (setDevolver(false), avisar("Devuelta a la cola"))} />
+      <ModalEnviado abierto={enviado} codigo="HO-000123" paqueterias={["Forza", "Cargo Expreso", "Guatex"]} onCerrar={() => setEnviado(false)} onConfirmar={(d) => (setEnviado(false), avisar(d.paqueteria ? `Enviado por ${d.paqueteria}` : "Entrega propia"))} />
+      <AvisoGuiaManual guia={guiaManual ? { url: "#", nombre: "guia-forza-123.pdf" } : null} onCerrar={() => setGuiaManual(false)} />
       <AvisoInactividad abierto={inactividad} segundos={42} onSeguir={() => setInactividad(false)} onSalir={() => (setInactividad(false), avisar("Aquí se cerraría la sesión"))} />
       <ModalPausaLarga abierto={pausaLarga} minutos={15} onActivar={() => (setPausaLarga(false), avisar("Disponible otra vez"))} onSeguir={() => setPausaLarga(false)} />
       <Modal abierto={modal} onCerrar={() => setModal(false)} titulo="Cerrar conversación">

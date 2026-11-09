@@ -56,20 +56,28 @@ export async function puedeVerPago(u: Actor, id: string) {
 }
 
 /**
- * Los archivos subidos (fotos del chat y comprobantes) se sirven por su nombre: un asesor solo puede abrir los de
+ * Los archivos subidos (fotos del chat, comprobantes y guías de paquetería) se sirven por su nombre: un asesor solo puede abrir los de
  * sus conversaciones y sus pedidos, o las fotos del catálogo, que son de todos.
  */
 export async function puedeVerArchivo(u: Actor, nombre: string) {
   const url = `/api/archivos/${nombre}`;
-  // Bodega solo ve las fotos del catálogo: nunca las fotos del chat ni los comprobantes de pago.
-  if (u.rol === "bodega") return (await db.product.count({ where: { imagenes: { has: url } } })) > 0;
+  // Bodega solo ve las fotos del catálogo y las guías de paquetería de los pedidos en despacho (las sube ella):
+  // nunca las fotos del chat ni los comprobantes de pago.
+  if (u.rol === "bodega") {
+    const [producto, guia] = await Promise.all([
+      db.product.count({ where: { imagenes: { has: url } } }),
+      db.order.count({ where: { guiaArchivoUrl: url, estado: { in: ["pagado", "preparando", "listo_para_recoger", "enviado"] } } }),
+    ]);
+    return producto + guia > 0;
+  }
   if (!(await restringido(u))) return true;
-  const [mensaje, pago, producto] = await Promise.all([
+  const [mensaje, pago, producto, guia] = await Promise.all([
     db.message.count({ where: { archivoUrl: url, conversacion: await filtroConversacion(u) } }),
     db.payment.count({ where: { archivoUrl: url, pedido: await filtroPedido(u) } }),
     db.product.count({ where: { imagenes: { has: url } } }),
+    db.order.count({ where: { guiaArchivoUrl: url, ...(await filtroPedido(u)) } }),
   ]);
-  return mensaje + pago + producto > 0;
+  return mensaje + pago + producto + guia > 0;
 }
 
 /** Un pago duplicado en un pedido ajeno se avisa, pero sin decir cuál es ni dejar abrirlo. */

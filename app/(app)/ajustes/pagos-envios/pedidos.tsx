@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Boton, CampoTexto, Interruptor, Selector } from "@/components/ui/form";
+import { AreaTexto, Boton, CampoTexto, Interruptor, Selector } from "@/components/ui/form";
 import { useToast } from "@/components/ui/toast";
 import { METODOS } from "@/lib/pedidos/metodos";
 import { guardarAjustesDePedidos } from "../actions";
@@ -11,6 +11,8 @@ type Datos = {
   prefijo: string;
   horasReserva: string;
   diasCotizacion: string;
+  /** Una por línea. */
+  paqueterias: string;
   descuentoMaxAgente: string;
   inventario: "separado" | "compartido";
   metodos: string[];
@@ -39,6 +41,7 @@ export function AjustesDePedidos({ inicial, ubicaciones, tarjetaConectada }: { i
       prefijo: d.prefijo,
       horasReserva: Number(d.horasReserva),
       diasCotizacion: Number(d.diasCotizacion),
+      paqueterias: d.paqueterias.split("\n"),
       descuentoMaxAgente: Number(d.descuentoMaxAgente),
       inventario: d.inventario,
       metodos: d.metodos,
@@ -74,6 +77,14 @@ export function AjustesDePedidos({ inicial, ubicaciones, tarjetaConectada }: { i
           <CampoTexto etiqueta="Días que vale una cotización" inputMode="numeric" maxLength={2} ayuda="Hasta el final del último día. La cotización no aparta productos." value={d.diasCotizacion} onChange={(e) => setD({ ...d, diasCotizacion: e.target.value.replace(/\D/g, "") })} />
           <CampoTexto etiqueta="Descuento máximo del agente (%)" inputMode="numeric" maxLength={3} ayuda="Más que eso lo autoriza un administrador o un jefe de tienda (ellos no tienen tope). 0 = sin descuentos." value={d.descuentoMaxAgente} onChange={(e) => setD({ ...d, descuentoMaxAgente: e.target.value.replace(/\D/g, "") })} />
         </div>
+        <AreaTexto
+          etiqueta="Paqueterías (una por línea)"
+          rows={4}
+          maxLength={500}
+          ayuda="Se eligen al marcar un pedido como enviado. Por paquetería se pide el número de guía y la guía adjunta (foto o PDF); en una entrega propia, nada."
+          value={d.paqueterias}
+          onChange={(e) => setD({ ...d, paqueterias: e.target.value })}
+        />
       </section>
 
       <section aria-labelledby="t-inventario" className="flex flex-col gap-4 rounded-tarjeta border border-linea bg-superficie p-4">

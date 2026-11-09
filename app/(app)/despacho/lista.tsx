@@ -6,14 +6,15 @@ import { useState } from "react";
 import { FotoProducto } from "@/app/(app)/catalogo/existencias";
 import { EstadoVacio } from "@/components/ui/estados";
 import { InsigniaEstado } from "@/components/ui/etiquetas";
-import { Boton, CampoTexto } from "@/components/ui/form";
+import { AvisoGuiaManual, EnlaceGuia, ModalEnviado, type DatosEnvioForm } from "@/components/ui/envio";
+import { Boton } from "@/components/ui/form";
 import { EncabezadoPagina, Modal, PestanasConContador } from "@/components/ui/estructura";
 import { useToast } from "@/components/ui/toast";
 import type { EstadoPedido } from "@/generated/prisma/client";
 import type { FilaDespacho } from "@/lib/pedidos/despacho";
 import { formatTelefono } from "@/lib/utils";
 import { useActualizacion } from "@/lib/tiempo-real";
-import { darPaso, listarParaDespacho } from "./actions";
+import { darPaso, enviarDesdeDespacho, listarParaDespacho } from "./actions";
 
 const PESTANAS = [
   { id: "por-preparar", texto: "Por preparar", estados: ["pagado"] },
@@ -27,24 +28,26 @@ const TEXTO_PASO: Partial<Record<EstadoPedido, string>> = {
   enviado: "Marcar como enviado",
   entregado: "Marcar como entregado",
 };
-/** Estos dos pasos le avisan al cliente por el chat: se confirman antes. */
-const AVISAN: readonly EstadoPedido[] = ["listo_para_recoger", "enviado"];
+/** «Listo para recoger» le avisa al cliente por el chat: se confirma antes. «Enviado» tiene su propia ventana (cómo sale y la guía). */
+const AVISAN: readonly EstadoPedido[] = ["listo_para_recoger"];
 
-export function ListaDespacho() {
+export function ListaDespacho({ paqueterias }: { paqueterias: string[] }) {
   const avisar = useToast();
   const { datos, fallo, refrescar } = useActualizacion("despacho", listarParaDespacho, 15_000);
   const [pestana, setPestana] = useState<(typeof PESTANAS)[number]["id"]>("por-preparar");
   const [confirmar, setConfirmar] = useState<{ pedido: FilaDespacho; a: EstadoPedido } | null>(null);
-  const [guia, setGuia] = useState("");
+  const [enviando, setEnviando] = useState<FilaDespacho | null>(null);
+  const [errorEnvio, setErrorEnvio] = useState("");
+  const [guiaManual, setGuiaManual] = useState<{ url: string; nombre: string } | null>(null);
   const [trabajando, setTrabajando] = useState(false);
 
   const filas = datos ?? [];
   const de = (id: (typeof PESTANAS)[number]["id"]) => filas.filter((f) => (PESTANAS.find((p) => p.id === id)!.estados as readonly EstadoPedido[]).includes(f.estado));
   const visibles = de(pestana);
 
-  const ejecutar = async (p: FilaDespacho, a: EstadoPedido, laGuia = "") => {
+  const ejecutar = async (p: FilaDespacho, a: EstadoPedido) => {
     setTrabajando(true);
-    const r = await darPaso(p.id, a, laGuia);
+    const r = await darPaso(p.id, a);
     setTrabajando(false);
     setConfirmar(null);
     if (!r.ok) avisar(r.error, "error");
@@ -53,10 +56,30 @@ export function ListaDespacho() {
     refrescar();
   };
   const pedirPaso = (p: FilaDespacho, a: EstadoPedido) => {
-    if (AVISAN.includes(a)) {
-      setGuia(p.guia ?? "");
-      setConfirmar({ pedido: p, a });
-    } else void ejecutar(p, a);
+    if (a === "enviado") {
+      setErrorEnvio("");
+      setEnviando(p);
+    } else if (AVISAN.includes(a)) setConfirmar({ pedido: p, a });
+    else void ejecutar(p, a);
+  };
+
+  /** «Marcar como enviado»: va como formulario porque lleva el archivo de la guía. */
+  const enviar = async (p: FilaDespacho, d: DatosEnvioForm) => {
+    setTrabajando(true);
+    setErrorEnvio("");
+    const datos = new FormData();
+    datos.set("pedidoId", p.id);
+    datos.set("paqueteria", d.paqueteria);
+    datos.set("guia", d.guia);
+    if (d.archivo) datos.set("archivo", d.archivo);
+    const r = await enviarDesdeDespacho(datos);
+    setTrabajando(false);
+    if (!r.ok) return setErrorEnvio(r.error);
+    setEnviando(null);
+    if (r.aviso && (r.aviso.estado === "copiar" || r.aviso.estado === "fallo")) avisar(`Pedido ${p.codigo} enviado, pero no se pudo avisar al cliente por el chat. Avise a su jefe.`, "error");
+    else avisar(`Pedido ${p.codigo} enviado`);
+    if (r.guia?.estado === "manual") setGuiaManual(r.guia);
+    refrescar();
   };
 
   return (
@@ -89,7 +112,12 @@ export function ListaDespacho() {
                 <InsigniaEstado estado={p.estado} />
               </div>
               {p.entrega === "envio" && p.direccion && <p className="cuerpo whitespace-pre-wrap">{p.direccion}</p>}
-              {p.guia && <p className="meta text-texto-suave">Guía: {p.guia}</p>}
+              {p.guia && (
+                <p className="meta text-texto-suave">
+                  {p.paqueteria ? `${p.paqueteria} · ` : ""}Guía: {p.guia}
+                </p>
+              )}
+              {p.guiaArchivo && <EnlaceGuia guia={p.guiaArchivo} />}
 
               <ul className="flex flex-col divide-y divide-linea rounded-campo border border-linea">
                 {p.lineas.map((l) => (
@@ -135,13 +163,12 @@ export function ListaDespacho() {
             className="flex flex-col gap-4"
             onSubmit={(e) => {
               e.preventDefault();
-              void ejecutar(confirmar.pedido, confirmar.a, guia);
+              void ejecutar(confirmar.pedido, confirmar.a);
             }}
           >
             <p className="cuerpo">
-              El pedido <strong>{confirmar.pedido.codigo}</strong> pasará a «{confirmar.a === "enviado" ? "enviado" : "listo para recoger"}» y <strong>se le avisará al cliente por el chat</strong>.
+              El pedido <strong>{confirmar.pedido.codigo}</strong> pasará a «listo para recoger» y <strong>se le avisará al cliente por el chat</strong>.
             </p>
-            {confirmar.a === "enviado" && <CampoTexto etiqueta="Número de guía" required autoComplete="off" maxLength={60} ayuda="Se manda al cliente en el aviso. Si la entrega es propia, escriba por ejemplo «Entrega propia»." value={guia} onChange={(e) => setGuia(e.target.value)} />}
             <div className="flex justify-end gap-2">
               <Boton variante="secundario" onClick={() => setConfirmar(null)}>
                 Cancelar
@@ -153,6 +180,18 @@ export function ListaDespacho() {
           </form>
         )}
       </Modal>
+      <ModalEnviado
+        abierto={!!enviando}
+        codigo={enviando?.codigo ?? ""}
+        paqueterias={paqueterias}
+        guiaActual={enviando ? { paqueteria: enviando.paqueteria, guia: enviando.guia } : undefined}
+        archivoActual={enviando?.guiaArchivo?.nombre}
+        trabajando={trabajando}
+        error={errorEnvio}
+        onCerrar={() => setEnviando(null)}
+        onConfirmar={(d) => enviando && void enviar(enviando, d)}
+      />
+      <AvisoGuiaManual guia={guiaManual} onCerrar={() => setGuiaManual(null)} />
     </div>
   );
 }

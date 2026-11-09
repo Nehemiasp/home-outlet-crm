@@ -60,11 +60,11 @@ const enviarA = async (cuerpo: object) => {
   return { externalMessageId: id };
 };
 
-/** Imagen del sistema (`/api/archivos/<nombre>`) → id de medio de WhatsApp. Una dirección pública se manda por enlace. */
-async function imagenParaEnviar(url: string): Promise<{ id: string } | { link: string } | null> {
+/** Imagen o PDF del sistema (`/api/archivos/<nombre>`) → id de medio de WhatsApp. Una dirección pública se manda por enlace. */
+async function imagenParaEnviar(url: string, soloPdf = false): Promise<{ id: string } | { link: string } | null> {
   if (/^https:\/\//.test(url)) return { link: url };
   const nombre = url.replace(/^\/api\/archivos\//, "");
-  if (!NOMBRE_VALIDO.test(nombre)) return null;
+  if (!NOMBRE_VALIDO.test(nombre) || nombre.endsWith(".pdf") !== soloPdf) return null; // una imagen no sale como documento ni al revés
   const datos = await almacenamiento.leer(nombre);
   if (!datos) return null;
   const tipo = TIPOS[nombre.split(".").pop()!]!;
@@ -137,6 +137,12 @@ async function enviar(to: string, m: OutboundMessage) {
     return enviarPlantilla(to, m.template);
   }
   const destino = { to: to.replace(/\D/g, "") }; // WhatsApp pide el número con código de país y sin "+"
+  // Un documento (la guía en PDF) se sube igual que una imagen y se manda por su id, con el nombre que verá el cliente.
+  if (m.type === "document") {
+    const medio = m.mediaUrl ? await imagenParaEnviar(m.mediaUrl, true) : null;
+    if (!medio) throw new Error("No se encontró el documento.");
+    return enviarA({ ...destino, type: "document", document: { ...medio, filename: m.filename ?? "documento.pdf", ...(m.text ? { caption: m.text } : {}) } });
+  }
   let texto = m.text;
   let imagen = m.type === "image" ? m.mediaUrl : undefined;
   if (m.type === "product") {
@@ -207,6 +213,7 @@ export async function interpretarEntrada(cuerpo: unknown): Promise<{ messages: I
 export const adaptadorWhatsApp: ChannelAdapter = {
   channel: "whatsapp",
   send: enviar,
+  enviaDocumentos: true,
   listTemplates: plantillas,
   verifySubscription: verificarSuscripcion,
   canSendFreeForm: (conversacion) => ventanaAbierta(conversacion.lastInboundAt),

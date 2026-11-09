@@ -138,6 +138,20 @@ describe("adaptador de WhatsApp (Meta simulado)", () => {
     assert.match(cuerpoDe(llamadas[0]!).text.body, /Licuadora de prueba/);
   });
 
+  test("un PDF del sistema (la guía de envío) se sube y se manda como documento con su nombre; una imagen no sale como documento", async () => {
+    const pdf = await almacenamiento.guardar(Buffer.from("%PDF-1.4\nguía\n"), "pdf");
+    archivos.push(pdf.url.replace("/api/archivos/", ""));
+    simular((u) => (u.endsWith("/media") ? json({ id: "medio-pdf" }) : json({ messages: [{ id: "wamid.doc" }] })));
+    await adaptadorWhatsApp.send("50240432655", { type: "document", mediaUrl: pdf.url, filename: "Guía Forza.pdf" });
+    const subida = llamadas[0]!.init.body as FormData;
+    assert.equal(subida.get("type"), "application/pdf");
+    assert.deepEqual(cuerpoDe(llamadas[1]!), { messaging_product: "whatsapp", to: "50240432655", type: "document", document: { id: "medio-pdf", filename: "Guía Forza.pdf" } });
+
+    simular(() => json({ messages: [{ id: "wamid.x" }] }));
+    await assert.rejects(adaptadorWhatsApp.send("50240432655", { type: "document", mediaUrl: `/api/archivos/${archivos[0]}`, filename: "foto.pdf" }));
+    assert.equal(llamadas.length, 0);
+  });
+
   test("un nombre de archivo que intenta salir de la carpeta no se sube", async () => {
     simular(() => json({ messages: [{ id: "wamid.z" }] }));
     await adaptadorWhatsApp.send("50240432655", { type: "image", mediaUrl: "/api/archivos/../../.env", text: "hola" });

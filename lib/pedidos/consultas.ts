@@ -102,6 +102,8 @@ export type DetallePedido = {
   creada: string;
   notas: string | null;
   guia: string | null;
+  paqueteria: string | null;
+  guiaArchivo: { url: string; nombre: string } | null;
   direccion: string | null;
   departamento: string | null;
   municipio: string | null;
@@ -147,7 +149,7 @@ export async function cargarPedido(id: string, u: Actor): Promise<DetallePedido 
   const enRevision = o.pagos.filter((p) => p.estado === "en_revision").reduce((t, p) => t + p.monto, 0);
   const duplicados = await Promise.all(o.pagos.map(async (p) => (p.estado === "rechazado" ? [] : redactarDuplicados(u, await buscarDuplicados(p.banco, p.referencia, p.id)))));
   return {
-    id: o.id, codigo: o.codigo, estado: o.estado, entrega: o.entrega, canal: o.canal as Channel, creada: o.creada.toISOString(), notas: o.notas, guia: o.guia, direccion: o.direccion, departamento: o.departamento, municipio: o.municipio, zona: o.zona,
+    id: o.id, codigo: o.codigo, estado: o.estado, entrega: o.entrega, canal: o.canal as Channel, creada: o.creada.toISOString(), notas: o.notas, guia: o.guia, paqueteria: o.paqueteria, guiaArchivo: o.guiaArchivoUrl ? { url: o.guiaArchivoUrl, nombre: o.guiaArchivoNombre ?? "guia" } : null, direccion: o.direccion, departamento: o.departamento, municipio: o.municipio, zona: o.zona,
     sobrePedido: o.sobrePedido, reservadoHasta: o.reservadoHasta?.toISOString() ?? null,
     subtotal: o.subtotal, descuentoMonto: o.descuentoMonto, descuentoMotivo: o.descuentoMotivo, costoEnvio: o.costoEnvio, total: o.total,
     contacto: o.contacto, conversacionId: o.conversacionId, creadoPor: o.creadoPor,

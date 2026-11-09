@@ -136,7 +136,7 @@ export async function reintentarMensaje(mensajeId: string): Promise<ResultadoEnv
 
   await db.message.update({ where: { id: msg.id }, data: { estado: "enviando" } });
   try {
-    const tipo = msg.tipo === "product" ? "product" : msg.tipo === "image" ? "image" : "text";
+    const tipo = msg.tipo === "product" ? "product" : msg.tipo === "image" ? "image" : msg.tipo === "document" ? "document" : "text";
     const { externalMessageId } = await canal.send(identidad.externalContactId, { type: tipo, text: msg.texto ?? undefined, mediaUrl: msg.archivoUrl ?? undefined, productId: msg.productoId ?? undefined });
     await db.message.update({ where: { id: msg.id }, data: { externalMessageId, estado: "enviado" } });
     return { ok: true, mensajeId: msg.id };

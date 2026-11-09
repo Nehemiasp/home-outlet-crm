@@ -1,6 +1,7 @@
 import "dotenv/config";
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync, statSync } from "node:fs";
+import { unlink } from "node:fs/promises";
 import path from "node:path";
 import { after, before, describe, test } from "node:test";
 import { cambiarPermisoPagos, cambiarRol } from "@/lib/ajustes";
@@ -128,25 +129,35 @@ describe("despacho de bodega (con base de datos)", () => {
   });
 
   test("bodega avanza el pedido paso a paso, sin saltarse ni cancelar", async () => {
-    assert.equal((await avanzarDespacho(pagado, "cancelado", "", BODEGA_ACTOR())).ok, false);
-    assert.equal((await avanzarDespacho(pagado, "pendiente_pago", "", BODEGA_ACTOR())).ok, false);
-    assert.equal((await avanzarDespacho(pagado, "enviado", "", BODEGA_ACTOR())).ok, false); // falta preparar
-    assert.equal((await avanzarDespacho(pendiente, "preparando", "", BODEGA_ACTOR())).ok, false); // no está pagado
+    const png = new File([Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(24)])], "guia.png", { type: "image/png" });
+    const envio = (guia: string) => ({ paqueteria: "Forza", guia, archivo: png });
+    assert.equal((await avanzarDespacho(pagado, "cancelado", BODEGA_ACTOR())).ok, false);
+    assert.equal((await avanzarDespacho(pagado, "pendiente_pago", BODEGA_ACTOR())).ok, false);
+    assert.equal((await avanzarDespacho(pagado, "enviado", BODEGA_ACTOR(), envio("G-1"))).ok, false); // falta preparar
+    assert.equal((await avanzarDespacho(pendiente, "preparando", BODEGA_ACTOR())).ok, false); // no está pagado
     assert.equal((await db.order.findUniqueOrThrow({ where: { id: pendiente } })).estado, "pendiente_pago");
 
-    assert.equal((await avanzarDespacho(pagado, "preparando", "", BODEGA_ACTOR())).ok, true);
-    assert.equal((await avanzarDespacho(pagado, "enviado", "  ", BODEGA_ACTOR())).ok, false); // enviar exige el número de guía
+    assert.equal((await avanzarDespacho(pagado, "preparando", BODEGA_ACTOR())).ok, true);
+    assert.equal((await avanzarDespacho(pagado, "enviado", BODEGA_ACTOR())).ok, false); // sin decir cómo sale
+    assert.equal((await avanzarDespacho(pagado, "enviado", BODEGA_ACTOR(), envio("  "))).ok, false); // por paquetería exige el número de guía
+    assert.equal((await avanzarDespacho(pagado, "enviado", BODEGA_ACTOR(), { ...envio("G-1"), paqueteria: "Mensajería inventada" })).ok, false); // solo las de Ajustes
     assert.equal((await db.order.findUniqueOrThrow({ where: { id: pagado } })).estado, "preparando");
-    const enviado = await avanzarDespacho(pagado, "enviado", "GUIA-77", BODEGA_ACTOR());
-    assert.equal(enviado.ok, true);
+    const enviado = await avanzarDespacho(pagado, "enviado", BODEGA_ACTOR(), envio("GUIA-77"));
+    assert.ok(enviado.ok && enviado.guia?.estado === "manual"); // bodega sube la guía; sin conversación, se manda a mano
     const o = await db.order.findUniqueOrThrow({ where: { id: pagado } });
-    assert.deepEqual([o.estado, o.guia], ["enviado", "GUIA-77"]);
+    assert.deepEqual([o.estado, o.guia, o.paqueteria], ["enviado", "GUIA-77", "Forza"]);
     assert.equal((await db.orderEvent.count({ where: { pedidoId: pagado, usuarioId: bodega.id } })) >= 2, true); // queda quién lo hizo
-    assert.equal((await avanzarDespacho(pagado, "entregado", "", BODEGA_ACTOR())).ok, true);
+    const nombre = o.guiaArchivoUrl!.replace("/api/archivos/", "");
+    assert.equal(await puedeVerArchivo(bodega, nombre), true); // bodega abre la guía de un pedido en despacho
+    assert.equal((await listarDespacho()).find((f) => f.id === pagado)?.guiaArchivo?.nombre, "guia.png");
+    const asesor = await crearUsuario("asesor-guia", "agente");
+    assert.equal(await puedeVerArchivo({ id: asesor.id, rol: "agente" }, nombre), false); // un asesor no abre la guía de un pedido ajeno
+    assert.equal((await avanzarDespacho(pagado, "entregado", BODEGA_ACTOR())).ok, true);
+    await unlink(path.join(process.cwd(), "uploads", nombre)).catch(() => {});
 
-    assert.equal((await avanzarDespacho(conChat, "preparando", "", BODEGA_ACTOR())).ok, true);
-    assert.equal((await avanzarDespacho(conChat, "listo_para_recoger", "", BODEGA_ACTOR())).ok, true);
-    assert.equal((await avanzarDespacho(enviadoYa, "cancelado", "", BODEGA_ACTOR())).ok, false);
+    assert.equal((await avanzarDespacho(conChat, "preparando", BODEGA_ACTOR())).ok, true);
+    assert.equal((await avanzarDespacho(conChat, "listo_para_recoger", BODEGA_ACTOR())).ok, true);
+    assert.equal((await avanzarDespacho(enviadoYa, "cancelado", BODEGA_ACTOR())).ok, false);
   });
 
   test("bodega solo abre las fotos del catálogo, nunca las del chat ni los comprobantes", async () => {

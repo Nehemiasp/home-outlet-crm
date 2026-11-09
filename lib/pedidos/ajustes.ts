@@ -28,6 +28,8 @@ export type EntradaAjustesPedidos = {
   horasReserva: number;
   /** Cuántos días vale una cotización. */
   diasCotizacion: number;
+  /** Las paqueterías que se ofrecen al marcar un pedido como enviado. */
+  paqueterias: string[];
   descuentoMaxAgente: number;
   inventario: ModoInventario;
   metodos: string[];
@@ -42,6 +44,11 @@ export async function guardarAjustesPedidos(d: EntradaAjustesPedidos, actor: Act
   if (!/^[A-Z0-9-]{1,6}$/.test(prefijo)) return fallo("El prefijo lleva de 1 a 6 letras, números o guiones, por ejemplo HO-.");
   if (!Number.isInteger(d.horasReserva) || d.horasReserva < 1 || d.horasReserva > 720) return fallo("Las horas de reserva van de 1 a 720.");
   if (!Number.isInteger(d.diasCotizacion) || d.diasCotizacion < 1 || d.diasCotizacion > 30) return fallo("Los días que vale una cotización van de 1 a 30.");
+  const paqueterias = d.paqueterias.map((p) => p.trim().replace(/\s+/g, " ")).filter(Boolean);
+  if (paqueterias.length === 0) return fallo("Deje al menos una paquetería (por ejemplo, Forza).");
+  if (paqueterias.length > 10) return fallo("Se pueden tener hasta 10 paqueterías.");
+  if (paqueterias.some((p) => p.length > 40)) return fallo("El nombre de cada paquetería lleva hasta 40 caracteres.");
+  if (new Set(paqueterias.map((p) => p.toLowerCase())).size !== paqueterias.length) return fallo("Hay una paquetería repetida.");
   if (!Number.isInteger(d.descuentoMaxAgente) || d.descuentoMaxAgente < 0 || d.descuentoMaxAgente > 100) return fallo("El descuento máximo del agente va de 0 a 100 %.");
 
   const permitidos = new Set<string>(metodosSeleccionables());
@@ -60,10 +67,10 @@ export async function guardarAjustesPedidos(d: EntradaAjustesPedidos, actor: Act
   if (ids.length !== 2) return fallo("Elija de qué ubicación sale cada tipo de entrega.");
   if ((await db.location.count({ where: { id: { in: ids }, activa: true } })) !== new Set(ids).size) return fallo("Alguna de las ubicaciones ya no existe o está desactivada.");
 
-  const datos = { prefijo, horasReserva: d.horasReserva, diasCotizacion: d.diasCotizacion, descuentoMaxAgente: d.descuentoMaxAgente, inventario: d.inventario, metodos, envioGratisDesde, ubicacionRecogerId: d.ubicacionRecogerId, ubicacionEnvioId: d.ubicacionEnvioId };
+  const datos = { prefijo, horasReserva: d.horasReserva, diasCotizacion: d.diasCotizacion, paqueterias, descuentoMaxAgente: d.descuentoMaxAgente, inventario: d.inventario, metodos, envioGratisDesde, ubicacionRecogerId: d.ubicacionRecogerId, ubicacionEnvioId: d.ubicacionEnvioId };
   await obtenerAjustesPedidos();
   await db.ajustesPedidos.update({ where: { id: "pedidos" }, data: datos });
-  await log(actor, "ajustes_pedidos", "AjustesPedidos", "pedidos", { ...datos, metodos: metodos.join(",") });
+  await log(actor, "ajustes_pedidos", "AjustesPedidos", "pedidos", { ...datos, metodos: metodos.join(","), paqueterias: paqueterias.join(", ") });
   return { ok: true };
 }
 

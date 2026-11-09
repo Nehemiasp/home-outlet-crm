@@ -167,12 +167,18 @@ export function Vista({ inicial, cotizacion }: { inicial: ConversacionDTO; cotiz
     const delAsistente = m.quien === "asistente";
     const base = { hora: horaCorta(m.fecha), estado: m.estado ?? undefined, autor: delAsistente ? undefined : (m.autor ?? undefined), asistente: delAsistente, consultas: delAsistente ? m.consultado : undefined, pedido: m.pedido };
     if (m.producto) return <Burbuja key={m.id} {...base} tipo="producto" producto={m.producto} onReintentar={() => alReintentar(m.id)} />;
-    const texto = m.texto ?? (m.tipo !== "text" && m.tipo !== "image" ? `${TIPOS_SIN_VISTA[m.tipo] ?? "Archivo"}: todavía no se puede mostrar aquí.` : undefined);
+    // Un PDF que mandó el sistema (la guía de envío) se abre aparte; los que no se pueden mostrar se nombran.
+    const documento = m.tipo === "document" && !!m.archivoUrl;
+    const texto = m.texto ?? (documento ? "Documento PDF" : m.tipo !== "text" && m.tipo !== "image" ? `${TIPOS_SIN_VISTA[m.tipo] ?? "Archivo"}: todavía no se puede mostrar aquí.` : undefined);
     const esComprobante = m.entrante && m.tipo === "image" && !!m.archivoUrl && c.pedidosAbiertos.length > 0;
     const acciones = esComprobante ? (
       <Boton variante="secundario" tamano="sm" onClick={() => setComprobante({ mensajeId: m.id, url: m.archivoUrl! })}>
         Registrar como comprobante
       </Boton>
+    ) : documento ? (
+      <a href={m.archivoUrl!} target="_blank" rel="noopener" className="cuerpo-fuerte text-texto hover:underline">
+        Abrir documento
+      </a>
     ) : undefined;
     return <Burbuja key={m.id} {...base} tipo={m.entrante ? "entrante" : "saliente"} texto={texto} imagenUrl={m.tipo === "image" ? (m.archivoUrl ?? undefined) : undefined} onReintentar={() => alReintentar(m.id)} acciones={acciones} />;
   };

@@ -146,7 +146,7 @@ describe("pedidos (con base de datos)", () => {
     ubicB = (await db.location.create({ data: { nombre: "PRUEBA-PED B" } })).id;
   });
   after(async () => {
-    await db.ajustesPedidos.update({ where: { id: "pedidos" }, data: { inventario: originales.inventario, ubicacionRecogerId: originales.ubicacionRecogerId, ubicacionEnvioId: originales.ubicacionEnvioId, prefijo: originales.prefijo, horasReserva: originales.horasReserva, descuentoMaxAgente: originales.descuentoMaxAgente, metodos: originales.metodos, envioGratisDesde: originales.envioGratisDesde } });
+    await db.ajustesPedidos.update({ where: { id: "pedidos" }, data: { inventario: originales.inventario, ubicacionRecogerId: originales.ubicacionRecogerId, ubicacionEnvioId: originales.ubicacionEnvioId, prefijo: originales.prefijo, horasReserva: originales.horasReserva, descuentoMaxAgente: originales.descuentoMaxAgente, metodos: originales.metodos, envioGratisDesde: originales.envioGratisDesde, diasCotizacion: originales.diasCotizacion, paqueterias: originales.paqueterias } });
     await db.order.deleteMany({ where: { contactoId } });
     await db.contact.deleteMany({ where: { nombre: "PRUEBA-PED contacto" } });
     await db.product.deleteMany({ where: { sku: { startsWith: "PRUEBA-PED-" } } });
@@ -265,12 +265,14 @@ describe("pedidos (con base de datos)", () => {
   });
 
   test("ajustes: valida el prefijo, el descuento y que la tarjeta no se pueda encender sin pasarela", async () => {
-    const base = { prefijo: "HO-", horasReserva: 24, diasCotizacion: 3, descuentoMaxAgente: 0, inventario: "separado" as const, metodos: ["transferencia", "deposito"], envioGratisDesde: "", ubicacionRecogerId: ubicA, ubicacionEnvioId: ubicB };
+    const base = { prefijo: "HO-", horasReserva: 24, diasCotizacion: 3, paqueterias: ["Forza", "Cargo Expreso"], descuentoMaxAgente: 0, inventario: "separado" as const, metodos: ["transferencia", "deposito"], envioGratisDesde: "", ubicacionRecogerId: ubicA, ubicacionEnvioId: ubicB };
     assert.equal((await guardarAjustesPedidos({ ...base, prefijo: "ho pedidos" }, actor)).ok, false);
     assert.equal((await guardarAjustesPedidos({ ...base, descuentoMaxAgente: 101 }, actor)).ok, false);
     assert.equal((await guardarAjustesPedidos({ ...base, horasReserva: 0 }, actor)).ok, false);
     assert.equal((await guardarAjustesPedidos({ ...base, diasCotizacion: 0 }, actor)).ok, false);
     assert.equal((await guardarAjustesPedidos({ ...base, diasCotizacion: 31 }, actor)).ok, false);
+    assert.equal((await guardarAjustesPedidos({ ...base, paqueterias: [" ", ""] }, actor)).ok, false); // al menos una
+    assert.equal((await guardarAjustesPedidos({ ...base, paqueterias: ["Forza", "forza"] }, actor)).ok, false); // repetida
     const pasarelaAntes = process.env.PASARELA; // la tarjeta solo se puede encender con una pasarela conectada: aquí no hay ninguna
     delete process.env.PASARELA;
     assert.equal((await guardarAjustesPedidos({ ...base, metodos: ["transferencia", "tarjeta"] }, actor)).ok, false);

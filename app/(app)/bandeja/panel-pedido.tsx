@@ -534,8 +534,10 @@ export function PanelPedido({ abierto, onCerrar, conversacionId, puedeEnviar, on
               {error}
             </p>
           )}
-          {/* Arriba las dos acciones de apoyo, lado a lado; abajo, a todo lo ancho, la principal: enviar el pedido. */}
-          <div className="sticky bottom-0 -mx-4 -mb-4 flex flex-col gap-2 border-t border-linea bg-superficie p-4">
+          {/* Arriba las dos acciones de apoyo, lado a lado; abajo, a todo lo ancho, la principal: enviar el pedido.
+              `-bottom-4`: el panel tiene 16 px de relleno y un pie pegado con bottom-0 quedaría esa distancia por encima del
+              borde, dejando ver por debajo lo que se desplaza. */}
+          <div className="sticky -bottom-4 -mx-4 -mb-4 flex flex-col gap-2 border-t border-linea bg-superficie p-4">
             <div className={cotizacion ? "grid" : "grid grid-cols-2 gap-2"}>
               {/* En un teléfono angosto el texto puede partirse en dos líneas: centrado y sin que el ícono se encoja. */}
               <Boton variante="secundario" onClick={guardar} disabled={trabajando || lineas.length === 0} className="text-center leading-tight">

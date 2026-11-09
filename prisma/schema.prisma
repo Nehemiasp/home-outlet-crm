@@ -484,29 +484,32 @@ enum ModoInventario {
 
 // Montos en centavos de quetzal. El servidor calcula los totales; el navegador nunca los manda.
 model Order {
-  id              String       @id @default(cuid())
-  codigo          String       @unique // HO-000123
-  contactoId      String
-  conversacionId  String?
-  canal           Canal
-  estado          EstadoPedido @default(borrador)
-  subtotal        Int          @default(0)
-  descuentoMonto  Int          @default(0)
-  descuentoMotivo String?
-  costoEnvio      Int          @default(0)
-  total           Int          @default(0)
-  entrega         Entrega      @default(recoger)
-  direccion       String?
-  municipio       String?
-  departamento    String?
-  zona            String?
-  guia            String?
-  notas           String?
-  creadoPorId     String?
-  reservadoHasta  DateTime?
-  sobrePedido     Boolean      @default(false)
-  creada          DateTime     @default(now())
-  actualizada     DateTime     @updatedAt
+  id                String       @id @default(cuid())
+  codigo            String       @unique // HO-000123
+  contactoId        String
+  conversacionId    String?
+  canal             Canal
+  estado            EstadoPedido @default(borrador)
+  subtotal          Int          @default(0)
+  descuentoMonto    Int          @default(0)
+  descuentoMotivo   String?
+  costoEnvio        Int          @default(0)
+  total             Int          @default(0)
+  entrega           Entrega      @default(recoger)
+  direccion         String?
+  municipio         String?
+  departamento      String?
+  zona              String?
+  guia              String?
+  paqueteria        String? // por dónde salió (de la lista de Ajustes); vacío = entrega propia o pedido anterior a esto
+  guiaArchivoUrl    String? // la guía de la paquetería (foto o PDF) en /api/archivos/…; obligatoria al enviar por paquetería
+  guiaArchivoNombre String? // el nombre con que se subió: con él la recibe el cliente y se descarga
+  notas             String?
+  creadoPorId       String?
+  reservadoHasta    DateTime?
+  sobrePedido       Boolean      @default(false)
+  creada            DateTime     @default(now())
+  actualizada       DateTime     @updatedAt
 
   contacto      Contact        @relation(fields: [contactoId], references: [id])
   conversacion  Conversation?  @relation(fields: [conversacionId], references: [id], onDelete: SetNull)
@@ -683,6 +686,7 @@ model AjustesPedidos {
   mensajes            Json? // textos editados de lo que se le manda al cliente: { clave: { activo, texto } }
   diasCotizacion      Int            @default(3) // cuántos días vale una cotización (hasta el final del último día, hora de Guatemala)
   siguienteCotizacion Int            @default(1)
+  paqueterias         String[]       @default(["Forza", "Cargo Expreso", "Guatex"]) // las que se ofrecen al marcar un pedido como enviado
 
   ubicacionRecoger Location? @relation("UbicacionRecoger", fields: [ubicacionRecogerId], references: [id], onDelete: SetNull)
   ubicacionEnvio   Location? @relation("UbicacionEnvio", fields: [ubicacionEnvioId], references: [id], onDelete: SetNull)

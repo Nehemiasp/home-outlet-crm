@@ -24,6 +24,7 @@ const yaFallo = new Set<string>();
 
 export const adaptadorSimulado: ChannelAdapter = {
   channel: "simulado",
+  enviaDocumentos: true, // para probar el envío de la guía en PDF sin un canal real
 
   async send(to, message) {
     if (process.env.NODE_ENV !== "production" && message.text?.trim() === "/fallar") {

@@ -5,7 +5,7 @@ import { esBodega, type ActorPedido } from "@/lib/permisos";
 import { puedeVerPedido } from "@/lib/visibilidad";
 import type { ResultadoAviso } from "./avisos";
 import { siguientes } from "./estados";
-import { avanzarPedido } from "./gestion";
+import { avanzarPedido, marcarEnviado, type EnvioPedido, type ResultadoGuia } from "./gestion";
 
 /**
  * Despacho: lo que necesita quien empaca y entrega (el rol de bodega). Pedidos ya pagados, con los productos, las
@@ -29,6 +29,9 @@ export type FilaDespacho = {
   lugar: string;
   direccion: string | null;
   guia: string | null;
+  paqueteria: string | null;
+  /** La guía de la paquetería adjunta (foto o PDF): bodega la sube y la puede abrir. */
+  guiaArchivo: { url: string; nombre: string } | null;
   notas: string | null;
   creada: string;
   lineas: { id: string; nombre: string; sku: string; cantidad: number; ubicacion: string | null; imagenUrl: string | null }[];
@@ -37,7 +40,7 @@ export type FilaDespacho = {
 };
 
 const SELECCION = {
-  id: true, codigo: true, estado: true, entrega: true, departamento: true, municipio: true, direccion: true, guia: true, notas: true, creada: true,
+  id: true, codigo: true, estado: true, entrega: true, departamento: true, municipio: true, direccion: true, guia: true, paqueteria: true, guiaArchivoUrl: true, guiaArchivoNombre: true, notas: true, creada: true,
   contacto: { select: { nombre: true, telefono: true } },
   lineas: { orderBy: [{ nombre: "asc" }, { id: "asc" }], select: { id: true, nombre: true, sku: true, cantidad: true, ubicacion: { select: { nombre: true } }, producto: { select: { imagenes: true } } } },
 } satisfies Prisma.OrderSelect;
@@ -47,7 +50,7 @@ type Fila = Prisma.OrderGetPayload<{ select: typeof SELECCION }>;
 const aFila = (o: Fila): FilaDespacho => ({
   id: o.id, codigo: o.codigo, estado: o.estado, entrega: o.entrega, cliente: o.contacto.nombre, telefono: o.contacto.telefono,
   departamento: o.departamento, municipio: o.municipio, lugar: o.entrega === "envio" ? textoLugar(o.municipio, o.departamento) : "",
-  direccion: o.direccion, guia: o.guia, notas: o.notas, creada: o.creada.toISOString(),
+  direccion: o.direccion, guia: o.guia, paqueteria: o.paqueteria, guiaArchivo: o.guiaArchivoUrl ? { url: o.guiaArchivoUrl, nombre: o.guiaArchivoNombre ?? "guia" } : null, notas: o.notas, creada: o.creada.toISOString(),
   lineas: o.lineas.map((l) => ({ id: l.id, nombre: l.nombre, sku: l.sku, cantidad: l.cantidad, ubicacion: l.ubicacion?.nombre ?? null, imagenUrl: l.producto?.imagenes[0] ?? null })),
   pasos: siguientes(o.estado, o.entrega).filter((a) => (PASOS_BODEGA as readonly EstadoPedido[]).includes(a)),
 });
@@ -70,10 +73,14 @@ export async function cargarHoja(id: string, u: { id: string; rol: ActorPedido["
 
 type Fallo = { ok: false; error: string };
 
-/** Un paso de bodega sobre un pedido en despacho. Avisa al cliente cuando corresponde (listo para recoger y enviado), como en el detalle. */
-export async function avanzarDespacho(pedidoId: string, a: EstadoPedido, guia: string, actor: ActorPedido & { nombre: string }): Promise<{ ok: true; aviso?: ResultadoAviso } | Fallo> {
+/**
+ * Un paso de bodega sobre un pedido en despacho. Avisa al cliente cuando corresponde (listo para recoger y enviado), como en el
+ * detalle. «Enviado» pide cómo sale (entrega propia o paquetería con guía y archivo): ver `marcarEnviado`.
+ */
+export async function avanzarDespacho(pedidoId: string, a: EstadoPedido, actor: ActorPedido & { nombre: string }, envio?: EnvioPedido): Promise<{ ok: true; aviso?: ResultadoAviso; guia?: ResultadoGuia } | Fallo> {
   if (!(PASOS_BODEGA as readonly EstadoPedido[]).includes(a)) return { ok: false, error: "Ese paso no lo da bodega." };
   const p = await db.order.findUnique({ where: { id: pedidoId }, select: { estado: true } });
   if (!p || !(ESTADOS_DESPACHO as readonly EstadoPedido[]).includes(p.estado)) return { ok: false, error: "El pedido no existe o no está listo para despachar." };
-  return avanzarPedido(pedidoId, a, actor, { guia: a === "enviado" ? guia : undefined });
+  if (a === "enviado") return envio ? marcarEnviado(pedidoId, actor, envio) : { ok: false, error: "Indique cómo sale el pedido." };
+  return avanzarPedido(pedidoId, a, actor);
 }

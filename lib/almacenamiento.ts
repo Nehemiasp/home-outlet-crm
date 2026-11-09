@@ -25,8 +25,8 @@ export const almacenamientoLocal: StorageProvider = {
   },
 };
 
-export const NOMBRE_VALIDO = /^[0-9a-f-]{36}\.(jpg|png|webp)$/;
-export const TIPOS: Record<string, string> = { jpg: "image/jpeg", png: "image/png", webp: "image/webp" };
+export const NOMBRE_VALIDO = /^[0-9a-f-]{36}\.(jpg|png|webp|pdf)$/;
+export const TIPOS: Record<string, string> = { jpg: "image/jpeg", png: "image/png", webp: "image/webp", pdf: "application/pdf" };
 export const MAX_BYTES = 5 * 1024 * 1024;
 
 /** Reconoce la imagen por su contenido, no por el nombre que trae el archivo. */
@@ -37,7 +37,28 @@ export function extensionDeImagen(b: Buffer): "jpg" | "png" | "webp" | null {
   return null;
 }
 
+/** Una guía de paquetería: foto (como las imágenes) o PDF, reconocido por su firma «%PDF-». */
+export function extensionDeGuia(b: Buffer): "jpg" | "png" | "webp" | "pdf" | null {
+  return extensionDeImagen(b) ?? (b.length > 8 && b.toString("ascii", 0, 5) === "%PDF-" ? "pdf" : null);
+}
+
 export const almacenamiento: StorageProvider = almacenamientoLocal;
+
+export type ArchivoDeGuia = { datos: Buffer; ext: "jpg" | "png" | "webp" | "pdf"; nombre: string };
+
+/**
+ * Revisa la guía que llegó en un formulario sin guardarla todavía (se guarda solo si el pedido de verdad pasa a «enviado»):
+ * JPG, PNG, WebP o PDF de hasta 5 MB. El nombre original se limpia: con él la recibe el cliente.
+ */
+export async function revisarGuia(archivo: unknown): Promise<{ ok: true; archivo: ArchivoDeGuia } | { ok: false; error: string }> {
+  if (!(archivo instanceof File) || archivo.size === 0) return { ok: false, error: "Adjunte la guía de la paquetería (foto o PDF)." };
+  if (archivo.size > MAX_BYTES) return { ok: false, error: "La guía pesa más de 5 MB. Elija un archivo más liviano." };
+  const datos = Buffer.from(await archivo.arrayBuffer());
+  const ext = extensionDeGuia(datos);
+  if (!ext) return { ok: false, error: "La guía tiene que ser una foto JPG, PNG o WebP, o un PDF." };
+  const base = archivo.name.replace(/\.[^.]*$/, "").replace(/[^\p{L}\p{N} ._-]/gu, "").trim().slice(0, 60) || "guia";
+  return { ok: true, archivo: { datos, ext, nombre: `${base}.${ext}` } };
+}
 
 /** Valida y guarda una imagen que llegó en un formulario (JPG, PNG o WebP de hasta 5 MB). */
 export async function guardarImagenSubida(archivo: unknown): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
