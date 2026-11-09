@@ -51,7 +51,7 @@ export type TarjetaPedido = {
   total: number;
   cuentas: { banco: string; tipo: "monetaria" | "ahorro"; numero: string; titular: string }[];
   /** Cómo va a pagar el cliente. Con tarjeta o efectivo la tarjeta no lleva cuentas bancarias. Null en los pedidos anteriores. */
-  formaPago?: "transferencia" | "deposito" | "efectivo_en_tienda" | "tarjeta" | null;
+  formaPago?: "transferencia" | "deposito" | "efectivo_en_tienda" | "tarjeta" | "contra_entrega" | null;
   /** El enlace de pago abierto (solo con tarjeta). */
   enlace?: string | null;
 };

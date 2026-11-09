@@ -178,7 +178,7 @@ export async function actualizarGuia(pedidoId: string, guia: string) {
 export async function cambiarFormaPago(pedidoId: string, metodo: string) {
   const a = await actor();
   if (!(await puedeVerPedido(a, id.parse(pedidoId)))) return NO_EXISTE;
-  const m = z.enum(["transferencia", "deposito", "efectivo_en_tienda", "tarjeta"]).safeParse(metodo);
+  const m = z.enum(["transferencia", "deposito", "efectivo_en_tienda", "tarjeta", "contra_entrega"]).safeParse(metodo);
   if (!m.success) return fallo("Esa forma de pago no es válida.");
   return cambiarFormaDePago(id.parse(pedidoId), m.data, a);
 }

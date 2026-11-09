@@ -35,6 +35,10 @@ export type EntradaAjustesPedidos = {
   metodos: string[];
   /** Monto en quetzales; vacío = envío gratis desactivado. */
   envioGratisDesde: string;
+  /** Lo que cuesta el envío con pago contra entrega, en quetzales (Q35 de fábrica). */
+  costoContraEntrega: string;
+  /** Con las demás formas de pago el envío es gratis (no se cobra el costo de la zona). */
+  envioGratisSinContraEntrega: boolean;
   ubicacionRecogerId: string | null;
   ubicacionEnvioId: string | null;
 };
@@ -62,12 +66,14 @@ export async function guardarAjustesPedidos(d: EntradaAjustesPedidos, actor: Act
     envioGratisDesde = parsePrecio(d.envioGratisDesde);
     if (!envioGratisDesde) return fallo("Escriba el monto del envío gratis como un precio, por ejemplo 500.00.");
   }
+  const costoContraEntrega = d.costoContraEntrega.trim() === "0" ? 0 : parsePrecio(d.costoContraEntrega);
+  if (costoContraEntrega === null) return fallo("Escriba el costo del envío contra entrega como un precio, por ejemplo 35.00.");
 
   const ids = [d.ubicacionRecogerId, d.ubicacionEnvioId].filter((x): x is string => !!x);
   if (ids.length !== 2) return fallo("Elija de qué ubicación sale cada tipo de entrega.");
   if ((await db.location.count({ where: { id: { in: ids }, activa: true } })) !== new Set(ids).size) return fallo("Alguna de las ubicaciones ya no existe o está desactivada.");
 
-  const datos = { prefijo, horasReserva: d.horasReserva, diasCotizacion: d.diasCotizacion, paqueterias, descuentoMaxAgente: d.descuentoMaxAgente, inventario: d.inventario, metodos, envioGratisDesde, ubicacionRecogerId: d.ubicacionRecogerId, ubicacionEnvioId: d.ubicacionEnvioId };
+  const datos = { prefijo, horasReserva: d.horasReserva, diasCotizacion: d.diasCotizacion, paqueterias, descuentoMaxAgente: d.descuentoMaxAgente, inventario: d.inventario, metodos, envioGratisDesde, costoContraEntrega, envioGratisSinContraEntrega: d.envioGratisSinContraEntrega, ubicacionRecogerId: d.ubicacionRecogerId, ubicacionEnvioId: d.ubicacionEnvioId };
   await obtenerAjustesPedidos();
   await db.ajustesPedidos.update({ where: { id: "pedidos" }, data: datos });
   await log(actor, "ajustes_pedidos", "AjustesPedidos", "pedidos", { ...datos, metodos: metodos.join(","), paqueterias: paqueterias.join(", ") });

@@ -32,3 +32,13 @@ export function describirZona(z: Pick<Zona, "departamentos" | "municipios">): st
 /** Costo de envío en centavos: 0 si el subtotal alcanza el mínimo de envío gratis (cuando está encendido). */
 export const costoEnvio = (zona: Pick<Zona, "costo">, subtotal: number, envioGratisDesde: number | null) =>
   envioGratisDesde !== null && subtotal >= envioGratisDesde ? 0 : zona.costo;
+
+type ReglaEnvio = { envioGratisDesde: number | null; costoContraEntrega: number; envioGratisSinContraEntrega: boolean };
+
+/**
+ * El costo de envío según la forma de pago (lo pidió Home Outlet): con pago contra entrega, el costo fijo de Ajustes (Q35 de
+ * fábrica); con las demás formas, gratis. Si el administrador apaga «envío gratis con las demás formas», vuelve el costo de la zona.
+ * Sin forma de pago elegida todavía (un borrador), cuenta como las demás.
+ */
+export const costoSegunPago = (aj: ReglaEnvio, zona: Pick<Zona, "costo">, subtotal: number, metodo: string | null | undefined) =>
+  metodo === "contra_entrega" ? aj.costoContraEntrega : aj.envioGratisSinContraEntrega ? 0 : costoEnvio(zona, subtotal, aj.envioGratisDesde);

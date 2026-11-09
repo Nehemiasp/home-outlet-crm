@@ -6,13 +6,13 @@ import { enviarMensaje, salientesRestantes } from "@/lib/mensajeria";
 import { puedeDescontar, puedeSobrePedido } from "@/lib/permisos";
 import { aplicarDatos, textoCuentas } from "@/lib/plantillas";
 import { normalizarTelefono } from "@/lib/telefono";
-import { formatTelefono } from "@/lib/utils";
+import { formatQ, formatTelefono } from "@/lib/utils";
 import { abrirCobro, cancelarCobrosAbiertos } from "@/lib/pagos-tarjeta/abrir";
 import { pasarela } from "@/lib/pagos-tarjeta";
 import type { Prisma, TipoPago } from "@/generated/prisma/client";
 import { listarZonas, obtenerAjustesPedidos } from "./ajustes";
 import { departamentoOficial, lugarGuardado, municipioOficial, textoLugar } from "@/lib/guatemala";
-import { costoEnvio, zonaPara } from "./envio";
+import { costoSegunPago, zonaPara } from "./envio";
 import { disponibleDe, disponibleProducto, apartadoProducto } from "./existencias";
 import { cambiarEstado } from "./flujo";
 import { compatibleConEntrega, METODOS, nombreMetodo } from "./metodos";
@@ -30,12 +30,12 @@ const MAX_LINEAS = 40;
 
 /**
  * Por qué una forma de pago no se puede usar en este pedido, o null si sirve: tiene que estar activa en Ajustes, la tarjeta
- * necesita una pasarela conectada y el efectivo en tienda solo vale cuando el cliente recoge.
+ * necesita una pasarela conectada, el efectivo en tienda solo vale cuando el cliente recoge y el pago contra entrega, cuando se envía.
  */
 export function errorDeForma(metodo: TipoPago, entrega: "recoger" | "envio", activos: readonly TipoPago[]): string | null {
   if (!activos.includes(metodo)) return `${nombreMetodo(metodo)} no está activo en Ajustes → Pagos y envíos.`;
   if (metodo === "tarjeta" && !pasarela()) return "El pago con tarjeta necesita una pasarela de pago conectada.";
-  if (!compatibleConEntrega(metodo, entrega)) return "El pago en efectivo en tienda solo sirve cuando el cliente recoge el pedido.";
+  if (!compatibleConEntrega(metodo, entrega)) return metodo === "contra_entrega" ? "El pago contra entrega solo sirve cuando el pedido se envía." : "El pago en efectivo en tienda solo sirve cuando el cliente recoge el pedido.";
   return null;
 }
 const ABIERTOS = ["borrador", "pendiente_pago", "en_revision"] as const;
@@ -162,7 +162,7 @@ async function preparar(e: EntradaPedido, actor: ActorPedidos) {
     if (!e.direccion.trim()) return fallo("Escriba la dirección de entrega.");
     zona = zonaPara(await listarZonas(), departamento, municipio);
     if (!zona) return fallo(`No hay una zona de envío para ${textoLugar(municipio, departamento)}. Agréguela en Ajustes → Pagos y envíos.`);
-    costo = costoEnvio(zona, subtotal, aj.envioGratisDesde);
+    costo = costoSegunPago(aj, zona, subtotal, e.metodoPago);
     direccion = e.referencia.trim() ? `${e.direccion.trim()}. Referencia: ${e.referencia.trim()}` : e.direccion.trim();
     if (direccion.length > 500) return fallo("La dirección y la referencia pasan de 500 caracteres.");
   }
@@ -339,10 +339,10 @@ export async function construirResumen(pedidoId: string): Promise<string> {
     configMensajes(),
     db.cobroTarjeta.findFirst({ where: { pedidoId, estado: "creado" }, orderBy: { creado: "desc" }, select: { url: true } }),
   ]);
-  const clave = o.metodoPago === "tarjeta" ? "resumen_tarjeta" : o.metodoPago === "efectivo_en_tienda" ? "resumen_efectivo" : "resumen";
+  const clave = o.metodoPago === "tarjeta" ? "resumen_tarjeta" : o.metodoPago === "efectivo_en_tienda" ? "resumen_efectivo" : o.metodoPago === "contra_entrega" ? "resumen_contra_entrega" : "resumen";
   const pie = rellenar(cfg[clave].texto, {
     cuentas: textoCuentas(cuentas) || aplicarDatos("{cuentas}", { ...negocio, cuentas: "" }),
-    horas: textoHoras(aj.horasReserva), codigo: o.codigo, enlace: cobro?.url ?? "",
+    horas: textoHoras(aj.horasReserva), codigo: o.codigo, enlace: cobro?.url ?? "", total: formatQ(o.total),
   });
   return textoResumen({ codigo: o.codigo, lineas: o.lineas, descuentoMonto: o.descuentoMonto, costoEnvio: o.costoEnvio, total: o.total, entrega: o.entrega, departamento: o.departamento, municipio: o.municipio, direccionTienda: negocio.direccion }, pie);
 }
@@ -440,20 +440,30 @@ export async function datosPanel(conversacionId: string, actor: ActorPedidos): P
  * cobro por el saldo; al salir de tarjeta anula el cobro abierto. Con un comprobante por verificar no se puede: primero se resuelve.
  */
 export async function cambiarFormaDePago(pedidoId: string, metodo: TipoPago, actor: ActorPedidos): Promise<ResultadoPedido<{ aviso: ResultadoAviso }>> {
-  const o = await db.order.findUnique({ where: { id: pedidoId }, select: { id: true, estado: true, codigo: true, conversacionId: true, metodoPago: true, entrega: true, total: true } });
+  const o = await db.order.findUnique({ where: { id: pedidoId }, select: { id: true, estado: true, codigo: true, conversacionId: true, metodoPago: true, entrega: true, total: true, subtotal: true, descuentoMonto: true, costoEnvio: true, departamento: true, municipio: true } });
   if (!o) return fallo("El pedido no existe.");
   if (o.estado !== "pendiente_pago") return fallo("Solo se puede cambiar la forma de pago de un pedido pendiente de pago.");
   if (o.metodoPago === metodo) return fallo("El pedido ya tiene esa forma de pago.");
-  const error = errorDeForma(metodo, o.entrega, (await obtenerAjustesPedidos()).metodos);
+  const aj = await obtenerAjustesPedidos();
+  const error = errorDeForma(metodo, o.entrega, aj.metodos);
   if (error) return fallo(error);
   if (await db.payment.count({ where: { pedidoId, estado: "en_revision" } })) return fallo("Hay un comprobante por verificar. Resuélvalo antes de cambiar la forma de pago.");
 
+  // El envío depende de la forma de pago (contra entrega cuesta; las demás, gratis): el total se vuelve a calcular.
+  let costoEnvio = o.costoEnvio;
+  if (o.entrega === "envio") {
+    const zona = zonaPara(await listarZonas(), o.departamento, o.municipio);
+    costoEnvio = zona ? costoSegunPago(aj, zona, o.subtotal, metodo) : metodo === "contra_entrega" ? aj.costoContraEntrega : aj.envioGratisSinContraEntrega ? 0 : o.costoEnvio;
+  }
+  const total = o.subtotal - o.descuentoMonto + costoEnvio;
   if (metodo === "tarjeta") {
     const verificado = (await db.payment.aggregate({ where: { pedidoId, estado: "verificado" }, _sum: { monto: true } }))._sum.monto ?? 0;
-    const c = await abrirCobro({ pedidoId, codigo: o.codigo, monto: saldoDe(o.total, verificado), creadoPorId: actor.id });
+    const c = await abrirCobro({ pedidoId, codigo: o.codigo, monto: saldoDe(total, verificado), creadoPorId: actor.id });
     if (!c.ok) return fallo(c.error);
   }
-  await db.order.update({ where: { id: pedidoId }, data: { metodoPago: metodo } });
+  // Contra entrega no vence (se cobra al entregar); al salir de contra entrega vuelve a correr la reserva.
+  const reservadoHasta = metodo === "contra_entrega" ? null : o.metodoPago === "contra_entrega" ? new Date(Date.now() + aj.horasReserva * 3_600_000) : undefined;
+  await db.order.update({ where: { id: pedidoId }, data: { metodoPago: metodo, costoEnvio, total, ...(reservadoHasta !== undefined ? { reservadoHasta } : {}) } });
   if (o.metodoPago === "tarjeta") await cancelarCobrosAbiertos(pedidoId);
   await log(actor, "cambiar_forma_pago", "Order", pedidoId, { codigo: o.codigo, de: o.metodoPago, a: metodo });
   if (!o.conversacionId) return { ok: true, aviso: { estado: "sin-conversacion" } };

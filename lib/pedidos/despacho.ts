@@ -15,6 +15,8 @@ import { avanzarPedido, marcarEnviado, type EnvioPedido, type ResultadoGuia } fr
 export const ESTADOS_DESPACHO = ["pagado", "preparando", "listo_para_recoger", "enviado"] as const satisfies readonly EstadoPedido[];
 /** Los pasos que bodega puede dar: preparar, dejarlo listo o enviarlo, y entregarlo. No cancela, no reactiva y no toca pagos. */
 export const PASOS_BODEGA = ["preparando", "listo_para_recoger", "enviado", "entregado"] as const satisfies readonly EstadoPedido[];
+/** En despacho: los pagados en adelante y, con pago contra entrega, también los pendientes de pago (salen antes de cobrar). */
+const EN_DESPACHO: Prisma.OrderWhereInput = { OR: [{ estado: { in: [...ESTADOS_DESPACHO] } }, { estado: "pendiente_pago", metodoPago: "contra_entrega" }] };
 
 export type FilaDespacho = {
   id: string;
@@ -40,7 +42,7 @@ export type FilaDespacho = {
 };
 
 const SELECCION = {
-  id: true, codigo: true, estado: true, entrega: true, departamento: true, municipio: true, direccion: true, guia: true, paqueteria: true, guiaArchivoUrl: true, guiaArchivoNombre: true, notas: true, creada: true,
+  id: true, codigo: true, estado: true, entrega: true, metodoPago: true, departamento: true, municipio: true, direccion: true, guia: true, paqueteria: true, guiaArchivoUrl: true, guiaArchivoNombre: true, notas: true, creada: true,
   contacto: { select: { nombre: true, telefono: true } },
   lineas: { orderBy: [{ nombre: "asc" }, { id: "asc" }], select: { id: true, nombre: true, sku: true, cantidad: true, ubicacion: { select: { nombre: true } }, producto: { select: { imagenes: true } } } },
 } satisfies Prisma.OrderSelect;
@@ -52,12 +54,13 @@ const aFila = (o: Fila): FilaDespacho => ({
   departamento: o.departamento, municipio: o.municipio, lugar: o.entrega === "envio" ? textoLugar(o.municipio, o.departamento) : "",
   direccion: o.direccion, guia: o.guia, paqueteria: o.paqueteria, guiaArchivo: o.guiaArchivoUrl ? { url: o.guiaArchivoUrl, nombre: o.guiaArchivoNombre ?? "guia" } : null, notas: o.notas, creada: o.creada.toISOString(),
   lineas: o.lineas.map((l) => ({ id: l.id, nombre: l.nombre, sku: l.sku, cantidad: l.cantidad, ubicacion: l.ubicacion?.nombre ?? null, imagenUrl: l.producto?.imagenes[0] ?? null })),
-  pasos: siguientes(o.estado, o.entrega).filter((a) => (PASOS_BODEGA as readonly EstadoPedido[]).includes(a)),
+  // La forma de pago solo se usa para saber los pasos (contra entrega se prepara sin pago previo); no viaja a la pantalla de bodega.
+  pasos: siguientes(o.estado, o.entrega, o.metodoPago).filter((a) => (PASOS_BODEGA as readonly EstadoPedido[]).includes(a)),
 });
 
 /** Los pedidos por despachar, del más antiguo al más nuevo (el primero en pagar, el primero en salir). */
 export async function listarDespacho(): Promise<FilaDespacho[]> {
-  const filas = await db.order.findMany({ where: { estado: { in: [...ESTADOS_DESPACHO] } }, orderBy: { creada: "asc" }, take: 200, select: SELECCION });
+  const filas = await db.order.findMany({ where: EN_DESPACHO, orderBy: { creada: "asc" }, take: 200, select: SELECCION });
   return filas.map(aFila);
 }
 
@@ -67,7 +70,7 @@ export async function listarDespacho(): Promise<FilaDespacho[]> {
  */
 export async function cargarHoja(id: string, u: { id: string; rol: ActorPedido["rol"] }): Promise<FilaDespacho | null> {
   if (!esBodega(u) && !(await puedeVerPedido(u, id))) return null;
-  const o = await db.order.findFirst({ where: { id, ...(esBodega(u) ? { estado: { in: [...ESTADOS_DESPACHO] } } : {}) }, select: SELECCION });
+  const o = await db.order.findFirst({ where: { id, ...(esBodega(u) ? EN_DESPACHO : {}) }, select: SELECCION });
   return o ? aFila(o) : null;
 }
 
@@ -79,8 +82,8 @@ type Fallo = { ok: false; error: string };
  */
 export async function avanzarDespacho(pedidoId: string, a: EstadoPedido, actor: ActorPedido & { nombre: string }, envio?: EnvioPedido): Promise<{ ok: true; aviso?: ResultadoAviso; guia?: ResultadoGuia } | Fallo> {
   if (!(PASOS_BODEGA as readonly EstadoPedido[]).includes(a)) return { ok: false, error: "Ese paso no lo da bodega." };
-  const p = await db.order.findUnique({ where: { id: pedidoId }, select: { estado: true } });
-  if (!p || !(ESTADOS_DESPACHO as readonly EstadoPedido[]).includes(p.estado)) return { ok: false, error: "El pedido no existe o no está listo para despachar." };
+  const p = await db.order.findFirst({ where: { id: pedidoId, ...EN_DESPACHO }, select: { estado: true } });
+  if (!p) return { ok: false, error: "El pedido no existe o no está listo para despachar." };
   if (a === "enviado") return envio ? marcarEnviado(pedidoId, actor, envio) : { ok: false, error: "Indique cómo sale el pedido." };
   return avanzarPedido(pedidoId, a, actor);
 }

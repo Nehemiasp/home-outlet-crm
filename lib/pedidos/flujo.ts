@@ -15,10 +15,10 @@ export type ResultadoEstado = { ok: true; estado: EstadoPedido } | { ok: false; 
 export async function cambiarEstado(p: { pedidoId: string; a: EstadoPedido; quien: QuienCambia; nota?: string; sobrePedido?: boolean }): Promise<ResultadoEstado> {
   try {
     return await db.$transaction(async (tx) => {
-      const pedido = await tx.order.findUnique({ where: { id: p.pedidoId }, select: { estado: true, entrega: true, sobrePedido: true } });
+      const pedido = await tx.order.findUnique({ where: { id: p.pedidoId }, select: { estado: true, entrega: true, sobrePedido: true, metodoPago: true } });
       if (!pedido) return { ok: false, error: "El pedido no existe." } as const;
       const de = pedido.estado;
-      if (!transicionValida(de, p.a, pedido.entrega)) return { ok: false, error: `Un pedido ${ETIQUETA_ESTADO[de].toLowerCase()} no puede pasar a ${ETIQUETA_ESTADO[p.a].toLowerCase()}.` } as const;
+      if (!transicionValida(de, p.a, pedido.entrega, pedido.metodoPago)) return { ok: false, error: `Un pedido ${ETIQUETA_ESTADO[de].toLowerCase()} no puede pasar a ${ETIQUETA_ESTADO[p.a].toLowerCase()}.` } as const;
 
       // Solo el primero que llega cambia el estado; si dos personas lo intentan a la vez, la otra recibe este aviso.
       if ((await tx.order.updateMany({ where: { id: p.pedidoId, estado: de }, data: { estado: p.a } })).count === 0) return { ok: false, error: "El pedido acaba de cambiar. Ábralo de nuevo." } as const;
@@ -29,7 +29,12 @@ export async function cambiarEstado(p: { pedidoId: string; a: EstadoPedido; quie
         const o = await tx.order.findUniqueOrThrow({ where: { id: p.pedidoId }, select: { entrega: true } });
         const sobrePedido = !!p.sobrePedido;
         await apartar(tx, p.pedidoId, { modo: aj.inventario, ubicacionDespacho: o.entrega === "recoger" ? aj.ubicacionRecogerId : aj.ubicacionEnvioId, sobrePedido });
-        await tx.order.update({ where: { id: p.pedidoId }, data: { reservadoHasta: new Date(Date.now() + aj.horasReserva * 3_600_000), sobrePedido } });
+        // Con pago contra entrega no vence: el cliente paga al recibir, después de que el pedido sale.
+        await tx.order.update({ where: { id: p.pedidoId }, data: { reservadoHasta: pedido.metodoPago === "contra_entrega" ? null : new Date(Date.now() + aj.horasReserva * 3_600_000), sobrePedido } });
+      } else if (p.a === "preparando" && reservaba) {
+        // Pago contra entrega: se prepara sin pago previo, así que aquí salen las unidades apartadas.
+        await descontar(tx, p.pedidoId);
+        await tx.order.update({ where: { id: p.pedidoId }, data: { reservadoHasta: null } });
       } else if (p.a === "pagado") {
         await descontar(tx, p.pedidoId);
         await tx.order.update({ where: { id: p.pedidoId }, data: { reservadoHasta: null } });

@@ -139,6 +139,8 @@ const ajustesPedidos = z.object({
   inventario: z.enum(["separado", "compartido"]),
   metodos: z.array(z.string().max(30)).max(10),
   envioGratisDesde: z.string().max(20),
+  costoContraEntrega: z.string().max(20),
+  envioGratisSinContraEntrega: z.boolean(),
   ubicacionRecogerId: id.nullable(),
   ubicacionEnvioId: id.nullable(),
 });

@@ -117,7 +117,7 @@ export function Detalle({ inicial }: { inicial: PedidoConPermisos }) {
     tras(r.aviso);
   };
 
-  const sig = siguientes(p.estado, p.entrega);
+  const sig = siguientes(p.estado, p.entrega, p.metodoPago); // con pago contra entrega se prepara sin pago previo
   const puedeReactivar = p.estado === "vencido";
   const puedeCancelarAhora = puedeCancelar && sig.includes("cancelado");
   const primerPagoPorVerificar = p.pagos.find((x) => x.estado === "en_revision");

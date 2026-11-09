@@ -120,7 +120,7 @@ export type TarjetaPedidoUI = {
   total: number;
   cuentas: { banco: string; tipo: "monetaria" | "ahorro"; numero: string; titular: string }[];
   /** Cómo va a pagar el cliente. Con tarjeta o efectivo la tarjeta no lleva cuentas bancarias. Null en los pedidos anteriores. */
-  formaPago?: "transferencia" | "deposito" | "efectivo_en_tienda" | "tarjeta" | null;
+  formaPago?: "transferencia" | "deposito" | "efectivo_en_tienda" | "tarjeta" | "contra_entrega" | null;
   /** El enlace de pago abierto (solo con tarjeta). */
   enlace?: string | null;
 };
@@ -177,6 +177,12 @@ function TarjetaDePedido({ p }: { p: TarjetaPedidoUI }) {
         <div>
           <p className="titulo-seccion mb-1 text-texto-suave">Pago en efectivo</p>
           <p className="meta text-texto">El cliente paga en efectivo al recoger el pedido en la tienda.</p>
+        </div>
+      )}
+      {p.formaPago === "contra_entrega" && (
+        <div>
+          <p className="titulo-seccion mb-1 text-texto-suave">Pago contra entrega</p>
+          <p className="meta text-texto">El cliente paga al recibir el pedido.</p>
         </div>
       )}
       {p.cuentas.length > 0 && (

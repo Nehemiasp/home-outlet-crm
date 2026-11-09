@@ -39,8 +39,8 @@ describe("estados del pedido", () => {
 describe("métodos de pago", () => {
   test("la tarjeta se puede encender solo si hay una pasarela (se valida al guardar los ajustes; ver tests/tarjeta.test.ts)", () => {
     assert.ok(METODOS.some((m) => m.id === "tarjeta" && m.disponible && !m.porDefecto));
-    assert.deepEqual(metodosSeleccionables(), ["transferencia", "deposito", "efectivo_en_tienda", "tarjeta"]);
-    assert.deepEqual(METODOS.filter((m) => m.porDefecto).map((m) => m.id), ["transferencia", "deposito"]);
+    assert.deepEqual(metodosSeleccionables(), ["transferencia", "deposito", "efectivo_en_tienda", "tarjeta", "contra_entrega"]);
+    assert.deepEqual(METODOS.filter((m) => m.porDefecto).map((m) => m.id), ["transferencia", "deposito", "contra_entrega"]);
   });
 });
 
@@ -146,7 +146,7 @@ describe("pedidos (con base de datos)", () => {
     ubicB = (await db.location.create({ data: { nombre: "PRUEBA-PED B" } })).id;
   });
   after(async () => {
-    await db.ajustesPedidos.update({ where: { id: "pedidos" }, data: { inventario: originales.inventario, ubicacionRecogerId: originales.ubicacionRecogerId, ubicacionEnvioId: originales.ubicacionEnvioId, prefijo: originales.prefijo, horasReserva: originales.horasReserva, descuentoMaxAgente: originales.descuentoMaxAgente, metodos: originales.metodos, envioGratisDesde: originales.envioGratisDesde, diasCotizacion: originales.diasCotizacion, paqueterias: originales.paqueterias } });
+    await db.ajustesPedidos.update({ where: { id: "pedidos" }, data: { inventario: originales.inventario, ubicacionRecogerId: originales.ubicacionRecogerId, ubicacionEnvioId: originales.ubicacionEnvioId, prefijo: originales.prefijo, horasReserva: originales.horasReserva, descuentoMaxAgente: originales.descuentoMaxAgente, metodos: originales.metodos, envioGratisDesde: originales.envioGratisDesde, costoContraEntrega: originales.costoContraEntrega, envioGratisSinContraEntrega: originales.envioGratisSinContraEntrega, diasCotizacion: originales.diasCotizacion, paqueterias: originales.paqueterias } });
     await db.order.deleteMany({ where: { contactoId } });
     await db.contact.deleteMany({ where: { nombre: "PRUEBA-PED contacto" } });
     await db.product.deleteMany({ where: { sku: { startsWith: "PRUEBA-PED-" } } });
@@ -265,7 +265,7 @@ describe("pedidos (con base de datos)", () => {
   });
 
   test("ajustes: valida el prefijo, el descuento y que la tarjeta no se pueda encender sin pasarela", async () => {
-    const base = { prefijo: "HO-", horasReserva: 24, diasCotizacion: 3, paqueterias: ["Forza", "Cargo Expreso"], descuentoMaxAgente: 0, inventario: "separado" as const, metodos: ["transferencia", "deposito"], envioGratisDesde: "", ubicacionRecogerId: ubicA, ubicacionEnvioId: ubicB };
+    const base = { prefijo: "HO-", horasReserva: 24, diasCotizacion: 3, paqueterias: ["Forza", "Cargo Expreso"], costoContraEntrega: "35.00", envioGratisSinContraEntrega: true, descuentoMaxAgente: 0, inventario: "separado" as const, metodos: ["transferencia", "deposito"], envioGratisDesde: "", ubicacionRecogerId: ubicA, ubicacionEnvioId: ubicB };
     assert.equal((await guardarAjustesPedidos({ ...base, prefijo: "ho pedidos" }, actor)).ok, false);
     assert.equal((await guardarAjustesPedidos({ ...base, descuentoMaxAgente: 101 }, actor)).ok, false);
     assert.equal((await guardarAjustesPedidos({ ...base, horasReserva: 0 }, actor)).ok, false);
@@ -279,6 +279,7 @@ describe("pedidos (con base de datos)", () => {
     if (pasarelaAntes !== undefined) process.env.PASARELA = pasarelaAntes;
     assert.equal((await guardarAjustesPedidos({ ...base, metodos: [] }, actor)).ok, false);
     assert.equal((await guardarAjustesPedidos({ ...base, envioGratisDesde: "mucho" }, actor)).ok, false);
+    assert.equal((await guardarAjustesPedidos({ ...base, costoContraEntrega: "caro" }, actor)).ok, false);
     assert.equal((await guardarAjustesPedidos({ ...base, ubicacionEnvioId: "no-existe" }, actor)).ok, false);
     assert.equal((await guardarAjustesPedidos({ ...base, prefijo: " ho- ", horasReserva: 48, descuentoMaxAgente: 5, envioGratisDesde: "500.00" }, actor)).ok, true);
     const a = await obtenerAjustesPedidos();

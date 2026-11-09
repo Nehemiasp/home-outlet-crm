@@ -470,7 +470,9 @@ export function PanelPedido({ abierto, onCerrar, conversacionId, puedeEnviar, on
                     ? "Al enviar el pedido, el cliente recibe también un enlace seguro para pagar con tarjeta."
                     : metodoPago === "efectivo_en_tienda"
                       ? "El cliente paga en efectivo al recoger. El pago se registra y se confirma cuando llegue."
-                      : metodoPago
+                      : metodoPago === "contra_entrega"
+                        ? "El cliente paga al recibir el envío; el costo del envío sale en el resumen. El pedido se puede preparar sin esperar el pago y el cobro queda registrado al marcarlo como entregado."
+                        : metodoPago
                         ? "El resumen lleva las cuentas bancarias; el cliente manda la foto del comprobante por el chat."
                         : "Pregúntele al cliente cómo quiere pagar. Hace falta para poder enviar el pedido."}
                 </p>

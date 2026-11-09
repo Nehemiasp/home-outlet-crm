@@ -1,7 +1,7 @@
 import { textoLugar } from "@/lib/guatemala";
 import { formatQ } from "@/lib/utils";
 
-export type ClaveMensaje = "resumen" | "comprobante_recibido" | "pago_confirmado" | "pago_parcial" | "pago_rechazado" | "listo_para_recoger" | "enviado" | "vencido" | "por_vencer" | "enlace_tarjeta" | "resumen_tarjeta" | "resumen_efectivo" | "cotizacion";
+export type ClaveMensaje = "resumen_contra_entrega" | "resumen" | "comprobante_recibido" | "pago_confirmado" | "pago_parcial" | "pago_rechazado" | "listo_para_recoger" | "enviado" | "vencido" | "por_vencer" | "enlace_tarjeta" | "resumen_tarjeta" | "resumen_efectivo" | "cotizacion";
 export type VariablesMensaje = Partial<Record<"codigo" | "total" | "saldo" | "cuentas" | "direccion" | "horario" | "guia" | "horas" | "motivo" | "enlace" | "vence", string>>;
 
 /**
@@ -25,6 +25,11 @@ export const MENSAJES: Record<ClaveMensaje, { titulo: string; texto: string; act
   resumen_efectivo: {
     titulo: "Resumen del pedido pagando en efectivo (texto al pie)",
     texto: "Pagará en efectivo al recoger su pedido en la tienda.\n\n📌 Recuerde:\n• Indique el número de pedido {codigo} al llegar.\n• Apartamos sus productos por {horas}. Pasado ese tiempo se liberan.\n\n¡Lo esperamos! 🧡",
+    activo: true,
+  },
+  resumen_contra_entrega: {
+    titulo: "Resumen del pedido con pago contra entrega (texto al pie)",
+    texto: "Pagará {total} al recibir su pedido.\n\n📌 Recuerde:\n• Tenga listo el pago cuando llegue la entrega.\n• Le avisaremos por este chat cuando su pedido vaya en camino. 🧡",
     activo: true,
   },
   comprobante_recibido: {

@@ -172,6 +172,14 @@ Se elige al crear el pedido (**Forma de pago → Tarjeta**) y el administrador t
 ### Pago en efectivo
 El cliente paga en la tienda al recoger. Cuando llegue, registre el pago (**Registrar comprobante**, método **Efectivo en la tienda**) y confírmelo con **Verificar pago**.
 
+### Pago contra entrega
+El cliente paga al recibir su pedido. Solo se puede elegir con **Envío**.
+- **El envío cuesta Q35** con contra entrega; con transferencia, depósito o tarjeta el envío es **gratis**. Los dos se cambian en **Ajustes → Pagos y envíos → Costo del envío**.
+- El cliente recibe el resumen con el total que pagará al recibir. El pedido **no vence**.
+- No hace falta esperar el pago: el pedido se puede **preparar** (en el detalle o en Despacho) y luego **enviar**. Al prepararlo se descuenta la existencia.
+- Al marcarlo como **entregado**, el cobro queda registrado y verificado a nombre de quien lo marcó.
+- Si el cliente cambia de forma de pago mientras está pendiente, el total se vuelve a calcular con el envío que corresponda.
+
 ### Si el cliente cambia de idea
 Mientras el pedido siga **pendiente de pago**, en el detalle use **Cambiar forma de pago** y elija la nueva: el sistema le manda al cliente el resumen actualizado (con el enlace si es tarjeta, con las cuentas si es banco). Si ya hay un comprobante por verificar, primero resuélvalo. Si cambió **desde tarjeta** y el cliente igualmente pagó el enlace anterior, ese pago queda **en revisión** (no se pierde) para que lo revise una persona.
 

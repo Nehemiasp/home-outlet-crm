@@ -87,7 +87,8 @@ describe("crear y enviar pedidos (con base de datos)", () => {
 
     ubicA = (await db.location.create({ data: { nombre: "PRUEBA-CR A" } })).id;
     ubicB = (await db.location.create({ data: { nombre: "PRUEBA-CR B" } })).id;
-    await ajustes({ inventario: "separado", ubicacionRecogerId: ubicA, ubicacionEnvioId: ubicB, descuentoMaxAgente: 0, envioGratisDesde: null, horasReserva: 24, prefijo: "PRCR-" });
+    // Aquí se prueba el costo de la zona: el envío gratis con las demás formas de pago (el de fábrica) va apagado (ver tests/contra-entrega.test.ts).
+    await ajustes({ inventario: "separado", ubicacionRecogerId: ubicA, ubicacionEnvioId: ubicB, descuentoMaxAgente: 0, envioGratisDesde: null, horasReserva: 24, prefijo: "PRCR-", envioGratisSinContraEntrega: false });
     producto = await nuevoProducto(10, 10);
 
     const contacto = await db.contact.create({ data: { nombre: "PRUEBA-CR cliente" } });
@@ -102,7 +103,7 @@ describe("crear y enviar pedidos (con base de datos)", () => {
     await db.bankAccount.create({ data: { banco: "PRUEBA-CR Banco", tipo: "monetaria", numero: "000-000000-0", titular: "Home Outlet" } });
   });
   after(async () => {
-    await ajustes({ inventario: originales.inventario, ubicacionRecogerId: originales.ubicacionRecogerId, ubicacionEnvioId: originales.ubicacionEnvioId, descuentoMaxAgente: originales.descuentoMaxAgente, envioGratisDesde: originales.envioGratisDesde, horasReserva: originales.horasReserva, prefijo: originales.prefijo, siguienteNumero: originales.siguienteNumero });
+    await ajustes({ inventario: originales.inventario, ubicacionRecogerId: originales.ubicacionRecogerId, ubicacionEnvioId: originales.ubicacionEnvioId, descuentoMaxAgente: originales.descuentoMaxAgente, envioGratisDesde: originales.envioGratisDesde, horasReserva: originales.horasReserva, prefijo: originales.prefijo, siguienteNumero: originales.siguienteNumero, envioGratisSinContraEntrega: originales.envioGratisSinContraEntrega });
     await db.order.deleteMany({ where: { contactoId } });
     await db.conversation.deleteMany({ where: { contactoId } });
     await db.contact.deleteMany({ where: { id: contactoId } });

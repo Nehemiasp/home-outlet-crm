@@ -18,6 +18,8 @@ type Datos = {
   metodos: string[];
   envioGratis: boolean;
   envioGratisDesde: string;
+  costoContraEntrega: string;
+  envioGratisSinContraEntrega: boolean;
   ubicacionRecogerId: string | null;
   ubicacionEnvioId: string | null;
 };
@@ -46,6 +48,8 @@ export function AjustesDePedidos({ inicial, ubicaciones, tarjetaConectada }: { i
       inventario: d.inventario,
       metodos: d.metodos,
       envioGratisDesde: d.envioGratis ? d.envioGratisDesde : "",
+      costoContraEntrega: d.costoContraEntrega,
+      envioGratisSinContraEntrega: d.envioGratisSinContraEntrega,
       ubicacionRecogerId: d.ubicacionRecogerId,
       ubicacionEnvioId: d.ubicacionEnvioId,
     });
@@ -106,10 +110,21 @@ export function AjustesDePedidos({ inicial, ubicaciones, tarjetaConectada }: { i
       </section>
 
       <section aria-labelledby="t-gratis" className="flex flex-col gap-3 rounded-tarjeta border border-linea bg-superficie p-4">
-        <h2 id="t-gratis" className="titulo-panel">Envío gratis</h2>
-        <Interruptor etiqueta="Envío gratis a partir de un monto" activo={d.envioGratis} onCambio={(a) => setD({ ...d, envioGratis: a })} />
-        {d.envioGratis && (
-          <CampoTexto etiqueta="Monto mínimo del subtotal (Q)" inputMode="decimal" autoComplete="off" maxLength={12} className="max-w-48" value={d.envioGratisDesde} onChange={(e) => setD({ ...d, envioGratisDesde: e.target.value })} />
+        <h2 id="t-gratis" className="titulo-panel">Costo del envío</h2>
+        <CampoTexto etiqueta="Envío con pago contra entrega (Q)" inputMode="decimal" autoComplete="off" maxLength={12} className="max-w-48" ayuda="Lo que se cobra por el envío cuando el cliente paga al recibir, sin importar la zona." value={d.costoContraEntrega} onChange={(e) => setD({ ...d, costoContraEntrega: e.target.value })} />
+        <Interruptor etiqueta="Envío gratis con las demás formas de pago" activo={d.envioGratisSinContraEntrega} onCambio={(a) => setD({ ...d, envioGratisSinContraEntrega: a })} />
+        <p className="meta text-texto-suave">
+          {d.envioGratisSinContraEntrega
+            ? "Con transferencia, depósito o tarjeta el envío no se cobra. Las zonas siguen sirviendo para saber a dónde se entrega y en cuánto tiempo."
+            : "Con transferencia, depósito o tarjeta se cobra el costo de la zona de envío."}
+        </p>
+        {!d.envioGratisSinContraEntrega && (
+          <>
+            <Interruptor etiqueta="Envío gratis a partir de un monto" activo={d.envioGratis} onCambio={(a) => setD({ ...d, envioGratis: a })} />
+            {d.envioGratis && (
+              <CampoTexto etiqueta="Monto mínimo del subtotal (Q)" inputMode="decimal" autoComplete="off" maxLength={12} className="max-w-48" value={d.envioGratisDesde} onChange={(e) => setD({ ...d, envioGratisDesde: e.target.value })} />
+            )}
+          </>
         )}
       </section>
 

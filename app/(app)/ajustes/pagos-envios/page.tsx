@@ -36,6 +36,8 @@ export default async function Pagina() {
           metodos: a.metodos,
           envioGratis: a.envioGratisDesde !== null,
           envioGratisDesde: a.envioGratisDesde !== null ? (a.envioGratisDesde / 100).toFixed(2) : "",
+          costoContraEntrega: (a.costoContraEntrega / 100).toFixed(2),
+          envioGratisSinContraEntrega: a.envioGratisSinContraEntrega,
           ubicacionRecogerId: a.ubicacionRecogerId,
           ubicacionEnvioId: a.ubicacionEnvioId,
         }}

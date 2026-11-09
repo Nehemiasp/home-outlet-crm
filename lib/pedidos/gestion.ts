@@ -8,6 +8,8 @@ import { puedeCancelarPedido, puedeSobrePedido, type ActorPedido } from "@/lib/p
 import type { EstadoPedido } from "@/generated/prisma/client";
 import { avisarCliente, type ResultadoAviso } from "./avisos";
 import { ETIQUETA_ESTADO, transicionValida } from "./estados";
+import { saldoDe } from "./totales";
+import { formatQ } from "@/lib/utils";
 import { cambiarEstado } from "./flujo";
 import { lineaDeSistema } from "./pedidos";
 import { veTodo } from "@/lib/permisos";
@@ -30,7 +32,7 @@ type DatosEnvio = { nota: string; datos: { paqueteria: string | null; guia: stri
 export async function avanzarPedido(pedidoId: string, a: EstadoPedido, actor: Actor, o: { sobrePedido?: boolean; envio?: DatosEnvio } = {}): Promise<{ ok: true; aviso?: ResultadoAviso } | Fallo> {
   if (!MANUALES.includes(a)) return fallo("Ese cambio se hace verificando los comprobantes de pago.");
   if (a === "enviado" && !o.envio) return fallo("Indique cómo sale el pedido: entrega propia o paquetería, con su guía.");
-  const p = await db.order.findUnique({ where: { id: pedidoId }, select: { estado: true, creadoPorId: true, codigo: true, conversacionId: true, pagos: { where: { estado: "verificado" }, select: { id: true } } } });
+  const p = await db.order.findUnique({ where: { id: pedidoId }, select: { estado: true, creadoPorId: true, codigo: true, conversacionId: true, metodoPago: true, total: true, pagos: { where: { estado: "verificado" }, select: { id: true, monto: true } } } });
   if (!p) return fallo("El pedido no existe.");
   if (a === "pendiente_pago" && p.estado !== "vencido") return fallo("Solo se reactiva un pedido vencido.");
   if (a === "cancelado" && !puedeCancelarPedido(actor, p, p.pagos.length > 0)) return fallo(veTodo(actor) ? "No se puede cancelar este pedido." : "Solo puede cancelar los pedidos que creó y que todavía no tienen un pago verificado.");
@@ -42,6 +44,15 @@ export async function avanzarPedido(pedidoId: string, a: EstadoPedido, actor: Ac
   if (a === "enviado" && o.envio) await db.order.update({ where: { id: pedidoId }, data: o.envio.datos });
   await log(actor, a === "cancelado" ? "cancelar_pedido" : "estado_pedido", "Order", pedidoId, { codigo: p.codigo, de: p.estado, a });
   if (p.conversacionId) await lineaDeSistema(actor, p.conversacionId, `${actor.nombre} pasó el pedido ${p.codigo} a «${ETIQUETA_ESTADO[a].toLowerCase()}»`);
+  // Pago contra entrega: entregarlo es cobrarlo. Queda el pago registrado y verificado por quien marcó la entrega.
+  if (a === "entregado" && p.metodoPago === "contra_entrega") {
+    const saldo = saldoDe(p.total, p.pagos.reduce((t, x) => t + x.monto, 0));
+    if (saldo > 0) {
+      const ahora = new Date();
+      await db.payment.create({ data: { pedidoId, tipo: "contra_entrega", monto: saldo, fechaPago: ahora, estado: "verificado", verificadoPorId: actor.id, verificadoEn: ahora, registradoPorId: actor.id } });
+      if (p.conversacionId) await lineaDeSistema(actor, p.conversacionId, `Cobro contra entrega de ${formatQ(saldo)} registrado al entregar el pedido ${p.codigo}`);
+    }
+  }
   const clave = AVISA[a];
   return { ok: true, aviso: clave ? await avisarCliente(pedidoId, clave, { usuarioId: actor.id }) : undefined };
 }
@@ -57,10 +68,10 @@ export type ResultadoGuia = { estado: "enviada" | "manual"; url: string; nombre:
  * guarda si el pedido de verdad puede pasar a «enviado». Al cliente le llega el aviso con la guía y, después, el archivo.
  */
 export async function marcarEnviado(pedidoId: string, actor: Actor, e: EnvioPedido): Promise<{ ok: true; aviso?: ResultadoAviso; guia?: ResultadoGuia } | Fallo> {
-  const p = await db.order.findUnique({ where: { id: pedidoId }, select: { estado: true, entrega: true, conversacionId: true, guiaArchivoUrl: true, guiaArchivoNombre: true } });
+  const p = await db.order.findUnique({ where: { id: pedidoId }, select: { estado: true, entrega: true, metodoPago: true, conversacionId: true, guiaArchivoUrl: true, guiaArchivoNombre: true } });
   if (!p) return fallo("El pedido no existe.");
   if (p.entrega !== "envio") return fallo("Solo un pedido con envío se marca como enviado.");
-  if (!transicionValida(p.estado, "enviado", p.entrega)) return fallo(`Un pedido ${ETIQUETA_ESTADO[p.estado].toLowerCase()} no puede pasar a enviado.`);
+  if (!transicionValida(p.estado, "enviado", p.entrega, p.metodoPago)) return fallo(`Un pedido ${ETIQUETA_ESTADO[p.estado].toLowerCase()} no puede pasar a enviado.`);
 
   const paqueteria = e.paqueteria?.trim() || null;
   let guia: string | null = null;

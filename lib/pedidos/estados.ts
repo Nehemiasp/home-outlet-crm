@@ -1,4 +1,4 @@
-import type { Entrega, EstadoPedido } from "@/generated/prisma/client";
+import type { Entrega, EstadoPedido, TipoPago } from "@/generated/prisma/client";
 
 export const ESTADOS: readonly EstadoPedido[] = ["borrador", "pendiente_pago", "en_revision", "pagado", "preparando", "listo_para_recoger", "enviado", "entregado", "cancelado", "vencido"];
 
@@ -33,12 +33,16 @@ const SIGUIENTES: Record<EstadoPedido, readonly EstadoPedido[]> = {
   vencido: ["pendiente_pago", "cancelado"],
 };
 
-/** Estados a los que puede pasar un pedido. "Listo para recoger" solo existe con entrega en tienda y "enviado" solo con envío. */
-export function siguientes(de: EstadoPedido, entrega: Entrega): EstadoPedido[] {
-  return SIGUIENTES[de].filter((a) => !(a === "listo_para_recoger" && entrega !== "recoger") && !(a === "enviado" && entrega !== "envio"));
+/**
+ * Estados a los que puede pasar un pedido. "Listo para recoger" solo existe con entrega en tienda y "enviado" solo con envío.
+ * Con pago contra entrega, un pedido pendiente de pago se puede preparar: se envía antes de cobrar.
+ */
+export function siguientes(de: EstadoPedido, entrega: Entrega, metodo?: TipoPago | null): EstadoPedido[] {
+  const extra: EstadoPedido[] = de === "pendiente_pago" && metodo === "contra_entrega" ? ["preparando"] : [];
+  return [...extra, ...SIGUIENTES[de]].filter((a) => !(a === "listo_para_recoger" && entrega !== "recoger") && !(a === "enviado" && entrega !== "envio"));
 }
 
-export const transicionValida = (de: EstadoPedido, a: EstadoPedido, entrega: Entrega) => siguientes(de, entrega).includes(a);
+export const transicionValida = (de: EstadoPedido, a: EstadoPedido, entrega: Entrega, metodo?: TipoPago | null) => siguientes(de, entrega, metodo).includes(a);
 
 /** Estados que tienen unidades apartadas. */
 export const RESERVAN: readonly EstadoPedido[] = ["pendiente_pago", "en_revision"];
