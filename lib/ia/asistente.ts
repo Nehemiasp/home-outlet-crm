@@ -1,5 +1,6 @@
 import { HERRAMIENTAS, ejecutarHerramienta, type ContextoHerramienta } from "./herramientas";
 import type { AiProvider, MensajeIa, UsoIa } from "./tipos";
+import { esIngles } from "./texto";
 
 export const TIEMPO_MAXIMO_MS = 20_000;
 const MAX_VUELTAS = 4;
@@ -40,12 +41,18 @@ export async function ejecutarAsistente(p: {
   const herramientas = p.soloLectura ? HERRAMIENTAS.filter((t) => SOLO_LECTURA.has(t.name)) : HERRAMIENTAS;
   const r: ResultadoAsistente = { uso: { inputTokens: 0, outputTokens: 0, cacheEscritos: 0, cacheLeidos: 0 }, ms: 0, herramientas: [], consultado: [], productos: [], sinRespuesta: false, mensajesEnviados: [], tarjetas: [] };
   const resultadosVacios: boolean[] = [];
+  // La regla 6 pide contestar en el idioma del cliente, pero con todo el contexto en español el modelo real a veces contestaba en
+  // español a un mensaje en inglés. Si el último mensaje del cliente está en inglés, se le dice explícitamente, al final de las
+  // instrucciones (en la parte que cambia, así no se pierde el caché de las reglas).
+  const ultimo = [...p.historial].reverse().find((m) => m.role === "user");
+  const system = ultimo && typeof ultimo.content === "string" && esIngles(ultimo.content) ? `${p.system}
+The customer is writing in English: write your whole reply in English, translating any business data or tool results that come in Spanish.` : p.system;
 
   try {
     for (let vuelta = 0; vuelta < MAX_VUELTAS; vuelta++) {
       const senal = AbortSignal.timeout(TIEMPO_MAXIMO_MS);
       const respuesta = await Promise.race([
-        p.proveedor.respond({ system: p.system, messages: mensajes, tools: herramientas, maxTokens: MAX_TOKENS, signal: senal }),
+        p.proveedor.respond({ system, messages: mensajes, tools: herramientas, maxTokens: MAX_TOKENS, signal: senal }),
         new Promise<never>((_, rechazar) => senal.addEventListener("abort", () => rechazar(new Error("Tiempo agotado")))),
       ]);
       r.uso.inputTokens += respuesta.usage.inputTokens;

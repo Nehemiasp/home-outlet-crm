@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { MODO, type AiProvider, type LlamadaHerramienta, type MensajeIa } from "./tipos";
-import { normalizar } from "./texto";
+import { esIngles, normalizar } from "./texto";
+
+export { esIngles };
 
 /**
  * Proveedor simulado: reglas por palabras clave que imitan al asistente y llaman a las mismas herramientas que el real.
@@ -13,14 +15,6 @@ type Intento =
   | { tipo: "estado_pedido" | "cuenta" | "horario" | "ubicacion" | "envios" | "pagos" | "garantia" | "faq" | "producto" | "seguimiento" | "gracias" | "saludo" | "injection" | "tema" };
 
 const tiene = (t: string, re: RegExp) => re.test(t);
-const MARCAS_EN = /\b(price|how much|do you have|hello|hi|shipping|delivery|open|opening|hours|where|stock|available|warranty|thanks|thank you|please|i want|i need|buy|cost|payment|deposit|account|order|paid|confirmed|receipt|my)\b/;
-const MARCAS_ES = /\b(hola|precio|cuanto|tienen|gracias|donde|horario|envio|quiero|necesito|buenas|cuesta)\b/;
-
-export const esIngles = (texto: string) => {
-  const t = normalizar(texto);
-  return MARCAS_EN.test(t) && !MARCAS_ES.test(t);
-};
-
 /** Palabras clave → motivo. Lo usan también el etiquetado automático y el resumen. */
 export function motivoPorPalabras(texto: string): (typeof import("./tipos").MOTIVOS)[number] {
   const t = normalizar(texto);
