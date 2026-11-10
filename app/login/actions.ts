@@ -10,6 +10,7 @@ import { COOKIE_SALIDA } from "@/lib/inactividad";
 import { ipDelCliente } from "@/lib/ip";
 import { limpiarFallos, minutosBloqueado, registrarFallo } from "@/lib/limite-intentos";
 import { requiereSegundoFactor } from "@/lib/permisos";
+import { firmarEquipo, ipParaRecordar, nombreCookie, opcionesCookie, recordadoEn } from "@/lib/recordar-equipo";
 import { MENSAJE_CODIGO_MALO } from "@/lib/segundo-factor";
 
 const MENSAJE_ERROR = "El correo o la contraseña no son correctos.";
@@ -22,17 +23,19 @@ export async function entrar(_previo: EstadoLogin, datos: FormData): Promise<Est
   const password = String(datos.get("password") ?? "");
   const codigo = String(datos.get("codigo") ?? "").trim();
   const paso = codigo ? ("codigo" as const) : undefined; // si ya estaba en el segundo paso, sigue en él aunque falle
-  const ip = ipDelCliente(await headers());
+  const encabezados = await headers();
+  const ip = ipDelCliente(encabezados);
   (await cookies()).delete({ name: COOKIE_SALIDA, path: "/login" }); // quien vuelve a entrar ya vio el aviso de inactividad
   const claves = ip ? [`correo:${correo}`, `ip:${ip}`] : [`correo:${correo}`]; // sin proxy confiable no hay IP que valga
 
   const espera = Math.max(...(await Promise.all(claves.map((c) => minutosBloqueado(c)))));
   if (espera > 0) return { error: `Demasiados intentos. Vuelva a intentarlo en ${espera} min.`, correo, paso };
 
-  // Primer paso: con la contraseña bien, quien tiene segundo factor activo pasa a escribir su código (no cuenta como intento fallido).
+  // Primer paso: con la contraseña bien, quien tiene segundo factor activo pasa a escribir su código (no cuenta como intento fallido),
+  // salvo que este equipo lo recuerde (misma IP, menos de 30 días): entonces entra directo y `authorize` vuelve a comprobarlo.
   if (!codigo) {
     const u = await verificarClave(correo, password);
-    if (u && requiereSegundoFactor(u) && u.totpSecreto) return { correo, paso: "codigo" };
+    if (u && requiereSegundoFactor(u) && u.totpSecreto && !recordadoEn(encabezados, u)) return { correo, paso: "codigo" };
   }
 
   try {
@@ -44,9 +47,20 @@ export async function entrar(_previo: EstadoLogin, datos: FormData): Promise<Est
     }
     // Entrar bien termina con una redirección, que Next lanza como excepción: ahí se limpian los fallos del correo
     // (no los de la IP: si quien rocía contraseñas tiene una cuenta propia, no debe poder reiniciar su límite entrando con ella).
-    if (String((e as { digest?: unknown })?.digest ?? "").startsWith("NEXT_REDIRECT")) await limpiarFallos(`correo:${correo}`);
+    if (String((e as { digest?: unknown })?.digest ?? "").startsWith("NEXT_REDIRECT")) {
+      await limpiarFallos(`correo:${correo}`);
+      // Entró con el código y dejó marcada la casilla: este equipo queda recordado 30 días para esta IP.
+      if (codigo && datos.get("recordar") === "on") await recordarEquipo(correo, encabezados);
+    }
     throw e; // la redirección debe seguir su camino
   }
+}
+
+/** Deja en el navegador la cookie firmada que recuerda este equipo (ver lib/recordar-equipo.ts). Sin IP confiable no hace nada. */
+async function recordarEquipo(correo: string, encabezados: Headers) {
+  const u = await db.user.findUnique({ where: { correo }, select: { id: true, passwordHash: true, totpSecreto: true } });
+  const valor = u ? firmarEquipo(u, ipParaRecordar(encabezados)) : null;
+  if (u && valor) (await cookies()).set(nombreCookie(u.id), valor, opcionesCookie());
 }
 
 /**

@@ -43,6 +43,8 @@ Quienes ven y mueven todo el negocio entran con la contraseña **y** con un cód
 
 **Cada vez que entre:** escriba correo y contraseña; en el segundo paso, el código de 6 dígitos (cambia cada 30 segundos y no sirve dos veces). Si perdió el teléfono, escriba en ese lugar un código de respaldo.
 
+**No volver a pedirlo por 30 días:** al escribir el código, la casilla «No volver a pedirlo en este equipo por 30 días» viene marcada. Con ella, en ese mismo equipo y desde la misma red, durante 30 días entra solo con correo y contraseña. Desde otra red (por ejemplo, el celular con datos), en otro equipo o pasados los 30 días, se lo vuelve a pedir. Si le restablecen la contraseña o le quitan el segundo factor, también. En una computadora compartida, desmárquela.
+
 **Si se equivoca con el código** cuenta como un intento fallido (5 en 15 minutos y se bloquea). Si el código nunca coincide, revise que la hora del teléfono sea la automática.
 
 **Si perdió el teléfono y los códigos de respaldo:** otro administrador entra a **Ajustes → Usuarios**, abre las acciones de esa persona y elige **Quitar segundo factor**. Al volver a entrar con su contraseña, tendrá que activarlo de nuevo, así que avísele que lo haga cuanto antes. Si era el único administrador, quien tenga acceso al servidor corre `npm run admin:sin-2fa -- --correo persona@empresa.com`.

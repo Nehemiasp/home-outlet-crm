@@ -2,7 +2,8 @@
 
 import { useActionState, useState } from "react";
 import { AlertCircle, ShieldCheck } from "lucide-react";
-import { Boton, CampoTexto } from "@/components/ui/form";
+import { Boton, CampoTexto, Casilla } from "@/components/ui/form";
+import { DIAS_RECORDAR } from "@/lib/recordar-equipo-texto";
 import { entrar } from "./actions";
 
 export function FormularioLogin() {
@@ -22,6 +23,10 @@ export function FormularioLogin() {
             <span>Escriba el código de 6 dígitos que muestra su aplicación de autenticación. Si perdió el teléfono, use un código de respaldo.</span>
           </p>
           <CampoTexto etiqueta="Código" name="codigo" autoComplete="one-time-code" autoCapitalize="none" spellCheck={false} maxLength={14} autoFocus required />
+          <div className="flex flex-col">
+            <Casilla name="recordar" defaultChecked etiqueta={`No volver a pedirlo en este equipo por ${DIAS_RECORDAR} días`} />
+            <p className="meta text-texto-suave">Desde otra red o en otro equipo se lo volverá a pedir. En una computadora compartida, desmárquela.</p>
+          </div>
         </>
       ) : (
         <>
