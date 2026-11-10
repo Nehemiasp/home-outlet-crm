@@ -193,7 +193,7 @@ describe("elección del proveedor y costo", () => {
     const antes = [process.env.AI_PRICE_INPUT_PER_MTOK, process.env.AI_PRICE_OUTPUT_PER_MTOK];
     delete process.env.AI_PRICE_INPUT_PER_MTOK;
     delete process.env.AI_PRICE_OUTPUT_PER_MTOK;
-    assert.equal(costoEstimadoUsd("anthropic", { inputTokens: 1_000_000, outputTokens: 1_000_000 }), 6); // 1 + 5 USD por defecto
+    assert.equal(costoEstimadoUsd("anthropic", { inputTokens: 1_000_000, outputTokens: 1_000_000 }), 0.6); // 0.10 + 0.50 USD por defecto (Claude Haiku 5.5)
     process.env.AI_PRICE_INPUT_PER_MTOK = "2";
     process.env.AI_PRICE_OUTPUT_PER_MTOK = "10";
     assert.equal(costoEstimadoUsd("anthropic", { inputTokens: 500_000, outputTokens: 100_000 }), 2);

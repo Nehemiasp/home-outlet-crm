@@ -156,7 +156,7 @@ Migraciones aplicadas incluyen backfills y las restricciones de pedidos (`pedido
 
 **Traspaso asistente ↔ persona:** `atendidaPor` + `esperandoAsesorDesde`. Cuando una persona escribe, el asistente se calla; los avisos automáticos de pedidos **no** le quitan la conversación. Al pasar a asesor la conversación queda sin asignar y «esperando asesor».
 
-**Controles y costo:** límite por minuto, máximo de turnos (4), tiempo de espera de 20 s, presupuesto mensual con aviso al 80 % y apagado al 100 %, registro en `AiRun`, precios por millón de tokens configurables (suposiciones: 1 y 5 USD).
+**Controles y costo:** límite por minuto, máximo de turnos (4), tiempo de espera de 20 s, presupuesto mensual con aviso al 80 % y apagado al 100 %, registro en `AiRun`, precios por millón de tokens configurables (de fábrica los de Claude Haiku 5.5: USD 0.10 y 0.50, corregidos el 10 nov 2026; antes eran 1 y 5, diez veces más, y el tope se habría alcanzado con una décima parte del gasto real).
 
 **Ayudas para el agente:** Sugerir respuesta, Resumen, motivo automático.
 

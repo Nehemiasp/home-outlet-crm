@@ -16,10 +16,18 @@ export function obtenerProveedor(): AiProvider {
 
 export const modoDePrueba = () => obtenerProveedor().name === "simulado";
 
+/**
+ * Precios de fábrica por millón de tokens: los de Claude Haiku 5.5, el modelo por defecto (USD 0.10 de entrada y 0.50 de salida,
+ * para prompts de hasta 100K tokens; los del asistente son mucho más cortos). Con el presupuesto mensual se apaga el asistente,
+ * así que deben coincidir con el modelo en uso: si se cambia AI_MODEL, cambiar también AI_PRICE_INPUT_PER_MTOK y AI_PRICE_OUTPUT_PER_MTOK.
+ */
+export const PRECIO_ENTRADA_POR_DEFECTO = 0.1;
+export const PRECIO_SALIDA_POR_DEFECTO = 0.5;
+
 /** Costo estimado en dólares. Los precios por millón de tokens son configurables porque cambian según el modelo. */
 export function costoEstimadoUsd(proveedor: AiProvider["name"], uso: { inputTokens: number; outputTokens: number }) {
   if (proveedor === "simulado") return 0;
-  const entrada = Number(process.env.AI_PRICE_INPUT_PER_MTOK) || 1;
-  const salida = Number(process.env.AI_PRICE_OUTPUT_PER_MTOK) || 5;
+  const entrada = Number(process.env.AI_PRICE_INPUT_PER_MTOK) || PRECIO_ENTRADA_POR_DEFECTO;
+  const salida = Number(process.env.AI_PRICE_OUTPUT_PER_MTOK) || PRECIO_SALIDA_POR_DEFECTO;
   return (uso.inputTokens * entrada + uso.outputTokens * salida) / 1_000_000;
 }
