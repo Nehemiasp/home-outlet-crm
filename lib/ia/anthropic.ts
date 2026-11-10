@@ -45,7 +45,12 @@ export function crearProveedorAnthropic(apiKey: string, modelo: string): AiProvi
       return {
         text: texto || undefined,
         toolCalls: llamadas.length ? llamadas : undefined,
-        usage: { inputTokens: u.input_tokens + (u.cache_creation_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0), outputTokens: u.output_tokens },
+        usage: {
+          inputTokens: u.input_tokens + (u.cache_creation_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0),
+          outputTokens: u.output_tokens,
+          cacheEscritos: u.cache_creation_input_tokens ?? 0,
+          cacheLeidos: u.cache_read_input_tokens ?? 0,
+        },
       };
     },
   };

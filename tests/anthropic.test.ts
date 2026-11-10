@@ -10,7 +10,8 @@ import { costoEstimadoUsd, obtenerProveedor } from "@/lib/ia/proveedor";
 import { SEPARADOR_DINAMICO, type ToolDefinition } from "@/lib/ia/tipos";
 import { db } from "@/lib/db";
 
-// El proveedor real nunca se ha probado con la API de Claude (falta la clave). Aquí se prueba con un servidor local que
+// Con la API real de Claude solo se comprobó el caché (10-nov-2026: la parte fija, ~2,380 tokens, se guarda en la primera
+// llamada y se lee en la siguiente); el resto del proveedor se prueba aquí con un servidor local que
 // imita POST /v1/messages: el SDK de verdad arma la petición y lee la respuesta, y se comprueba lo que enviamos y cómo
 // reaccionamos a lo que vuelve (texto, herramientas, uso con caché, errores, silencio). Falta, con la clave, probar el tono real.
 
@@ -100,7 +101,7 @@ describe("proveedor de Claude (contra un servidor local que imita la API)", () =
     const r = await proveedor().respond({ system: "s", messages: [{ role: "user", content: "x" }], tools: [herramienta], maxTokens: 100 });
     assert.equal(r.text, "Un momento. Gracias.");
     assert.deepEqual(r.toolCalls, [{ id: "tu_9", name: "datos_negocio", arguments: { tema: "pagos" } }]);
-    assert.deepEqual(r.usage, { inputTokens: 450, outputTokens: 20 });
+    assert.deepEqual(r.usage, { inputTokens: 450, outputTokens: 20, cacheEscritos: 300, cacheLeidos: 50 });
   });
 
   test("una respuesta sin texto ni herramientas no inventa nada", async () => {
@@ -132,12 +133,12 @@ describe("el asistente con el proveedor de Claude", () => {
     recibidas.length = 0;
     respuestas = [
       ok([{ type: "tool_use", id: "tu_1", name: "datos_negocio", input: { tema: "horario" } }], { input_tokens: 100, output_tokens: 10 }),
-      ok([{ type: "text", text: "Atendemos de lunes a sábado." }], { input_tokens: 150, output_tokens: 12 }),
+      ok([{ type: "text", text: "Atendemos de lunes a sábado." }], { input_tokens: 150, output_tokens: 12, cache_read_input_tokens: 2_000 }),
     ];
     const r = await ejecutarAsistente({ proveedor: proveedor(), system: "s", historial: [{ role: "user", content: "¿A qué hora abren?" }], contexto });
     assert.equal(r.texto, "Atendemos de lunes a sábado.");
     assert.deepEqual(r.herramientas, ["datos_negocio"]);
-    assert.deepEqual(r.uso, { inputTokens: 250, outputTokens: 22 });
+    assert.deepEqual(r.uso, { inputTokens: 2_250, outputTokens: 22, cacheEscritos: 0, cacheLeidos: 2_000 });
     assert.equal(r.error, undefined);
     const segunda = recibidas[1]!.cuerpo.messages;
     assert.equal(segunda.at(-1).content[0].type, "tool_result");
@@ -199,5 +200,30 @@ describe("elección del proveedor y costo", () => {
     assert.equal(costoEstimadoUsd("anthropic", { inputTokens: 500_000, outputTokens: 100_000 }), 2);
     if (antes[0] === undefined) delete process.env.AI_PRICE_INPUT_PER_MTOK; else process.env.AI_PRICE_INPUT_PER_MTOK = antes[0];
     if (antes[1] === undefined) delete process.env.AI_PRICE_OUTPUT_PER_MTOK; else process.env.AI_PRICE_OUTPUT_PER_MTOK = antes[1];
+  });
+
+  test("la entrada que pasó por el caché se cobra a su precio: guardar 1.25 veces, leer 0.1 veces", () => {
+    const antes = [process.env.AI_PRICE_INPUT_PER_MTOK, process.env.AI_PRICE_OUTPUT_PER_MTOK];
+    process.env.AI_PRICE_INPUT_PER_MTOK = "10"; // precios redondos para que las cuentas se lean fácil
+    process.env.AI_PRICE_OUTPUT_PER_MTOK = "50";
+    const casi = (a: number, b: number) => assert.ok(Math.abs(a - b) < 1e-9, `${a} ≠ ${b}`);
+    try {
+      // 1M de entrada: 200K normales (2 USD) + 400K guardados (4 × 1.25 = 5 USD) + 400K leídos (4 × 0.1 = 0.40 USD); sin salida
+      casi(costoEstimadoUsd("anthropic", { inputTokens: 1_000_000, outputTokens: 0, cacheEscritos: 400_000, cacheLeidos: 400_000 }), 7.4);
+      // Sin datos de caché, como antes: todo a precio normal
+      casi(costoEstimadoUsd("anthropic", { inputTokens: 1_000_000, outputTokens: 100_000 }), 15);
+      // La llamada medida con la API real (10-nov-2026): 2,380 leídos del caché, 101 sin caché y 29 de salida; con los precios
+      // de Haiku 5.5 cuesta unas 5 veces menos que cobrándolo todo completo
+      delete process.env.AI_PRICE_INPUT_PER_MTOK;
+      delete process.env.AI_PRICE_OUTPUT_PER_MTOK;
+      const real = { inputTokens: 2_481, outputTokens: 29, cacheEscritos: 0, cacheLeidos: 2_380 };
+      casi(costoEstimadoUsd("anthropic", real), (101 * 0.1 + 2_380 * 0.01 + 29 * 0.5) / 1e6);
+      assert.ok(costoEstimadoUsd("anthropic", { inputTokens: 2_481, outputTokens: 29 }) / costoEstimadoUsd("anthropic", real) > 5);
+      // Datos raros (más caché que entrada) no dan tokens normales negativos
+      assert.ok(costoEstimadoUsd("anthropic", { inputTokens: 10, outputTokens: 0, cacheLeidos: 100 }) >= 0);
+    } finally {
+      if (antes[0] === undefined) delete process.env.AI_PRICE_INPUT_PER_MTOK; else process.env.AI_PRICE_INPUT_PER_MTOK = antes[0];
+      if (antes[1] === undefined) delete process.env.AI_PRICE_OUTPUT_PER_MTOK; else process.env.AI_PRICE_OUTPUT_PER_MTOK = antes[1];
+    }
   });
 });

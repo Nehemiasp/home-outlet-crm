@@ -18,6 +18,11 @@ const nextConfig = {
   experimental: { serverActions: { bodySizeLimit: "6mb" } }, // fotos de hasta 5 MB
   devIndicators: false, // la insignia de desarrollo tapaba "Salir" y "Enviar"
   poweredByHeader: false,
+  // Protección contra versiones mezcladas: con un id por publicación, una pestaña abierta desde la versión anterior se recarga sola en
+  // la siguiente navegación o acción, en vez de llamar acciones que ya no existen («Failed to find Server Action» en el registro).
+  // DEPLOYMENT_VERSION sirve en cualquier alojamiento; en Railway se usa el commit (el Dockerfile lo recibe al construir).
+  // En desarrollo no hay id: todo sigue igual.
+  deploymentId: process.env.DEPLOYMENT_VERSION || process.env.RAILWAY_GIT_COMMIT_SHA || undefined,
   async headers() {
     return [{ source: "/:path*", headers: seguridad }];
   },

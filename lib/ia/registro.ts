@@ -1,14 +1,14 @@
 import { db } from "@/lib/db";
 import type { ResultadoIa } from "@/generated/prisma/client";
 import { costoEstimadoUsd } from "./proveedor";
-import type { AiProvider } from "./tipos";
+import type { AiProvider, UsoIa } from "./tipos";
 
 /** Deja constancia de cada llamada al proveedor: tokens, costo, tiempo, herramientas y resultado. Nunca guarda la clave ni logs de texto. */
 export function registrarRun(p: {
   conversacionId: string | null;
   tipo: "respuesta" | "sugerencia" | "resumen" | "motivo" | "prueba";
   proveedor: AiProvider;
-  uso?: { inputTokens: number; outputTokens: number };
+  uso?: UsoIa;
   ms?: number;
   herramientas?: string[];
   consultado?: string[];

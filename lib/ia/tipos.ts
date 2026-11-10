@@ -15,13 +15,19 @@ export type MensajeIa = {
   toolResults?: { id: string; name: string; content: string }[];
 };
 
+/**
+ * Tokens de una llamada. `inputTokens` es toda la entrada (con lo que pasó por el caché); `cacheEscritos` y `cacheLeidos`
+ * son la parte de esa entrada que se guardó en caché o se leyó de él, porque se cobran distinto (ver costoEstimadoUsd).
+ */
+export type UsoIa = { inputTokens: number; outputTokens: number; cacheEscritos?: number; cacheLeidos?: number };
+
 export interface AiProvider {
   name: "simulado" | "anthropic";
   modelo: string;
   respond(input: { system: string; messages: MensajeIa[]; tools: ToolDefinition[]; maxTokens: number; signal?: AbortSignal }): Promise<{
     text?: string;
     toolCalls?: LlamadaHerramienta[];
-    usage: { inputTokens: number; outputTokens: number };
+    usage: UsoIa;
   }>;
 }
 

@@ -1,6 +1,6 @@
 import { crearProveedorAnthropic } from "./anthropic";
 import { proveedorSimulado } from "./simulado";
-import type { AiProvider } from "./tipos";
+import type { AiProvider, UsoIa } from "./tipos";
 
 export const MODELO_POR_DEFECTO = "claude-haiku-5-5";
 
@@ -24,10 +24,26 @@ export const modoDePrueba = () => obtenerProveedor().name === "simulado";
 export const PRECIO_ENTRADA_POR_DEFECTO = 0.1;
 export const PRECIO_SALIDA_POR_DEFECTO = 0.5;
 
-/** Costo estimado en dólares. Los precios por millón de tokens son configurables porque cambian según el modelo. */
-export function costoEstimadoUsd(proveedor: AiProvider["name"], uso: { inputTokens: number; outputTokens: number }) {
+/**
+ * Lo que cuesta el caché respecto del precio de entrada: guardar (caché de 5 minutos) 1.25 veces y leer 0.1 veces.
+ * Son los de Claude Haiku 5.5; Opus 5.5 y Sonnet 5.5 cobran la lectura aún más barata (0.05), así que con ellos el cálculo
+ * queda un poco por encima del real, del lado seguro para el tope mensual.
+ */
+export const FACTOR_CACHE_ESCRITO = 1.25;
+export const FACTOR_CACHE_LEIDO = 0.1;
+
+/**
+ * Costo estimado en dólares. Los precios por millón de tokens son configurables porque cambian según el modelo.
+ * La entrada que pasó por el caché se cobra con sus factores (antes se cobraba completa y el tope se alcanzaba unas 5 veces
+ * antes de tiempo: con la API real, 2,380 de cada ~2,480 tokens de entrada se leen del caché).
+ */
+export function costoEstimadoUsd(proveedor: AiProvider["name"], uso: UsoIa) {
   if (proveedor === "simulado") return 0;
   const entrada = Number(process.env.AI_PRICE_INPUT_PER_MTOK) || PRECIO_ENTRADA_POR_DEFECTO;
   const salida = Number(process.env.AI_PRICE_OUTPUT_PER_MTOK) || PRECIO_SALIDA_POR_DEFECTO;
-  return (uso.inputTokens * entrada + uso.outputTokens * salida) / 1_000_000;
+  const escritos = uso.cacheEscritos ?? 0;
+  const leidos = uso.cacheLeidos ?? 0;
+  const normales = Math.max(0, uso.inputTokens - escritos - leidos);
+  const tokensEntrada = normales + escritos * FACTOR_CACHE_ESCRITO + leidos * FACTOR_CACHE_LEIDO; // en «tokens a precio normal»
+  return (tokensEntrada * entrada + uso.outputTokens * salida) / 1_000_000;
 }

@@ -28,6 +28,10 @@ COPY prisma ./prisma
 RUN npm ci
 
 COPY . .
+# Un id por publicación para que Next detecte pestañas con la versión anterior (ver deploymentId en next.config.mjs).
+# Railway pasa RAILWAY_GIT_COMMIT_SHA solo si se declara aquí; en otro lado, --build-arg DEPLOYMENT_VERSION=<lo que sea>.
+ARG RAILWAY_GIT_COMMIT_SHA
+ARG DEPLOYMENT_VERSION
 RUN npm run build
 
 ENV NODE_ENV=production \

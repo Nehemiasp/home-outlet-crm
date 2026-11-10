@@ -1,5 +1,5 @@
 import { HERRAMIENTAS, ejecutarHerramienta, type ContextoHerramienta } from "./herramientas";
-import type { AiProvider, MensajeIa } from "./tipos";
+import type { AiProvider, MensajeIa, UsoIa } from "./tipos";
 
 export const TIEMPO_MAXIMO_MS = 20_000;
 const MAX_VUELTAS = 4;
@@ -10,7 +10,7 @@ export type ResultadoAsistente = {
   /** Motivo por el que el asistente decidió pasar la conversación a un asesor. */
   derivar?: string;
   error?: boolean;
-  uso: { inputTokens: number; outputTokens: number };
+  uso: Required<UsoIa>;
   ms: number;
   herramientas: string[];
   consultado: string[];
@@ -36,7 +36,7 @@ export async function ejecutarAsistente(p: {
   const inicio = Date.now();
   const mensajes = [...p.historial];
   const herramientas = p.soloLectura ? HERRAMIENTAS.filter((t) => SOLO_LECTURA.has(t.name)) : HERRAMIENTAS;
-  const r: ResultadoAsistente = { uso: { inputTokens: 0, outputTokens: 0 }, ms: 0, herramientas: [], consultado: [], productos: [], sinRespuesta: false, mensajesEnviados: [] };
+  const r: ResultadoAsistente = { uso: { inputTokens: 0, outputTokens: 0, cacheEscritos: 0, cacheLeidos: 0 }, ms: 0, herramientas: [], consultado: [], productos: [], sinRespuesta: false, mensajesEnviados: [] };
   const resultadosVacios: boolean[] = [];
 
   try {
@@ -48,6 +48,8 @@ export async function ejecutarAsistente(p: {
       ]);
       r.uso.inputTokens += respuesta.usage.inputTokens;
       r.uso.outputTokens += respuesta.usage.outputTokens;
+      r.uso.cacheEscritos += respuesta.usage.cacheEscritos ?? 0;
+      r.uso.cacheLeidos += respuesta.usage.cacheLeidos ?? 0;
 
       if (!respuesta.toolCalls?.length) {
         r.texto = respuesta.text?.trim() || undefined;
