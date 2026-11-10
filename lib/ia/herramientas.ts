@@ -53,6 +53,7 @@ export type ResultadoHerramienta = {
   sinResultado?: boolean; // buscó y no encontró nada
   derivar?: string; // pasar_a_asesor
   mensajesEnviados?: string[]; // ids de mensajes que mandó la herramienta
+  tarjeta?: { productoId: string; fotos: string[] }; // enviar_producto: la tarjeta y las fotos que salen (o saldrían, en prueba)
 };
 
 const json = (o: unknown) => JSON.stringify(o);
@@ -162,10 +163,11 @@ export async function ejecutarHerramienta(nombre: string, entrada: unknown, ctx:
       if (!p) return falla("Producto no encontrado.");
       const todas = (a.data as { todas_las_fotos?: boolean }).todas_las_fotos === true && p.imagenes.length > 1;
       const consultado = todas ? `Envió la tarjeta de ${p.nombre} y sus ${p.imagenes.length} fotos` : `Envió la tarjeta de ${p.nombre}`;
-      if (ctx.sandbox || !ctx.conversacionId) return { contenido: json({ enviado: true, fotos: todas ? p.imagenes.length : Math.min(1, p.imagenes.length), nota: "Simulado en modo de prueba." }), consultado, productos: [p.id] };
+      const tarjeta = { productoId: p.id, fotos: todas ? p.imagenes : p.imagenes.slice(0, 1) };
+      if (ctx.sandbox || !ctx.conversacionId) return { contenido: json({ enviado: true, fotos: tarjeta.fotos.length, nota: "Simulado en modo de prueba." }), consultado, productos: [p.id], tarjeta };
       const r = await enviarProductoConFotos({ conversacionId: ctx.conversacionId, productoId: p.id, fotos: todas ? "todas" : undefined, autor: "asistente", aiRunId: ctx.aiRunId });
       if (!r.ok) return falla(r.error);
-      return { contenido: json({ enviado: true, fotos: r.mensajesIds?.length ?? 1 }), consultado, productos: [p.id], mensajesEnviados: r.mensajesIds ?? [r.mensajeId] };
+      return { contenido: json({ enviado: true, fotos: r.mensajesIds?.length ?? 1 }), consultado, productos: [p.id], mensajesEnviados: r.mensajesIds ?? [r.mensajeId], tarjeta };
     }
     case "guardar_dato_cliente": {
       if (!ctx.sandbox && ctx.contactoId) {

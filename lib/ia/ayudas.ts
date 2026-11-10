@@ -92,5 +92,12 @@ export async function probarAsistente(historial: MensajeIa[]) {
     contexto: { conversacionId: null, contactoId: null, sandbox: true },
   });
   await registrarRun({ conversacionId: null, tipo: "prueba", proveedor, uso: r.uso, ms: r.ms, herramientas: r.herramientas, consultado: r.consultado, productos: r.productos, resultado: r.error ? "error" : r.derivar ? "paso_a_asesor" : "respondio", sinRespuesta: r.sinRespuesta });
-  return { ...r, proveedor: proveedor.name, modelo: proveedor.modelo, costoUsd: costoEstimadoUsd(proveedor.name, r.uso), textoDerivacion: textoDerivacion(negocio) };
+  // Las tarjetas que habría recibido el cliente, para dibujarlas en la pantalla de prueba como en la conversación.
+  const ids = [...new Set(r.tarjetas.map((t) => t.productoId))];
+  const datos = ids.length ? await db.product.findMany({ where: { id: { in: ids } }, select: { id: true, nombre: true, sku: true, precio: true } }) : [];
+  const tarjetas = r.tarjetas.flatMap((t) => {
+    const p = datos.find((d) => d.id === t.productoId);
+    return p ? [{ nombre: p.nombre, sku: p.sku, precioCentavos: p.precio, fotos: t.fotos }] : [];
+  });
+  return { ...r, tarjetas, proveedor: proveedor.name, modelo: proveedor.modelo, costoUsd: costoEstimadoUsd(proveedor.name, r.uso), textoDerivacion: textoDerivacion(negocio) };
 }

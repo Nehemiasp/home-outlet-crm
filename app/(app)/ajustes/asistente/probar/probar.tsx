@@ -8,8 +8,11 @@ import { probar } from "../../actions";
 
 type Turno =
   | { de: "cliente"; texto: string }
-  | { de: "asistente"; texto: string; detalle: { herramientas: string[]; consultado: string[]; tokensEntrada: number; tokensSalida: number; ms: number; costoUsd: number; proveedor: string; modelo: string; derivar?: string } }
+  | { de: "asistente"; texto: string; tarjetas?: TarjetaPrueba[]; detalle: { herramientas: string[]; consultado: string[]; tokensEntrada: number; tokensSalida: number; ms: number; costoUsd: number; proveedor: string; modelo: string; derivar?: string } }
   | { de: "sistema"; texto: string };
+
+/** Una tarjeta de producto que habría recibido el cliente, con las fotos que saldrían (la primera va en la tarjeta). */
+type TarjetaPrueba = { nombre: string; sku: string; precioCentavos: number; fotos: string[] };
 
 const EJEMPLOS = ["¿Cuánto cuesta la pantalla para carro?", "¿Hay audífonos inalámbricos?", "¿Cuál es el horario?", "¿Hacen envíos a Morales?", "Quiero comprarlo", "¿Quién ganó el partido de ayer?"];
 
@@ -45,13 +48,13 @@ export function Probar({ bienvenida }: { bienvenida: string }) {
       nuevos.push({ de: "asistente", texto: r.textoDerivacion, detalle });
       nuevos.push({ de: "sistema", texto: `El asistente pasaría la conversación a un asesor · Motivo: ${r.derivar}` });
     } else if (r.error || !r.texto) nuevos.push({ de: "asistente", texto: "Un asesor le responderá en breve.", detalle }, { de: "sistema", texto: "Hubo un error o se agotó el tiempo: el asistente pasaría la conversación a un asesor." });
-    else nuevos.push({ de: "asistente", texto: r.texto, detalle });
+    else nuevos.push({ de: "asistente", texto: r.texto, tarjetas: r.tarjetas, detalle });
     setTurnos([...previos, ...nuevos]);
   };
 
   return (
     <div className="flex max-w-3xl flex-col gap-3">
-      <p className="cuerpo text-texto-suave">Escríbale al asistente como si fuera un cliente. Aquí no se crean conversaciones ni se manda nada a nadie: sirve para revisar los cambios en las preguntas frecuentes antes de activarlos.</p>
+      <p className="cuerpo text-texto-suave">Escríbale al asistente como si fuera un cliente. Aquí no se crean conversaciones ni se manda nada a nadie: sirve para revisar los cambios en las preguntas frecuentes antes de activarlos. Las tarjetas de producto se ven como las recibiría el cliente.</p>
 
       <div className="flex flex-wrap gap-2" aria-label="Ejemplos">
         {EJEMPLOS.map((e) => (
@@ -71,6 +74,15 @@ export function Probar({ bienvenida }: { bienvenida: string }) {
               <Burbuja key={i} tipo="sistema" texto={t.texto} />
             ) : (
               <div key={i} className="flex flex-col gap-1">
+                {/* Como en la conversación: la tarjeta (y sus demás fotos) sale antes que el texto que la acompaña. */}
+                {t.tarjetas?.map((p, k) => (
+                  <div key={k} className="flex flex-col gap-1">
+                    <Burbuja tipo="producto" asistente producto={{ nombre: p.nombre, sku: p.sku, precioCentavos: p.precioCentavos, imagenUrl: p.fotos[0] }} />
+                    {p.fotos.slice(1).map((f) => (
+                      <Burbuja key={f} tipo="saliente" asistente imagenUrl={f} />
+                    ))}
+                  </div>
+                ))}
                 <Burbuja tipo="saliente" asistente texto={t.texto} consultas={t.detalle.consultado} />
                 <p className="meta self-end text-right text-texto-suave">
                   {t.detalle.herramientas.length ? `Herramientas: ${t.detalle.herramientas.join(", ")}` : "Sin herramientas"} · {t.detalle.tokensEntrada} + {t.detalle.tokensSalida} tokens · {t.detalle.ms} ms ·{" "}

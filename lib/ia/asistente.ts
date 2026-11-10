@@ -17,6 +17,8 @@ export type ResultadoAsistente = {
   productos: string[];
   sinRespuesta: boolean;
   mensajesEnviados: string[];
+  /** Las tarjetas de producto que mandó (o mandaría, en prueba), con sus fotos, en orden. */
+  tarjetas: { productoId: string; fotos: string[] }[];
 };
 
 const SOLO_LECTURA = new Set(["buscar_productos", "ver_producto", "datos_negocio", "buscar_respuesta", "estado_pedido"]);
@@ -36,7 +38,7 @@ export async function ejecutarAsistente(p: {
   const inicio = Date.now();
   const mensajes = [...p.historial];
   const herramientas = p.soloLectura ? HERRAMIENTAS.filter((t) => SOLO_LECTURA.has(t.name)) : HERRAMIENTAS;
-  const r: ResultadoAsistente = { uso: { inputTokens: 0, outputTokens: 0, cacheEscritos: 0, cacheLeidos: 0 }, ms: 0, herramientas: [], consultado: [], productos: [], sinRespuesta: false, mensajesEnviados: [] };
+  const r: ResultadoAsistente = { uso: { inputTokens: 0, outputTokens: 0, cacheEscritos: 0, cacheLeidos: 0 }, ms: 0, herramientas: [], consultado: [], productos: [], sinRespuesta: false, mensajesEnviados: [], tarjetas: [] };
   const resultadosVacios: boolean[] = [];
 
   try {
@@ -64,6 +66,7 @@ export async function ejecutarAsistente(p: {
         if (h.consultado) r.consultado.push(h.consultado);
         if (h.productos) r.productos.push(...h.productos);
         if (h.mensajesEnviados) r.mensajesEnviados.push(...h.mensajesEnviados);
+        if (h.tarjeta) r.tarjetas.push(h.tarjeta);
         if (SOLO_LECTURA.has(llamada.name)) resultadosVacios.push(!!h.sinResultado);
         if (h.derivar) r.derivar = h.derivar;
         resultados.push({ id: llamada.id, name: llamada.name, content: h.contenido });
