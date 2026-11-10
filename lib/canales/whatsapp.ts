@@ -147,7 +147,7 @@ async function enviar(to: string, m: OutboundMessage) {
     if (!m.productId) throw new Error("Falta el producto.");
     const t = await leyendaDeProducto(m.productId);
     texto = t.texto;
-    imagen = t.imagen ?? undefined;
+    imagen = m.mediaUrl ?? t.imagen ?? undefined; // la foto que se eligió; si no, la principal
   }
   const medio = imagen ? await imagenParaEnviar(imagen) : null;
   if (medio) return enviarA({ ...destino, type: "image", image: { ...medio, ...(texto ? { caption: texto } : {}) } });

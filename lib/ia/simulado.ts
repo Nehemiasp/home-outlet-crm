@@ -224,7 +224,7 @@ Envíe una foto del comprobante por este chat.` };
       const t = normalizar(pregunta);
       const pideFoto = /foto|imagen|mostr|muestr|ensen|mandeme|enviem|picture|photo|show me/.test(t);
       // "¿Podría mostrarme el producto?" sin nombrarlo: se refiere al último producto de la conversación.
-      const sinNombre = pideFoto && t.replace(/\b(podrias?|puedes?|puede|me|mostr\w*|muestr\w*|ensen\w*|mande\w*|envi\w*|foto|imagen|del?|el|la|lo|los|las|un|una|ese|esa|eso|este|esta|esto|producto|articulo|por|favor|quiero|ver|y|a)\b|[^a-z0-9]/g, "") === "";
+      const sinNombre = pideFoto && t.replace(/\b(podrias?|puedes?|puede|me|mostr\w*|muestr\w*|ensen\w*|mand\w*|envi\w*|fotos?|imagen(es)?|mas|otras|todas|tiene|tienen|del?|el|la|lo|los|las|un|una|ese|esa|eso|este|esta|esto|producto|articulo|por|favor|quiero|ver|y|a)\b|[^a-z0-9]/g, "") === "";
       const previo = sinNombre ? ultimoProductoMencionado(messages.slice(0, ultimoDelCliente.i)) : undefined;
       if (sinNombre && !previo) return { text: en ? "Which product would you like to see? Tell me its name." : "¿Cuál producto le gustaría ver? Dígame el nombre." };
       if (!hizo("buscar_productos")) return ahora({ toolCalls: [llamada("buscar_productos", { texto: previo ?? pregunta })] });
@@ -238,7 +238,9 @@ Envíe una foto del comprobante por este chat.` };
       }
       if (lista.length === 1 || pideFoto) {
         const p = lista[0]!;
-        if (pideFoto && !hizo("enviar_producto")) return ahora({ toolCalls: [llamada("enviar_producto", { id: p.id })] });
+        // «Más fotos», «otras fotos», «todas las fotos»: van todas las del producto; si solo pide verlo, la tarjeta con la principal.
+        const pideMas = /(mas|otras|todas las) (fotos|imagenes)|more (photos|pictures)|other (photos|pictures)|all (the )?(photos|pictures)/.test(t);
+        if (pideFoto && !hizo("enviar_producto")) return ahora({ toolCalls: [llamada("enviar_producto", pideMas ? { id: p.id, todas_las_fotos: true } : { id: p.id })] });
         return { text: en ? `${p.nombre} costs ${p.precio}.` : `${p.nombre} cuesta ${p.precio}.` };
       }
       const tres = lista.slice(0, 3).map((p) => `${p.nombre} (${p.precio})`);

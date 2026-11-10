@@ -85,7 +85,7 @@ async function enviar(a: string, m: OutboundMessage) {
     if (!m.productId) throw new Error("Falta el producto.");
     const t = await leyendaDeProducto(m.productId);
     texto = t.texto.replace(/\*/g, ""); // las negritas de WhatsApp (*así*) aquí se verían como asteriscos
-    imagen = t.imagen ?? undefined;
+    imagen = m.mediaUrl ?? t.imagen ?? undefined; // la foto que se eligió; si no, la principal
   }
   let ultimo: string | null = null;
   const mediaId = imagen ? await subirImagen(imagen) : null;

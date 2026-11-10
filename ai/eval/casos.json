@@ -53,6 +53,15 @@
     "mensaje": "podrías mostrarme el producto",
     "esperado": { "accion": "responde", "herramientas": ["enviar_producto"] }
   },
+  {
+    "id": "mas-fotos",
+    "historial": [
+      { "role": "user", "content": "¿Cuánto cuesta la bocina bluetooth?" },
+      { "role": "assistant", "content": "Hola, soy el asistente virtual de Home Outlet.\nBocina bluetooth portátil cuesta Q249.00." }
+    ],
+    "mensaje": "¿Me manda más fotos?",
+    "esperado": { "accion": "responde", "herramientas": ["enviar_producto"] }
+  },
   { "id": "saludo", "mensaje": "Hola, buenas tardes", "esperado": { "accion": "responde", "contiene": ["ayudar"], "noHerramientas": true } },
   { "id": "gracias", "mensaje": "Muchas gracias", "esperado": { "accion": "responde", "contiene": ["Con gusto"] } },
   { "id": "dato-cliente", "mensaje": "Me llamo Carlos", "esperado": { "accion": "responde", "contiene": ["Carlos"], "herramientas": ["guardar_dato_cliente"] } },

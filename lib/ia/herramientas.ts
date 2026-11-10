@@ -3,7 +3,7 @@ import { obtenerNegocio } from "@/lib/ajustes";
 import { db } from "@/lib/db";
 import { departamentoDe, municipioOficial } from "@/lib/guatemala";
 import { estaAbierto } from "@/lib/horario";
-import { enviarMensaje } from "@/lib/mensajeria";
+import { enviarProductoConFotos } from "@/lib/mensajeria";
 import { DESCONTADOS, ETIQUETA_ESTADO } from "@/lib/pedidos/estados";
 import { estadoDePago, saldoDe } from "@/lib/pedidos/totales";
 import { textoCuentas } from "@/lib/plantillas";
@@ -18,7 +18,7 @@ const esquemas = {
   ver_producto: z.object({ id: z.string().min(1).max(40) }),
   datos_negocio: z.object({}),
   buscar_respuesta: z.object({ pregunta: z.string().trim().min(1).max(200) }),
-  enviar_producto: z.object({ id: z.string().min(1).max(40) }),
+  enviar_producto: z.object({ id: z.string().min(1).max(40), todas_las_fotos: z.boolean().optional() }),
   guardar_dato_cliente: z.object({ campo: z.enum(["nombre", "municipio"]), valor: z.string().trim().min(1).max(80) }),
   pasar_a_asesor: z.object({ motivo: z.string().trim().min(1).max(120) }),
   estado_pedido: z.object({ codigo: z.string().trim().max(30).optional() }),
@@ -31,7 +31,7 @@ export const HERRAMIENTAS: ToolDefinition[] = [
   { name: "ver_producto", description: "Detalle de un producto: precio, descripción y foto.", schema: esquemas.ver_producto },
   { name: "datos_negocio", description: "Horario, dirección, formas de pago, envíos y garantía de Home Outlet.", schema: esquemas.datos_negocio },
   { name: "buscar_respuesta", description: "Busca en las preguntas frecuentes del negocio (cambios y devoluciones, apartados, instalación, envíos a municipios, etc.).", schema: esquemas.buscar_respuesta },
-  { name: "enviar_producto", description: "Manda al cliente la tarjeta del producto con foto y precio.", schema: esquemas.enviar_producto },
+  { name: "enviar_producto", description: "Manda al cliente la tarjeta del producto con su foto principal y el precio. Con todas_las_fotos: true manda además las demás fotos del producto: úselo solo si el cliente pidió más fotos o ver mejor el producto.", schema: esquemas.enviar_producto },
   { name: "guardar_dato_cliente", description: "Guarda el nombre o el municipio que el cliente acaba de decir. No guarda nada más.", schema: esquemas.guardar_dato_cliente },
   { name: "estado_pedido", description: "Estado de un pedido DEL CLIENTE de esta conversación: estado, si el pago está confirmado, total, saldo, entrega y guía. Sin código devuelve el último pedido abierto. Si el pedido espera pago, incluye las cuentas bancarias. No puede ver pedidos de otras personas.", schema: esquemas.estado_pedido },
   { name: "pasar_a_asesor", description: "Termina la atención del asistente y deja la conversación esperando a una persona. Úsela cuando el cliente quiera comprar, apartar, pagar, pedir descuento, reclamar, o hable con una persona.", schema: esquemas.pasar_a_asesor },
@@ -158,12 +158,14 @@ export async function ejecutarHerramienta(nombre: string, entrada: unknown, ctx:
       return { contenido: json(r.map((x) => ({ pregunta: x.pregunta, respuesta: x.respuesta }))), consultado: r.length ? `Consultó: preguntas frecuentes (${r[0]!.pregunta})` : "Buscó en las preguntas frecuentes y no encontró nada", sinResultado: r.length === 0 };
     }
     case "enviar_producto": {
-      const p = await db.product.findFirst({ where: { id: args.id, activo: true }, select: { id: true, nombre: true } });
+      const p = await db.product.findFirst({ where: { id: args.id, activo: true }, select: { id: true, nombre: true, imagenes: true } });
       if (!p) return falla("Producto no encontrado.");
-      if (ctx.sandbox || !ctx.conversacionId) return { contenido: json({ enviado: true, nota: "Simulado en modo de prueba." }), consultado: `Envió la tarjeta de ${p.nombre}`, productos: [p.id] };
-      const r = await enviarMensaje({ conversacionId: ctx.conversacionId, autor: "asistente", aiRunId: ctx.aiRunId, mensaje: { type: "product", productId: p.id } });
+      const todas = (a.data as { todas_las_fotos?: boolean }).todas_las_fotos === true && p.imagenes.length > 1;
+      const consultado = todas ? `Envió la tarjeta de ${p.nombre} y sus ${p.imagenes.length} fotos` : `Envió la tarjeta de ${p.nombre}`;
+      if (ctx.sandbox || !ctx.conversacionId) return { contenido: json({ enviado: true, fotos: todas ? p.imagenes.length : Math.min(1, p.imagenes.length), nota: "Simulado en modo de prueba." }), consultado, productos: [p.id] };
+      const r = await enviarProductoConFotos({ conversacionId: ctx.conversacionId, productoId: p.id, fotos: todas ? "todas" : undefined, autor: "asistente", aiRunId: ctx.aiRunId });
       if (!r.ok) return falla(r.error);
-      return { contenido: json({ enviado: true }), consultado: `Envió la tarjeta de ${p.nombre}`, productos: [p.id], mensajesEnviados: [r.mensajeId] };
+      return { contenido: json({ enviado: true, fotos: r.mensajesIds?.length ?? 1 }), consultado, productos: [p.id], mensajesEnviados: r.mensajesIds ?? [r.mensajeId] };
     }
     case "guardar_dato_cliente": {
       if (!ctx.sandbox && ctx.contactoId) {

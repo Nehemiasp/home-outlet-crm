@@ -11,7 +11,7 @@ import { db } from "@/lib/db";
 import { devolverAlAsistente, pausarAsistente } from "@/lib/ia/atencion";
 import { resumirConversacion, sugerirRespuesta } from "@/lib/ia/ayudas";
 import { MOTIVOS } from "@/lib/ia/tipos";
-import { enviarMensaje, reintentarMensaje, type ResultadoEnvio } from "@/lib/mensajeria";
+import { enviarMensaje, enviarProductoConFotos, reintentarMensaje, type ResultadoEnvio } from "@/lib/mensajeria";
 import { puedeAsignar, puedeCerrar } from "@/lib/permisos";
 import { vencerReservas } from "@/lib/pedidos/vencimiento";
 import { requireUsuario } from "@/lib/session";
@@ -62,7 +62,7 @@ export async function buscarProductos(q: string): Promise<ProductoBusqueda[]> {
     take: 12,
     include: { stock: true },
   });
-  return filas.map((p) => ({ id: p.id, nombre: p.nombre, sku: p.sku, precioCentavos: p.precio, existencia: p.stock.reduce((s, x) => s + x.cantidad, 0), imagenUrl: p.imagenes[0] }));
+  return filas.map((p) => ({ id: p.id, nombre: p.nombre, sku: p.sku, precioCentavos: p.precio, existencia: p.stock.reduce((s, x) => s + x.cantidad, 0), imagenUrl: p.imagenes[0], imagenes: p.imagenes }));
 }
 
 /* ── Enviar ── */
@@ -74,12 +74,16 @@ export async function enviarTexto(conversacionId: string, t: string): Promise<Re
   return enviarMensaje({ conversacionId: id.parse(conversacionId), usuarioId: u.id, mensaje: { type: "text", text: p.data } });
 }
 
-export async function enviarProducto(conversacionId: string, productoId: string): Promise<ResultadoEnvio> {
+/** La tarjeta del producto con las fotos que eligió el asesor (la primera va con nombre y precio; las demás, detrás). */
+const fotosElegidas = z.array(z.string().min(1).max(500)).max(10).optional();
+
+export async function enviarProducto(conversacionId: string, productoId: string, fotos?: string[]): Promise<ResultadoEnvio> {
   const u = await requireUsuario();
   if (!(await ve(u, conversacionId))) return NO_EXISTE;
-  const producto = await db.product.findFirst({ where: { id: id.parse(productoId), activo: true }, select: { id: true } });
-  if (!producto) return fallo("El producto ya no está disponible.");
-  return enviarMensaje({ conversacionId: id.parse(conversacionId), usuarioId: u.id, mensaje: { type: "product", productId: producto.id } });
+  const f = fotosElegidas.safeParse(fotos);
+  if (!f.success) return fallo("Revise las fotos elegidas.");
+  const r = await enviarProductoConFotos({ conversacionId: id.parse(conversacionId), productoId: id.parse(productoId), fotos: f.data, usuarioId: u.id });
+  return r.ok ? { ok: true, mensajeId: r.mensajeId } : { ok: false, error: r.error, mensajeId: r.mensajeId };
 }
 
 export async function enviarImagen(conversacionId: string, datos: FormData): Promise<ResultadoEnvio> {

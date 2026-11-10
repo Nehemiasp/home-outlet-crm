@@ -84,6 +84,32 @@ async function topeSuperado(conv: { id: string; canal: Channel; lastInboundAt: D
 
 export type ResultadoEnvio = { ok: true; mensajeId: string } | { ok: false; error: string; mensajeId?: string };
 
+/**
+ * Manda un producto: la tarjeta (nombre y precio) con la primera foto elegida y, detrás, las demás fotos elegidas, sin texto.
+ * Solo se aceptan fotos del propio producto, y salen en el orden del catálogo. `fotos` sin indicar = solo la principal (como antes);
+ * "todas" = todas las del producto (el asistente, cuando el cliente pide más fotos). Un producto sin fotos manda la tarjeta sola.
+ * `mensajeId` es el de la tarjeta; `mensajesIds`, todos los que salieron.
+ */
+export async function enviarProductoConFotos(p: {
+  conversacionId: string; productoId: string; fotos?: string[] | "todas"; usuarioId?: string; autor?: "asesor" | "asistente"; aiRunId?: string;
+}): Promise<ResultadoEnvio & { mensajesIds?: string[] }> {
+  const producto = await db.product.findFirst({ where: { id: p.productoId, activo: true }, select: { id: true, imagenes: true } });
+  if (!producto) return { ok: false, error: "El producto ya no está disponible." };
+  const elegidas = p.fotos === "todas" ? producto.imagenes : p.fotos?.length ? producto.imagenes.filter((f) => p.fotos!.includes(f)) : producto.imagenes.slice(0, 1);
+  if (Array.isArray(p.fotos) && p.fotos.length && elegidas.length === 0) return { ok: false, error: "Esas fotos ya no son de este producto. Vuelva a elegirlas." };
+
+  const base = { conversacionId: p.conversacionId, usuarioId: p.usuarioId, autor: p.autor, aiRunId: p.aiRunId };
+  const tarjeta = await enviarMensaje({ ...base, mensaje: { type: "product", productId: producto.id, mediaUrl: elegidas[0] } });
+  if (!tarjeta.ok) return tarjeta;
+  const mensajesIds = [tarjeta.mensajeId];
+  for (const [i, foto] of elegidas.slice(1).entries()) {
+    const r = await enviarMensaje({ ...base, mensaje: { type: "image", mediaUrl: foto } });
+    if (!r.ok) return { ok: false, error: `Se envió la tarjeta${i ? ` y ${i} foto${i === 1 ? "" : "s"} más` : ""}, pero no el resto de las fotos: ${r.error}`, mensajeId: r.mensajeId ?? tarjeta.mensajeId, mensajesIds };
+    mensajesIds.push(r.mensajeId);
+  }
+  return { ok: true, mensajeId: tarjeta.mensajeId, mensajesIds };
+}
+
 /** Envía un mensaje al cliente por el canal de la conversación. Si el canal falla, el mensaje queda en "fallo" para reintentar. */
 export async function enviarMensaje(p: { conversacionId: string; usuarioId?: string; autor?: "asesor" | "asistente"; aiRunId?: string; pedidoId?: string; aviso?: boolean; mensaje: OutboundMessage }): Promise<ResultadoEnvio> {
   const autor = p.autor ?? (p.usuarioId ? "asesor" : "asistente");

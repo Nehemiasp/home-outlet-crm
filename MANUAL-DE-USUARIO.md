@@ -90,10 +90,11 @@ Arriba de cada conversación hay un selector **Quién atiende: Asistente / Aseso
 ### Atender una conversación
 1. **Asignársela:** menú **Más → Asignarme esta conversación**. El sistema también reparte solo entre los agentes disponibles (el que tenga menos conversaciones abiertas). El jefe de tienda y el administrador ven **Más → Asignar a otra persona**: se abre una ventana con la lista del equipo para elegir a quién pasarla (y **Quitar asignación** si ya la tiene alguien).
 2. **Responder:** escriba abajo y **Enviar**. Con `/` aparecen las **respuestas rápidas** (por ejemplo `/horario`).
-3. **Notas internas:** solo las ve el equipo; no se mandan al cliente.
-4. **Imágenes** del cliente: se ven en la conversación (aquí también se registran comprobantes, ver sección 6).
-5. **Ficha del cliente** (derecha, **Más → Ver ficha**): datos, canales, etiquetas, conversaciones anteriores y compras. Puede **Editar datos**, **Agregar etiqueta** y **Generar resumen** de la conversación.
-6. Si un mensaje no salió, aparece **Reintentar** en su burbuja.
+3. **Enviar un producto:** con el botón de producto (la bolsa, bajo el cuadro de texto) busque por nombre o SKU y pulse **Enviar**. Si el producto tiene varias fotos, aparecen todas marcadas: desmarque las que no quiera y pulse **Enviar N fotos**. La primera marcada sale con el nombre y el precio; las demás, detrás. Si el cliente le pide más fotos al asistente, él le manda todas las del producto.
+4. **Notas internas:** solo las ve el equipo; no se mandan al cliente.
+5. **Imágenes** del cliente: se ven en la conversación (aquí también se registran comprobantes, ver sección 6).
+6. **Ficha del cliente** (derecha, **Más → Ver ficha**): datos, canales, etiquetas, conversaciones anteriores y compras. Puede **Editar datos**, **Agregar etiqueta** y **Generar resumen** de la conversación.
+7. Si un mensaje no salió, aparece **Reintentar** en su burbuja.
 
 ### Cambiar el estado
 Menú **Más**: **Marcar como pendiente / abierta** o **Cerrar conversación**.

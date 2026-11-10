@@ -61,7 +61,7 @@ export type TonoSistema = "neutro" | "info" | "aviso" | "exito" | "peligro";
 
 export type ProductoDTO = { id: string; nombre: string; sku: string; precioCentavos: number; imagenUrl?: string };
 /** En el buscador del equipo (no lo ve el cliente) sí va la existencia de referencia. */
-export type ProductoBusqueda = ProductoDTO & { existencia: number };
+export type ProductoBusqueda = ProductoDTO & { existencia: number; imagenes: string[] };
 
 export type ItemLinea =
   | { clase: "mensaje"; id: string; entrante: boolean; tipo: string; texto: string | null; archivoUrl: string | null; producto: ProductoDTO | null; estado: Entrega | null; autor: string | null; quien: Autor; consultado: string[]; pedido: TarjetaPedido | null; fecha: string }

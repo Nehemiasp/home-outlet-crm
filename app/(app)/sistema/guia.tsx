@@ -18,6 +18,7 @@ import { useToast } from "@/components/ui/toast";
 import { BarrasApiladas, BarrasHorizontales, COLOR_CANAL, LineaAcumulada, TarjetaKPI } from "@/components/ui/graficas";
 import { CeldaExistencia, FotoProducto } from "@/app/(app)/catalogo/existencias";
 import { Logo } from "@/components/brand/logo";
+import { SelectorFotos } from "@/components/ui/selector-fotos";
 import { formatQ, formatTelefono } from "@/lib/utils";
 
 const colores = [
@@ -149,12 +150,16 @@ const secciones = [
   ["graficas", "Gráficas"],
 ];
 
+/** Fotos ficticias para la demostración del selector de fotos (la misma imagen con distinta dirección). */
+const FOTOS_DEMO = ["/placeholder/producto.svg?foto=1", "/brand/logo-home-outlet-claro.svg", "/placeholder/producto.svg?foto=3"];
+
 export function Guia() {
   const avisar = useToast();
   const [busqueda, setBusqueda] = useState("");
   const [pestana, setPestana] = useState("sin-asignar");
   const [interruptor, setInterruptor] = useState(true);
   const [zonasMarcadas, setZonasMarcadas] = useState<string[]>(["Izabal"]);
+  const [fotosDemo, setFotosDemo] = useState<string[]>(FOTOS_DEMO);
   const [modal, setModal] = useState(false);
   const [panel, setPanel] = useState(false);
   const [pagina, setPagina] = useState(1);
@@ -597,6 +602,9 @@ export function Guia() {
 
         <Seccion id="conversacion" titulo="Conversación">
           <div className="grid gap-6 lg:grid-cols-2">
+            <Bloque titulo="Elegir fotos al enviar un producto · todas empiezan marcadas; la primera marcada lleva nombre y precio">
+              <SelectorFotos fotos={FOTOS_DEMO} elegidas={fotosDemo} onCambio={setFotosDemo} nombre="Licuadora de prueba" />
+            </Bloque>
             <Bloque titulo="Item de conversación · tercera línea con logo, canal y estado en palabras (normal, seleccionado, con no leídos)">
               <div className="overflow-hidden rounded-tarjeta border border-linea">
                 {[

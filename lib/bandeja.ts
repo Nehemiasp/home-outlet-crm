@@ -181,12 +181,13 @@ export async function cargarConversacion(id: string, yo: { id: string; rol: Rol 
     return t && m.texto?.startsWith(`Pedido ${t.codigo}\n`) ? t : null;
   };
 
-  const producto = (p: (typeof conv.mensajes)[number]["producto"]): ProductoDTO | null =>
-    p ? { id: p.id, nombre: p.nombre, sku: p.sku, precioCentavos: p.precio, imagenUrl: p.imagenes[0] } : null;
+  // La tarjeta muestra la foto con la que salió (se puede elegir otra que la principal); los mensajes de antes no la guardaban.
+  const producto = (p: (typeof conv.mensajes)[number]["producto"], foto: string | null): ProductoDTO | null =>
+    p ? { id: p.id, nombre: p.nombre, sku: p.sku, precioCentavos: p.precio, imagenUrl: foto ?? p.imagenes[0] } : null;
 
   const linea: ItemLinea[] = [
     ...conv.mensajes.map((m): ItemLinea => ({
-      clase: "mensaje", id: m.id, entrante: m.direccion === "entrante", tipo: m.tipo, texto: m.texto, archivoUrl: m.archivoUrl, producto: producto(m.producto),
+      clase: "mensaje", id: m.id, entrante: m.direccion === "entrante", tipo: m.tipo, texto: m.texto, archivoUrl: m.archivoUrl, producto: producto(m.producto, m.archivoUrl),
       estado: m.estado, autor: m.enviadoPor?.nombre ?? null, quien: m.autor, consultado: m.aiRun?.consultado ?? [], pedido: tarjetaDe(m), fecha: m.fecha.toISOString(),
     })),
     ...conv.notas.map((n): ItemLinea => ({ clase: "nota", id: n.id, texto: n.texto, autor: n.autor.nombre, fecha: n.fecha.toISOString() })),

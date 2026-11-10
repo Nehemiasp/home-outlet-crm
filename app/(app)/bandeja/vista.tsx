@@ -107,9 +107,9 @@ export function Vista({ inicial, cotizacion }: { inicial: ConversacionDTO; cotiz
     setPlantillas((s) => (sigueAbierta ? { ...s, enviando: false } : { abierta: false }));
     await resolver(r);
   };
-  const alElegirProducto = async (p: ProductoDTO) => {
+  const alElegirProducto = async (p: ProductoDTO, fotos: string[]) => {
     setProductos(false);
-    await resolver(await enviarProducto(c.id, p.id));
+    await resolver(await enviarProducto(c.id, p.id, fotos));
   };
   const alElegirArchivo = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
