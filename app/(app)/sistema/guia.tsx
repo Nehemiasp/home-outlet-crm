@@ -17,6 +17,7 @@ import { AvisoAccionable, BotonFiltros, EncabezadoPagina, enlaceTabla, LineaDePa
 import { useToast } from "@/components/ui/toast";
 import { BarrasApiladas, BarrasHorizontales, COLOR_CANAL, LineaAcumulada, TarjetaKPI } from "@/components/ui/graficas";
 import { CeldaExistencia, FotoProducto } from "@/app/(app)/catalogo/existencias";
+import { Logo } from "@/components/brand/logo";
 import { formatQ, formatTelefono } from "@/lib/utils";
 
 const colores = [
@@ -224,6 +225,22 @@ export function Guia() {
               </div>
             ))}
           </div>
+          <Bloque titulo="Logo · SVG en public/brand; sobre carbón va la versión con blanco, sobre fondos claros la de carbón. El tamaño se da con la altura">
+            <div className="flex flex-wrap items-end gap-6">
+              <div className="flex flex-col items-start gap-2">
+                <div className="rounded-tarjeta bg-carbon p-4">
+                  <Logo sobreOscuro className="h-24" />
+                </div>
+                <p className="meta text-texto-suave">sobreOscuro · menú lateral (h-20) e inicio de sesión (h-28)</p>
+              </div>
+              <div className="flex flex-col items-start gap-2">
+                <div className="rounded-tarjeta border border-linea bg-superficie p-4">
+                  <Logo className="h-24" />
+                </div>
+                <p className="meta text-texto-suave">Fondo claro · cotización (h-16) y página de pago (h-14)</p>
+              </div>
+            </div>
+          </Bloque>
           <Bloque titulo="Paleta de estados · fondo tenue, texto oscuro e ícono. Ninguna insignia de estado es sólida">
             <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {estados.map(([tono, fondo, texto, uso]) => (

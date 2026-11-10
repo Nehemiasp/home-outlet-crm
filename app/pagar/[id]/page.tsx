@@ -19,7 +19,7 @@ export default async function PagarSimulado({ params }: { params: Promise<{ id: 
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-6 p-6">
-      <Logo />
+      <Logo className="h-14 self-start" />
       <p role="note" className="rounded-campo bg-estado-aviso-fondo p-3 meta text-estado-aviso-texto">
         Esto es una simulación para probar el sistema: no se cobra nada.
       </p>

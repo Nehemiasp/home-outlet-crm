@@ -71,7 +71,7 @@ export default async function Pagina({ params }: { params: Promise<{ id: string 
       <article aria-label={`Cotización ${c.codigo}`} className="flex flex-col gap-6 rounded-tarjeta border border-linea bg-superficie p-6 print:rounded-none print:border-0 print:p-0">
         <header className="flex flex-wrap items-start justify-between gap-4 border-b-2 border-carbon pb-4">
           <div className="flex flex-col gap-2">
-            <Logo />
+            <Logo className="h-16 self-start" />
             <div className="meta text-texto-suave">
               <p>{c.negocio.nombre}</p>
               {c.negocio.direccion && <p>{c.negocio.direccion}</p>}

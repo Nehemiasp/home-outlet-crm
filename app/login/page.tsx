@@ -17,8 +17,8 @@ export default async function Login() {
   return (
     <main className="grid min-h-dvh place-items-center bg-carbon p-4">
       <div className="w-full max-w-sm rounded-tarjeta bg-superficie p-6">
-        <div className="mb-6 rounded-campo bg-carbon p-4">
-          <Logo sobreOscuro />
+        <div className="mb-6 flex justify-center rounded-campo bg-carbon p-4">
+          <Logo sobreOscuro prioridad className="h-28" />
         </div>
         <h1 className="titulo-panel mb-4">Entrar</h1>
         {motivo === "inactividad" && (

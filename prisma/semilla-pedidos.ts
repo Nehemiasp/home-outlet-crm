@@ -1,12 +1,11 @@
-// Contenido de demostración de Pagos y envíos. Las cuentas llevan número de puros ceros: nunca un formato que parezca una cuenta real.
+// Contenido de Pagos y envíos. Las cuentas son las reales de Home Outlet (las dio el cliente el 10-nov-2026); las zonas siguen de ejemplo.
 import type { PrismaClient } from "../generated/prisma/client";
 import { TIENDA_MIXCO, TIENDA_PUERTO_BARRIOS } from "../lib/tiendas";
 
-// FICTICIO: hasta que lleguen los bancos y cuentas reales.
+// Las cuentas reales de Home Outlet (10-nov-2026): las dos monetarias, a nombre de la sociedad.
 const cuentas = [
-  { banco: "Banco Industrial", tipo: "monetaria", numero: "000-000000-0", titular: "Home Outlet Internacional, S.A." },
-  { banco: "Banrural", tipo: "ahorro", numero: "0000-000000-0", titular: "Home Outlet Internacional, S.A." },
-  { banco: "BAC Credomatic", tipo: "monetaria", numero: "00-000000-0", titular: "Home Outlet Internacional, S.A." },
+  { banco: "Banco Industrial", tipo: "monetaria", numero: "552-009627-1", titular: "Home Outlet Internacional, S.A." },
+  { banco: "Banrural", tipo: "monetaria", numero: "3109125249", titular: "Home Outlet Internacional, S.A." },
 ] as const;
 
 // FICTICIO: hasta que lleguen las zonas y los costos reales (centavos).

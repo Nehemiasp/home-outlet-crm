@@ -64,8 +64,8 @@ export function Navegacion({ nombre, rol, porVerificar: verificarInicial, puedeV
     <>
       {/* Escritorio: barra lateral */}
       <aside className="sticky top-0 hidden h-dvh w-60 shrink-0 flex-col bg-carbon text-sobre-carbon md:flex print:hidden">
-        <div className="p-6">
-          <Logo sobreOscuro />
+        <div className="px-6 pb-4 pt-6">
+          <Logo sobreOscuro prioridad className="h-20" />
         </div>
         <nav aria-label="Principal" className="flex-1">
           <ul className="flex flex-col gap-1 px-2">

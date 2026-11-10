@@ -17,8 +17,8 @@ export default async function Seguridad() {
   return (
     <main className="grid min-h-dvh place-items-center bg-carbon p-4">
       <div className="w-full max-w-md rounded-tarjeta bg-superficie p-6">
-        <div className="mb-6 rounded-campo bg-carbon p-4">
-          <Logo sobreOscuro />
+        <div className="mb-6 flex justify-center rounded-campo bg-carbon p-4">
+          <Logo sobreOscuro prioridad className="h-28" />
         </div>
         <ActivarSegundoFactor nombre={u.nombre} qr={r.qr} secreto={r.secreto} />
       </div>
