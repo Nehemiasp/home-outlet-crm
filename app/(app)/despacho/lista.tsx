@@ -84,7 +84,12 @@ export function ListaDespacho({ paqueterias }: { paqueterias: string[] }) {
 
   return (
     <div className="flex flex-col gap-4 p-6">
-      <EncabezadoPagina titulo="Despacho" detalle="Pedidos ya pagados que hay que empacar y entregar, del más antiguo al más nuevo. Sin precios ni pagos." />
+      <EncabezadoPagina titulo="Despacho" detalle="Pedidos ya pagados que hay que empacar y entregar, del más antiguo al más nuevo. Sin precios ni pagos.">
+        <Link href="/despacho/etiquetas" target="_blank" rel="noopener" className="cuerpo-fuerte inline-flex h-10 items-center gap-2 rounded-campo border border-linea bg-superficie px-4 hover:bg-fondo max-md:min-h-11">
+          <Printer className="size-4" aria-hidden />
+          Etiquetas de envío
+        </Link>
+      </EncabezadoPagina>
       <PestanasConContador
         etiqueta="Estado del despacho"
         activa={pestana}

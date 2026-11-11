@@ -137,6 +137,16 @@ Es la pantalla de inicio de **bodega** (el administrador y el jefe de tienda tam
 - **Listo para recoger / Marcar como enviado:** pide confirmar porque **se le avisa al cliente por el chat**. Al enviar se elige **cómo sale** (ver «Marcar como enviado» en la sección 6). Bodega también sube la guía de la paquetería y la puede abrir desde aquí.
 - **Marcar como entregado:** cierra el pedido.
 
+**Etiquetas de envío:** el botón **Etiquetas de envío**, arriba a la derecha de Despacho, abre en otra pestaña una hoja con **todos los pedidos con envío que todavía no salen**: pagados, preparando o listos, y los de pago contra entrega. Los de recoger en tienda no entran. Caben **8 por hoja carta**, con línea punteada para recortar. Cada etiqueta lleva:
+- el número de pedido;
+- la paquetería, o «por definir» si aún no se eligió;
+- el nombre y el teléfono del cliente;
+- la dirección, con municipio y departamento;
+- los productos con cantidad y precio (si son más de 4, dice cuántos faltan);
+- el envío, el descuento si lo hay, y el **total**.
+
+Sirve para identificar los paquetes al despacharlos; **no es la guía de la paquetería**. A diferencia del resto de Despacho, esta hoja **sí lleva precios**, también para bodega. Toque **Imprimir** y elija tamaño carta.
+
 Bodega **no cancela** pedidos ni toca pagos. Si algo no cuadra (falta producto, el cliente cambió algo), avise al jefe de tienda. Cada paso queda registrado con el nombre de quien lo dio.
 
 ## 6. Pedidos y pagos

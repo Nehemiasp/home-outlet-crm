@@ -6,7 +6,7 @@ import path from "node:path";
 import { after, before, describe, test } from "node:test";
 import { cambiarPermisoPagos, cambiarRol } from "@/lib/ajustes";
 import { db } from "@/lib/db";
-import { avanzarDespacho, cargarHoja, ESTADOS_DESPACHO, listarDespacho } from "@/lib/pedidos/despacho";
+import { avanzarDespacho, cargarHoja, ESTADOS_DESPACHO, listarDespacho, listarEtiquetasEnvio } from "@/lib/pedidos/despacho";
 import { esBodega, inicioDe, puedeAjustarExistencias, puedeDespachar, puedeGestionarProductos, puedeUnirContactos, puedeVerAjustes, puedeVerReportes, puedeVerificarPagos, veTodo, type Actor, type Rol } from "@/lib/permisos";
 import { puedeVerArchivo } from "@/lib/visibilidad";
 import { aislar, crearUsuario, limpiar, PREFIJO, restaurar } from "./apoyo-equipo";
@@ -59,6 +59,7 @@ describe("bodega solo entra por donde se le abrió", () => {
       "app/(app)/catalogo/actions.ts",
       "app/(app)/catalogo/page.tsx",
       "app/(app)/despacho/actions.ts",
+      "app/(app)/despacho/etiquetas/page.tsx",
       "app/(app)/despacho/page.tsx",
       "app/(app)/equipo/actions.ts",
       "app/(app)/layout.tsx",
@@ -118,6 +119,26 @@ describe("despacho de bodega (con base de datos)", () => {
     assert.equal(uno.lugar, "Morales, Izabal");
     assert.deepEqual([uno.lineas[0]!.cantidad, uno.notas], [2, "Frágil"]);
     assert.deepEqual(uno.pasos, ["preparando"]); // de pagado solo se puede empezar a preparar (no cancelar)
+  });
+
+  test("etiquetas de envío: solo los envíos que no han salido (y contra entrega), con precios y productos sumados", async () => {
+    // Uno de contra entrega, sin pagar todavía, con el mismo producto partido en dos ubicaciones.
+    await db.order.create({
+      data: {
+        codigo: "PREQ-000005", contactoId, canal: "simulado", estado: "pendiente_pago", entrega: "envio", metodoPago: "contra_entrega", direccion: "Barrio El Centro", departamento: "Izabal", municipio: "Puerto Barrios",
+        paqueteria: "Forza", subtotal: 30_000, descuentoMonto: 1_000, costoEnvio: 3_500, total: 32_500,
+        lineas: { create: [{ sku: "PRUEBA-EQ-2", nombre: "PRUEBA-EQ Otro", precio: 15_000, cantidad: 1 }, { sku: "PRUEBA-EQ-2", nombre: "PRUEBA-EQ Otro", precio: 15_000, cantidad: 1 }] },
+      },
+    });
+    const mias = (await listarEtiquetasEnvio()).filter((e) => e.codigo.startsWith("PREQ-"));
+    // El pagado con envío y el de contra entrega; no el pendiente por transferencia, ni el ya enviado, ni el de recoger.
+    assert.deepEqual(mias.map((e) => e.codigo), ["PREQ-000001", "PREQ-000005"]);
+    const [uno, ce] = mias as [(typeof mias)[number], (typeof mias)[number]];
+    assert.deepEqual([uno.cliente.startsWith(PREFIJO), uno.telefono, uno.lugar, uno.direccion, uno.paqueteria], [true, "+50255559901", "Morales, Izabal", "Calle 1, zona 2", null]);
+    assert.deepEqual(uno.lineas, [{ nombre: "PRUEBA-EQ Producto", cantidad: 2, precio: 10_000 }]);
+    assert.deepEqual([uno.costoEnvio, uno.total], [2_500, 22_500]);
+    assert.deepEqual([ce.paqueteria, ce.lineas, ce.descuento, ce.total], ["Forza", [{ nombre: "PRUEBA-EQ Otro", cantidad: 2, precio: 15_000 }], 1_000, 32_500]);
+    assert.equal(JSON.stringify(mias).includes("metodoPago"), false); // la forma de pago no viaja
   });
 
   test("la hoja de bodega: bodega abre las de despacho y no las demás", async () => {

@@ -81,6 +81,63 @@ export async function cargarHoja(id: string, u: { id: string; rol: ActorPedido["
   return o ? aFila(o, (await tiendaDeRecoger(null))?.nombre ?? null) : null;
 }
 
+/**
+ * Etiquetas de envío: una hoja con todos los pedidos con envío que todavía no salen (pagados, preparando o listos, y los de
+ * contra entrega), varias por página, para identificar los paquetes al despacharlos. A diferencia del resto del despacho,
+ * SÍ lleva precios y el total: lo decidió Nehemias el 10-nov-2026 (esta hoja la imprime también bodega). No lleva pagos,
+ * formas de pago ni conversaciones. No tiene que ver con la guía de la paquetería.
+ */
+export type EtiquetaEnvio = {
+  id: string;
+  codigo: string;
+  cliente: string;
+  telefono: string | null;
+  direccion: string | null;
+  /** «Morales, Izabal». */
+  lugar: string;
+  zona: string | null;
+  /** La paquetería, si ya se eligió al prepararlo; si no, null («por definir»). */
+  paqueteria: string | null;
+  /** Una por producto: si el pedido lo partió por ubicación, aquí se suman. Montos en centavos. */
+  lineas: { nombre: string; cantidad: number; precio: number }[];
+  costoEnvio: number;
+  descuento: number;
+  total: number;
+};
+
+const POR_ENVIAR: Prisma.OrderWhereInput = {
+  entrega: "envio",
+  OR: [{ estado: { in: ["pagado", "preparando", "listo_para_recoger"] } }, { estado: "pendiente_pago", metodoPago: "contra_entrega" }],
+};
+
+/** Las etiquetas, del pedido más antiguo al más nuevo (el mismo orden del despacho). */
+export async function listarEtiquetasEnvio(): Promise<EtiquetaEnvio[]> {
+  const filas = await db.order.findMany({
+    where: POR_ENVIAR,
+    orderBy: { creada: "asc" },
+    take: 400,
+    select: {
+      id: true, codigo: true, direccion: true, municipio: true, departamento: true, zona: true, paqueteria: true, costoEnvio: true, descuentoMonto: true, total: true,
+      contacto: { select: { nombre: true, telefono: true } },
+      lineas: { orderBy: [{ nombre: "asc" }, { id: "asc" }], select: { sku: true, nombre: true, cantidad: true, precio: true } },
+    },
+  });
+  return filas.map((o) => {
+    const lineas = new Map<string, { nombre: string; cantidad: number; precio: number }>();
+    for (const l of o.lineas) {
+      const k = `${l.sku}|${l.precio}`;
+      const previa = lineas.get(k);
+      if (previa) previa.cantidad += l.cantidad;
+      else lineas.set(k, { nombre: l.nombre, cantidad: l.cantidad, precio: l.precio });
+    }
+    return {
+      id: o.id, codigo: o.codigo, cliente: o.contacto.nombre, telefono: o.contacto.telefono, direccion: o.direccion,
+      lugar: textoLugar(o.municipio, o.departamento), zona: o.zona, paqueteria: o.paqueteria,
+      lineas: [...lineas.values()], costoEnvio: o.costoEnvio, descuento: o.descuentoMonto, total: o.total,
+    };
+  });
+}
+
 type Fallo = { ok: false; error: string };
 
 /**
