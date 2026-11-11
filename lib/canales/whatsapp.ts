@@ -3,7 +3,7 @@ import { almacenamiento, extensionDeImagen, NOMBRE_VALIDO, TIPOS } from "@/lib/a
 import { formatQ } from "@/lib/utils";
 import { ventanaAbierta } from "./ventana";
 import { contarVariables } from "./plantillas-canal";
-import type { ChannelAdapter, InboundMessage, OutboundMessage, PlantillaCanal, StatusUpdate } from "./tipos";
+import { ErrorDeCanal, type ChannelAdapter, type InboundMessage, type OutboundMessage, type PlantillaCanal, type StatusUpdate } from "./tipos";
 
 /**
  * WhatsApp Business Platform (Cloud API).
@@ -40,15 +40,34 @@ export function verificarSuscripcion(url: URL) {
   return esperado && p.get("hub.mode") === "subscribe" && p.get("hub.verify_token") === esperado ? p.get("hub.challenge") : null;
 }
 
-/** Llamada a la API de Meta. El error nunca incluye el token ni el contenido del mensaje: solo el código HTTP y el de Meta. */
+/** Qué quieren decir los códigos de error de Meta más comunes (WhatsApp, Messenger e Instagram). Texto nuestro, para el registro. */
+const EXPLICACION_META: Record<number, string> = {
+  10: "el token no tiene permiso sobre esa cuenta o número",
+  100: "dato inválido en la llamada (número, id o parámetro)",
+  190: "el token venció o no es válido",
+  200: "falta un permiso en el token",
+  368: "Meta bloqueó el envío por sus políticas",
+  551: "esa persona no está disponible en este momento",
+  4: "se pasó el límite de llamadas a la API",
+  80007: "se pasó el límite de mensajes de la cuenta",
+  130429: "se pasó el límite de envíos por segundo",
+  131026: "el número no puede recibir el mensaje (sin WhatsApp o versión vieja)",
+  131030: "el número no está en la lista de destinatarios de prueba",
+  131047: "pasaron más de 24 horas desde el último mensaje del cliente: hace falta una plantilla",
+  131051: "tipo de mensaje no admitido",
+  2018278: "pasaron más de 24 horas desde el último mensaje del cliente",
+};
+export const explicacionMeta = (codigo?: number) => (codigo ? EXPLICACION_META[codigo] : undefined);
+
+/** Llamada a la API de Meta. El error nunca incluye el token ni el contenido del mensaje: solo el código HTTP, el de Meta y nuestra explicación. */
 async function llamar(ruta: string, init: RequestInit = {}) {
   const r = await fetch(ruta.startsWith("http") ? ruta : `${GRAPH}/${ruta}`, {
     ...init,
     headers: { Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`, ...(init.headers ?? {}) },
   });
   if (!r.ok) {
-    const codigo = await r.json().then((j: { error?: { code?: number } }) => j.error?.code).catch(() => undefined);
-    throw new Error(`WhatsApp respondió ${r.status}${codigo ? ` (código ${codigo})` : ""}`);
+    const e = await r.json().then((j: { error?: { code?: number } }) => j.error).catch(() => undefined);
+    throw new ErrorDeCanal("WhatsApp", r.status, e?.code, explicacionMeta(e?.code));
   }
   return r;
 }

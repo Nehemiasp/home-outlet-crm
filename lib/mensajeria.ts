@@ -3,6 +3,7 @@ import type { Channel, InboundMessage, OutboundMessage } from "@/lib/canales/tip
 import { textoVentanaCerrada } from "@/lib/canales/ventana";
 import { db } from "@/lib/db";
 import { alResponder } from "@/lib/equipo/compartida";
+import { registrarError } from "@/lib/registro";
 import { normalizarTelefono } from "@/lib/telefono";
 
 const conTelefono = (canal: string) => canal === "whatsapp" || canal === "simulado";
@@ -143,7 +144,8 @@ export async function enviarMensaje(p: { conversacionId: string; usuarioId?: str
     const { externalMessageId } = await canal.send(identidad.externalContactId, p.mensaje);
     await db.message.update({ where: { id: msg.id }, data: { externalMessageId, estado: "enviado" } });
     return { ok: true, mensajeId: msg.id };
-  } catch {
+  } catch (e) {
+    registrarError(`envío por ${conv.canal} (mensaje ${msg.id})`, e, { nivel: "aviso" });
     await db.message.update({ where: { id: msg.id }, data: { estado: "fallo" } });
     return { ok: false, error: "No se envió.", mensajeId: msg.id };
   }
@@ -169,7 +171,8 @@ export async function reintentarMensaje(mensajeId: string): Promise<ResultadoEnv
     const { externalMessageId } = await canal.send(identidad.externalContactId, { type: tipo, text: msg.texto ?? undefined, mediaUrl: msg.archivoUrl ?? undefined, productId: msg.productoId ?? undefined });
     await db.message.update({ where: { id: msg.id }, data: { externalMessageId, estado: "enviado" } });
     return { ok: true, mensajeId: msg.id };
-  } catch {
+  } catch (e) {
+    registrarError(`reintento por ${conv.canal} (mensaje ${msg.id})`, e, { nivel: "aviso" });
     await db.message.update({ where: { id: msg.id }, data: { estado: "fallo" } });
     return { ok: false, error: "No se envió.", mensajeId: msg.id };
   }

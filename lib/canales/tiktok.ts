@@ -3,7 +3,7 @@ import { almacenamiento, extensionDeImagen, NOMBRE_VALIDO, TIPOS } from "@/lib/a
 import { guardarImagenEntrante, partirTexto } from "./meta-mensajeria";
 import { ventanaAbierta } from "./ventana";
 import { leyendaDeProducto } from "./whatsapp";
-import type { ChannelAdapter, InboundMessage, OutboundMessage, StatusUpdate } from "./tipos";
+import { ErrorDeCanal, type ChannelAdapter, type InboundMessage, type OutboundMessage, type StatusUpdate } from "./tipos";
 
 /**
  * TikTok (mensajes directos de una cuenta TikTok Business), por la API de mensajes de TikTok para negocios.
@@ -40,7 +40,7 @@ const base = () => (process.env.TIKTOK_API_URL?.trim() || API_REAL).replace(/\/+
 async function llamar(ruta: string, init: RequestInit = {}): Promise<Record<string, unknown>> {
   const r = await fetch(`${base()}/${ruta}`, { ...init, headers: { "Access-Token": process.env.TIKTOK_ACCESS_TOKEN ?? "", ...(init.headers ?? {}) } });
   const j = (await r.json().catch(() => ({}))) as { code?: number; data?: Record<string, unknown> };
-  if (!r.ok || j.code !== 0) throw new Error(`TikTok respondió ${r.status}${j.code ? ` (código ${j.code})` : ""}`);
+  if (!r.ok || j.code !== 0) throw new ErrorDeCanal("TikTok", r.status, j.code || undefined);
   return j.data ?? {};
 }
 

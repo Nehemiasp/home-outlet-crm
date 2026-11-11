@@ -1,6 +1,20 @@
 export const CANALES = ["whatsapp", "tiktok", "instagram", "facebook", "simulado"] as const;
 export type Channel = (typeof CANALES)[number];
 
+/**
+ * Error de la API de un canal (Meta, TikTok) al enviar o consultar. Su texto es seguro para el registro: lo arma el
+ * adaptador con el código HTTP, el código del canal y, si es un código conocido, una explicación nuestra. Nunca lleva el
+ * token, el contenido del mensaje ni el texto que devuelve la API (podría repetir lo que escribió el cliente).
+ * `registrarError` lo escribe completo para que se sepa por qué falló un envío.
+ */
+export class ErrorDeCanal extends Error {
+  readonly seguro = true;
+  constructor(canal: string, estado: number, codigo?: number, explicacion?: string) {
+    super(`${canal} respondió ${estado}${codigo ? ` (código ${codigo})` : ""}${explicacion ? `: ${explicacion}` : ""}`);
+    this.name = "ErrorDeCanal";
+  }
+}
+
 export interface InboundMessage {
   channel: Channel;
   externalContactId: string; // teléfono en WhatsApp, id del usuario en otras redes

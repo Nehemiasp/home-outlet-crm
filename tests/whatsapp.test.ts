@@ -102,8 +102,8 @@ describe("adaptador de WhatsApp (Meta simulado)", () => {
   test("si Meta rechaza el envío, falla sin mostrar el token ni el mensaje", async () => {
     simular(() => json({ error: { code: 131047, message: "Re-engagement message" } }, 400));
     await assert.rejects(adaptadorWhatsApp.send("+50240432655", { type: "text", text: "texto privado del cliente" }), (e: Error) => {
-      assert.match(e.message, /400.*131047/);
-      assert.ok(!e.message.includes(TOKEN) && !e.message.includes("texto privado"));
+      assert.match(e.message, /400.*131047.*plantilla/); // el código y nuestra explicación, para el registro
+      assert.ok(!e.message.includes(TOKEN) && !e.message.includes("texto privado") && !e.message.includes("Re-engagement")); // nunca el texto de la API
       return true;
     });
     simular(() => json({ ok: true }));

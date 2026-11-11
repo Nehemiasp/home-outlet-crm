@@ -1,7 +1,7 @@
 import { almacenamiento, extensionDeImagen, NOMBRE_VALIDO, TIPOS } from "@/lib/almacenamiento";
-import { firmaValida, leyendaDeProducto } from "./whatsapp";
+import { explicacionMeta, firmaValida, leyendaDeProducto } from "./whatsapp";
 import { ventanaAbierta } from "./ventana";
-import type { ChannelAdapter, InboundMessage, OutboundMessage, StatusUpdate } from "./tipos";
+import { ErrorDeCanal, type ChannelAdapter, type InboundMessage, type OutboundMessage, type StatusUpdate } from "./tipos";
 
 /**
  * Facebook Messenger e Instagram (mensajes directos), por la API de mensajería de Meta. Las dos usan la misma forma de
@@ -60,12 +60,12 @@ export function partirTexto(texto: string, maxBytes: number): string[] {
   return trozos;
 }
 
-/** Llamada a la API de Meta. El error nunca incluye el token ni el contenido del mensaje: solo el código HTTP y el de Meta. */
+/** Llamada a la API de Meta. El error nunca incluye el token ni el contenido del mensaje: solo el código HTTP, el de Meta y nuestra explicación. */
 async function llamar(p: Plataforma, ruta: string, init: RequestInit = {}) {
   const r = await fetch(`${GRAPH}/${ruta}`, { ...init, headers: { Authorization: `Bearer ${process.env[CONFIG[p].token]}`, ...(init.headers ?? {}) } });
   if (!r.ok) {
-    const codigo = await r.json().then((j: { error?: { code?: number } }) => j.error?.code).catch(() => undefined);
-    throw new Error(`${CONFIG[p].nombre} respondió ${r.status}${codigo ? ` (código ${codigo})` : ""}`);
+    const e = await r.json().then((j: { error?: { code?: number } }) => j.error).catch(() => undefined);
+    throw new ErrorDeCanal(CONFIG[p].nombre, r.status, e?.code, explicacionMeta(e?.code));
   }
   return r;
 }
