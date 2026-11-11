@@ -12,6 +12,7 @@ enum Rol {
   agente
   jefe_tienda // ve y gestiona todo lo operativo, pero no cambia ajustes, usuarios ni canales
   bodega // solo ve el catálogo y despacha los pedidos ya pagados (sin precios, pagos ni conversaciones)
+  oficina // como el jefe de tienda (todo lo operativo), pero sin la pantalla de reportes
 }
 
 /// Disponibilidad de un asesor (rol agente) para recibir conversaciones nuevas.

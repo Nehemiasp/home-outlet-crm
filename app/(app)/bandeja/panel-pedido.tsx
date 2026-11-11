@@ -508,7 +508,7 @@ export function PanelPedido({ abierto, onCerrar, conversacionId, puedeEnviar, on
               <CampoTexto etiqueta="Valor" inputMode="decimal" autoComplete="off" maxLength={12} value={descValor} onChange={(e) => setDescValor(e.target.value)} />
             </div>
             {descValor.trim() && <CampoTexto etiqueta="Motivo del descuento" autoComplete="off" maxLength={200} value={descMotivo} onChange={(e) => setDescMotivo(e.target.value)} />}
-            {!datos.sinLimites && <p className="meta text-texto-suave">{datos.descuentoMaxAgente > 0 ? `Usted puede dar hasta ${datos.descuentoMaxAgente} %. Más de eso lo autoriza un administrador o un jefe de tienda.` : "Los descuentos los autoriza un administrador."}</p>}
+            {!datos.sinLimites && <p className="meta text-texto-suave">{datos.descuentoMaxAgente > 0 ? `Usted puede dar hasta ${datos.descuentoMaxAgente} %. Más de eso lo autoriza un administrador, un jefe de tienda o alguien de oficina.` : "Los descuentos los autoriza un administrador."}</p>}
           </section>
 
           <AreaTexto etiqueta="Notas del pedido" maxLength={500} ayuda="Solo las ve el equipo." value={notas} onChange={(e) => setNotas(e.target.value)} />
@@ -536,7 +536,7 @@ export function PanelPedido({ abierto, onCerrar, conversacionId, puedeEnviar, on
             (datos.sinLimites ? (
               <Casilla etiqueta="Apartar «sobre pedido» aunque no alcance la existencia" checked={sobrePedido} onChange={(e) => setSobrePedido(e.target.checked)} />
             ) : (
-              <p className="meta text-texto-suave">Para enviarlo sin existencia suficiente, un administrador o un jefe de tienda debe apartarlo «sobre pedido».</p>
+              <p className="meta text-texto-suave">Para enviarlo sin existencia suficiente, un administrador, un jefe de tienda o alguien de oficina debe apartarlo «sobre pedido».</p>
             ))}
 
           {!puedeEnviar && (

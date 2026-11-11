@@ -74,7 +74,7 @@ export function Equipo({ inicial }: { inicial: AjustesEquipo }) {
             ? "Todos ven todas las conversaciones y nada se reparte: lo nuevo espera en «Sin asignar», a la vista de todos. Quien le escribe al cliente queda asignado; si otra persona también le escribe, se suma («Asignada a Ana y Carlos»). Las notas internas no asignan. Así ningún chat se queda esperando porque alguien olvidó ponerse en pausa."
             : ajustes.modoAsignacion === "automatica"
               ? "Cuando el asistente pasa una conversación a un asesor, o llega un mensaje y el asistente está apagado, se asigna sola al asesor disponible con menos conversaciones abiertas (primero al asesor responsable del cliente, si está disponible)."
-              : "Nada se asigna solo: todo queda en «Sin asignar» y un administrador o un jefe de tienda reparte."}
+              : "Nada se asigna solo: todo queda en «Sin asignar» y un administrador, un jefe de tienda o alguien de oficina reparte."}
         </p>
       </section>
 

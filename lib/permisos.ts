@@ -1,15 +1,16 @@
 // Permisos de la sección 6. Se validan en el servidor; ocultar botones no basta.
 //
-// Cuatro roles:
+// Cinco roles:
 //  - Administrador: todo, incluidos los ajustes, los usuarios, los canales y el asistente.
 //  - Jefe de tienda: ve y gestiona todo lo operativo (conversaciones, contactos, pedidos, pagos, catálogo y existencias,
 //    reportes y el estado del equipo), pero NO cambia ajustes, usuarios, canales, cuentas bancarias ni el asistente.
+//  - Oficina: igual que el jefe de tienda en lo operativo, pero NO ve la pantalla de reportes. Entra sin segundo factor.
 //  - Agente (asesor): atiende lo que se le asigna.
 //  - Bodega: solo ve el catálogo y despacha los pedidos ya pagados (sin precios, pagos, conversaciones ni contactos).
 //    A diferencia de los otros, NO entra a ninguna pantalla ni acción salvo las que lo permiten expresamente (ver `lib/session.ts`).
-export type Rol = "admin" | "jefe_tienda" | "agente" | "bodega";
-export const ROLES = ["admin", "jefe_tienda", "agente", "bodega"] as const satisfies readonly Rol[];
-export const NOMBRE_ROL: Record<Rol, string> = { admin: "Administrador", jefe_tienda: "Jefe de tienda", agente: "Agente", bodega: "Bodega" };
+export type Rol = "admin" | "jefe_tienda" | "oficina" | "agente" | "bodega";
+export const ROLES = ["admin", "jefe_tienda", "oficina", "agente", "bodega"] as const satisfies readonly Rol[];
+export const NOMBRE_ROL: Record<Rol, string> = { admin: "Administrador", jefe_tienda: "Jefe de tienda", oficina: "Oficina", agente: "Agente", bodega: "Bodega" };
 
 export type Actor = { id: string; rol: Rol };
 /** `participantes`: en la bandeja compartida, quienes le escribieron al cliente (también la pueden cerrar). */
@@ -19,8 +20,8 @@ export const esAdmin = (u: { rol: Rol }) => u.rol === "admin";
 
 /** Quienes deben entrar con segundo factor (código de una aplicación de autenticación): los que ven y mueven todo el negocio. */
 export const requiereSegundoFactor = (u: { rol: Rol }) => u.rol === "admin" || u.rol === "jefe_tienda";
-/** Administrador o jefe de tienda: no se les limita lo que ven y pueden gestionar todo lo operativo. */
-export const veTodo = (u: { rol: Rol }) => u.rol === "admin" || u.rol === "jefe_tienda";
+/** Administrador, jefe de tienda u oficina: no se les limita lo que ven y pueden gestionar todo lo operativo. */
+export const veTodo = (u: { rol: Rol }) => u.rol === "admin" || u.rol === "jefe_tienda" || u.rol === "oficina";
 
 /** Bodega: solo catálogo (sin editar ni ajustar existencias) y despacho. */
 export const esBodega = (u: { rol: Rol }) => u.rol === "bodega";
@@ -41,7 +42,10 @@ export const puedeCerrar = (u: Actor, c: ConDueno) => veTodo(u) || c.asignadaAId
 export const puedeUnirContactos = veTodo;
 export const puedeGestionarProductos = veTodo; // crear, editar y borrar, y las existencias
 export const puedeVerAjustes = esAdmin; // ajustes, usuarios, simulador y /sistema: solo el administrador
-export const puedeVerReportes = veTodo; // reportes de atención, ventas por canal y costo del asistente
+/** Reportes de atención, ventas por canal y costo del asistente: administrador y jefe de tienda (oficina no). */
+export const puedeVerReportes = (u: { rol: Rol }) => u.rol === "admin" || u.rol === "jefe_tienda";
+/** El reporte de asesores (mensajes que escribió cada agente y las ventas en que participó): solo el administrador. */
+export const puedeVerReporteAsesores = esAdmin;
 
 /* ── Pedidos (fase 2.5) ── */
 export type ActorPedido = Actor & { puedeVerificarPagos?: boolean };

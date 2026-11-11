@@ -1,6 +1,6 @@
 # Home Outlet CRM — Manual de usuario
 
-Para el equipo de Home Outlet: agentes, jefe de tienda, bodega y administradores. Cada persona ve solo lo que su rol permite; en cada sección se indica quién puede hacer qué.
+Para el equipo de Home Outlet: agentes, jefe de tienda, oficina, bodega y administradores. Cada persona ve solo lo que su rol permite; en cada sección se indica quién puede hacer qué.
 
 ---
 
@@ -16,7 +16,7 @@ El menú de la izquierda (en el teléfono, la barra de abajo) tiene:
 | **Pedidos** | Pedidos, pagos y entregas |
 | **Contactos** | Clientes, etiquetas y notas |
 | **Catálogo** | Productos y existencias |
-| **Reportes** | Cifras de atención y ventas (jefe de tienda y administrador) |
+| **Reportes** | Cifras de atención y ventas (jefe de tienda y administrador); la pestaña **Asesores**, solo el administrador |
 | **Ajustes** | Configuración (solo administrador) |
 
 Los números naranja junto a Bandeja y Pedidos son lo que está esperando: mensajes sin leer y pagos por verificar.
@@ -51,24 +51,29 @@ Quienes ven y mueven todo el negocio entran con la contraseña **y** con un cód
 
 ## 3. Roles: qué puede hacer cada quien
 
-| | **Agente** | **Jefe de tienda** | **Administrador** |
-|---|---|---|---|
-| Ve las conversaciones, contactos y pedidos | Solo los **asignados a usted** (lo normal) | **Todos** | **Todos** |
-| Atiende y responde | Sí | Sí | Sí |
-| Se asigna una conversación | Solo si está libre o ya es suya | A cualquiera, y reasigna | A cualquiera, y reasigna |
-| Cierra conversaciones | Solo las suyas | Cualquiera | Cualquiera |
-| Crea y envía pedidos | Sí | Sí | Sí |
-| Da descuentos | Hasta el límite que fija el administrador | **Sin tope** | **Sin tope** |
-| Aparta «sobre pedido» (sin existencia suficiente) | No | Sí | Sí |
-| Verifica pagos | Solo si el administrador se lo activó | Sí | Sí |
-| Cancela pedidos | Solo los que creó y sin pago verificado | Cualquiera | Cualquiera |
-| Cambia el estado de los agentes y reparte sus conversaciones | No | Sí | Sí |
-| Crea y edita productos, existencias e importa CSV | No (solo ve) | Sí | Sí |
-| Une contactos duplicados | No | Sí | Sí |
-| Ve **Reportes** | No | Sí | Sí |
-| **Ajustes**: usuarios, canales, asistente, cuentas bancarias, envíos, mensajes | No | **No** | Sí |
+| | **Agente** | **Oficina** | **Jefe de tienda** | **Administrador** |
+|---|---|---|---|---|
+| Ve las conversaciones, contactos y pedidos | Solo los **asignados a usted** (lo normal) | **Todos** | **Todos** | **Todos** |
+| Atiende y responde | Sí | Sí | Sí | Sí |
+| Se asigna una conversación | Solo si está libre o ya es suya | A cualquiera, y reasigna | A cualquiera, y reasigna | A cualquiera, y reasigna |
+| Cierra conversaciones | Solo las suyas | Cualquiera | Cualquiera | Cualquiera |
+| Crea y envía pedidos | Sí | Sí | Sí | Sí |
+| Da descuentos | Hasta el límite que fija el administrador | **Sin tope** | **Sin tope** | **Sin tope** |
+| Aparta «sobre pedido» (sin existencia suficiente) | No | Sí | Sí | Sí |
+| Verifica pagos | Solo si el administrador se lo activó | Sí | Sí | Sí |
+| Cancela pedidos | Solo los que creó y sin pago verificado | Cualquiera | Cualquiera | Cualquiera |
+| Despacho (pedidos pagados por preparar y enviar) | No | Sí | Sí | Sí |
+| Cambia el estado de los agentes y reparte sus conversaciones | No | Sí | Sí | Sí |
+| Crea y edita productos, existencias e importa CSV | No (solo ve) | Sí | Sí | Sí |
+| Une contactos duplicados | No | Sí | Sí | Sí |
+| Ve **Reportes** | No | **No** | Sí | Sí |
+| Ve el reporte de **Asesores** (mensajes y ventas de cada agente) | No | No | No | Sí |
+| **Ajustes**: usuarios, canales, asistente, cuentas bancarias, envíos, mensajes | No | **No** | **No** | Sí |
+| Entra con código de verificación (segundo factor) | No | No | Sí | Sí |
 
 El **jefe de tienda** está pensado para quien dirige la operación diaria: ve y resuelve todo, pero no cambia la configuración del sistema ni a las personas que lo usan.
+
+**Oficina** hace lo mismo que el jefe de tienda en el trabajo diario (bandeja, pedidos, despacho, contactos y catálogo), pero **no ve Reportes** ni Ajustes, y entra solo con correo y contraseña. Si escribe esas direcciones, el sistema lo regresa a la Bandeja. Los mensajes que escribe oficina no cuentan en el reporte de asesores.
 
 **Bodega** es para quien empaca y entrega: solo ve dos cosas. El **Catálogo** (para mirar productos y existencias; no puede editar ni ajustar) y el **Despacho** (los pedidos ya pagados, con productos, cantidades, ubicación y a dónde van). **No ve** precios, pagos, cuentas, conversaciones, contactos, reportes ni ajustes: si escribe esas direcciones, el sistema lo regresa al Despacho. Al entrar, empieza en el Despacho.
 
@@ -236,6 +241,13 @@ Con rango de fechas y filtro por canal:
 - **Atención:** conversaciones nuevas, tiempo de primera respuesta, resueltas por el asistente, motivos de consulta, productos más consultados, mensajes por hora.
 - **Ventas:** pedidos creados, ventas confirmadas (cuentan el día en que se confirmó el pago), ticket promedio, pagos por verificar, pedidos vencidos, productos más vendidos.
 - **Asistente:** su costo por día y lo acumulado del mes contra el presupuesto.
+- **Asesores (solo el administrador):** sirve para ver la efectividad de cada agente aunque la venta la haya cerrado otra persona. Por cada agente muestra:
+  - **Mensajes escritos** al cliente. Cuentan textos, imágenes y tarjetas de producto; no cuentan el asistente, las notas internas ni los resúmenes y avisos automáticos de pedidos.
+  - En cuántas **conversaciones** escribió.
+  - **Ventas en que participó:** pedidos con pago confirmado de clientes a los que les escribió antes del pago, con el monto. Incluye cuántas de esas **las cerró otra persona** (oficina, un jefe u otro agente). Si dos agentes hablaron con el mismo cliente, la venta cuenta para los dos.
+  - **Pedidos que él creó** y su monto.
+
+  Solo aparecen los agentes: oficina, jefes de tienda y administradores no cuentan. Los agentes desactivados aparecen solo si hicieron algo en el rango.
 - Se puede **exportar a CSV** para abrirlo en Excel.
 
 ## 10. Ajustes (solo administrador)
@@ -245,7 +257,7 @@ Al entrar, si aún faltan cosas para trabajar con datos reales, se abre **Primer
 | Sección | Qué se configura |
 |---|---|
 | **Primeros pasos** | La lista de lo que falta para trabajar con datos reales |
-| **Usuarios** | **Invitar usuario** (nombre, correo y rol: Agente, Jefe de tienda o Administrador; se muestra una contraseña temporal **una sola vez**). En cada fila: cambiar de rol, **Restablecer contraseña**, **Quitar segundo factor** (para administradores y jefes de tienda que perdieron su teléfono), desactivar, y el interruptor de **Verifica pagos** para los agentes |
+| **Usuarios** | **Invitar usuario** (nombre, correo y rol: Agente, Oficina, Jefe de tienda, Bodega o Administrador; se muestra una contraseña temporal **una sola vez**). En cada fila: cambiar de rol, **Restablecer contraseña**, **Quitar segundo factor** (para administradores y jefes de tienda que perdieron su teléfono), desactivar, y el interruptor de **Verifica pagos** para los agentes |
 | **Equipo** | Cómo se asignan las conversaciones (automática o manual), si los agentes ven solo lo suyo, y el estado de cada agente |
 | **Respuestas rápidas** | Los atajos con `/` y sus textos |
 | **Etiquetas** | Las etiquetas de los clientes |

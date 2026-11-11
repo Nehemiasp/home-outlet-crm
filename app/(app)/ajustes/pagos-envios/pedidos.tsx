@@ -79,7 +79,7 @@ export function AjustesDePedidos({ inicial, ubicaciones, tarjetaConectada }: { i
           <CampoTexto etiqueta="Prefijo del código" autoComplete="off" maxLength={6} ayuda="Por ejemplo HO-000123. Los pedidos ya creados no cambian." value={d.prefijo} onChange={(e) => setD({ ...d, prefijo: e.target.value })} />
           <CampoTexto etiqueta="Horas de reserva sin pago" inputMode="numeric" maxLength={3} ayuda="Pasado ese tiempo el pedido vence y libera las unidades." value={d.horasReserva} onChange={(e) => setD({ ...d, horasReserva: e.target.value.replace(/\D/g, "") })} />
           <CampoTexto etiqueta="Días que vale una cotización" inputMode="numeric" maxLength={2} ayuda="Hasta el final del último día. La cotización no aparta productos." value={d.diasCotizacion} onChange={(e) => setD({ ...d, diasCotizacion: e.target.value.replace(/\D/g, "") })} />
-          <CampoTexto etiqueta="Descuento máximo del agente (%)" inputMode="numeric" maxLength={3} ayuda="Más que eso lo autoriza un administrador o un jefe de tienda (ellos no tienen tope). 0 = sin descuentos." value={d.descuentoMaxAgente} onChange={(e) => setD({ ...d, descuentoMaxAgente: e.target.value.replace(/\D/g, "") })} />
+          <CampoTexto etiqueta="Descuento máximo del agente (%)" inputMode="numeric" maxLength={3} ayuda="Más que eso lo autoriza un administrador, un jefe de tienda o alguien de oficina (ellos no tienen tope). 0 = sin descuentos." value={d.descuentoMaxAgente} onChange={(e) => setD({ ...d, descuentoMaxAgente: e.target.value.replace(/\D/g, "") })} />
         </div>
         <AreaTexto
           etiqueta="Paqueterías (una por línea)"

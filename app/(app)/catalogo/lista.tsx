@@ -148,7 +148,7 @@ export function Catalogo({ categorias, puedeGestionar, puedeAjustar = true }: { 
           <EstadoVacio
             icono={PackageSearch}
             titulo="Todavía no hay productos"
-            descripcion={puedeGestionar ? "Cree uno o importe una lista desde un archivo CSV." : "Un administrador o un jefe de tienda puede cargar los productos."}
+            descripcion={puedeGestionar ? "Cree uno o importe una lista desde un archivo CSV." : "Un administrador, un jefe de tienda o alguien de oficina puede cargar los productos."}
             accion={puedeGestionar ? <Link href="/catalogo/importar" className="cuerpo-fuerte inline-flex h-10 items-center rounded-campo border border-linea bg-superficie px-4 hover:bg-fondo">Importar CSV</Link> : undefined}
           />
         ) : (

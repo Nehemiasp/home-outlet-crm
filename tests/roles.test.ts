@@ -8,7 +8,7 @@ import { cargarConversacion, listarConversaciones } from "@/lib/bandeja";
 import type { Filtros } from "@/lib/bandeja-tipos";
 import { db } from "@/lib/db";
 import { Rol as RolPrisma } from "@/generated/prisma/client";
-import { NOMBRE_ROL, ROLES, esAdmin, puedeAsignar, puedeCancelarPedido, puedeCerrar, puedeDescontar, puedeGestionarProductos, puedeSobrePedido, puedeUnirContactos, puedeVerAjustes, puedeVerReportes, puedeVerificarPagos, veTodo, type Actor, type Rol } from "@/lib/permisos";
+import { NOMBRE_ROL, ROLES, esAdmin, puedeAsignar, puedeCancelarPedido, puedeCerrar, puedeDescontar, puedeGestionarProductos, puedeSobrePedido, puedeUnirContactos, puedeDespachar, puedeVerAjustes, puedeVerReporteAsesores, puedeVerReportes, puedeVerificarPagos, requiereSegundoFactor, veTodo, type Actor, type Rol } from "@/lib/permisos";
 import { puedeVerConversacion, restringido } from "@/lib/visibilidad";
 import { aislar, conversacionEsperando, crearUsuario, limpiar, restaurar } from "./apoyo-equipo";
 
@@ -43,6 +43,23 @@ describe("permisos por rol (funciones puras)", () => {
       assert.equal(puedeAsignar(u, { asignadaAId: "otro" }, "tercero"), true, rol);
       assert.equal(puedeCerrar(u, { asignadaAId: "otro" }), true, rol);
     }
+  });
+
+  test("oficina hace lo operativo como el jefe de tienda, pero sin reportes, sin ajustes y sin segundo factor", () => {
+    const u = act("oficina");
+    assert.equal(NOMBRE_ROL.oficina, "Oficina");
+    for (const permiso of [veTodo, puedeGestionarProductos, puedeUnirContactos, puedeSobrePedido, puedeVerificarPagos, puedeDespachar]) assert.equal(permiso(u), true, permiso.name);
+    assert.equal(puedeAsignar(u, { asignadaAId: "otro" }, "tercero"), true);
+    assert.equal(puedeDescontar(u, 9_999, 10_000, 0), true);
+    assert.equal(puedeVerReportes(u), false);
+    assert.equal(puedeVerReporteAsesores(u), false);
+    assert.equal(puedeVerAjustes(u), false);
+    assert.equal(requiereSegundoFactor(u), false);
+  });
+
+  test("el reporte de asesores es solo del administrador", () => {
+    assert.equal(puedeVerReporteAsesores(act("admin")), true);
+    for (const rol of ["jefe_tienda", "oficina", "agente", "bodega"] as const) assert.equal(puedeVerReporteAsesores(act(rol)), false, rol);
   });
 
   test("el agente conserva sus límites", () => {

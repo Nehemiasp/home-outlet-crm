@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { CANALES } from "@/lib/canales/tipos";
-import { puedeVerReportes } from "@/lib/permisos";
+import { puedeVerReporteAsesores, puedeVerReportes } from "@/lib/permisos";
 import { generarReportes, validarFiltros, type Reportes } from "@/lib/reportes";
 import { requireUsuario } from "@/lib/session";
 
@@ -15,5 +15,5 @@ export async function obtenerReportes(f: z.input<typeof filtros>): Promise<{ ok:
   if (!p.success) return { ok: false, error: "Revise los filtros." };
   const error = validarFiltros(p.data);
   if (error) return { ok: false, error };
-  return { ok: true, datos: await generarReportes(p.data) };
+  return { ok: true, datos: await generarReportes(p.data, { asesores: puedeVerReporteAsesores(u) }) };
 }

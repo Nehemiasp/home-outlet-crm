@@ -60,7 +60,7 @@ const telefonoRepetido = async (e: unknown, telefono: string | null, u: { id: st
   if ((e as { code?: string }).code !== "P2002") throw e;
   // A un asesor limitado no se le dice de quién es el contacto repetido: puede ser de otro asesor.
   const otro = telefono && !(await restringido(u)) ? await db.contact.findUnique({ where: { telefono }, select: { nombre: true } }) : null;
-  return fallo(`Ya existe un contacto con ese teléfono${otro ? `: ${otro.nombre}` : ""}. Un administrador o un jefe de tienda puede unir los contactos.`);
+  return fallo(`Ya existe un contacto con ese teléfono${otro ? `: ${otro.nombre}` : ""}. Un administrador, un jefe de tienda o alguien de oficina puede unir los contactos.`);
 };
 
 export async function crearContacto(entrada: z.input<typeof datos>): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
@@ -100,6 +100,6 @@ export async function cambiarEtiqueta(contactoId: string, etiquetaId: string, po
 /* ── Unir contactos (solo admin) ── */
 export async function unirContactos(conservarId: string, unirId: string): Promise<Resultado> {
   const u = await requireUsuario();
-  if (!puedeUnirContactos(u)) return fallo("Solo un administrador o un jefe de tienda puede unir contactos.");
+  if (!puedeUnirContactos(u)) return fallo("Solo un administrador, un jefe de tienda o alguien de oficina puede unir contactos.");
   return unir(id.parse(conservarId), id.parse(unirId), u);
 }

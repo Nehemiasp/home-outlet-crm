@@ -18,6 +18,28 @@ export type Reportes = {
   costoPorDia: { fecha: string; etiqueta: string; costo: number }[];
   costoMes: { mes: string; dias: { fecha: string; etiqueta: string; acumulado: number }[]; gasto: number; presupuesto: number };
   ventas: Ventas;
+  /** Solo para el administrador (ver `puedeVerReporteAsesores`); a los demás no se les calcula ni se les manda. */
+  asesores?: FilaAsesor[];
+};
+
+/**
+ * Lo que hizo cada asesor (rol «agente») en el rango. Oficina, jefe de tienda y administrador no aparecen.
+ *  - mensajes: los que le escribió a clientes (texto, imágenes y tarjetas de producto). No cuentan el asistente, las notas internas
+ *    ni los resúmenes y avisos automáticos de pedidos.
+ *  - conversaciones: en cuántas conversaciones distintas escribió.
+ *  - participo: ventas (pago confirmado en el rango) de conversaciones en las que escribió antes de que se confirmara el pago,
+ *    las haya creado él u otra persona. Si dos asesores hablaron con el cliente, la venta cuenta para los dos.
+ *  - creados: ventas cuyo pedido creó él.
+ * Los montos van en centavos.
+ */
+export type FilaAsesor = {
+  id: string;
+  nombre: string;
+  activo: boolean;
+  mensajes: number;
+  conversaciones: number;
+  participo: { ventas: number; monto: number; cerroOtro: number };
+  creados: { ventas: number; monto: number };
 };
 
 /** Ventas de pedidos. Los montos van en centavos. Una venta cuenta el día en que se confirmó su pago. */
@@ -55,7 +77,7 @@ export function validarFiltros(f: FiltrosReporte): string | null {
   return null;
 }
 
-export async function generarReportes(f: FiltrosReporte): Promise<Reportes> {
+export async function generarReportes(f: FiltrosReporte, o: { asesores?: boolean } = {}): Promise<Reportes> {
   const inicio = inicioDe(f.desde);
   const fin = new Date(inicioDe(f.hasta).getTime() + DIA);
   const rango = { gte: inicio, lt: fin };
@@ -142,10 +164,11 @@ export async function generarReportes(f: FiltrosReporte): Promise<Reportes> {
   }
   const { presupuesto } = await estadoPresupuesto();
 
-  const ventas = await generarVentas(f, diasLista, nuevas.map((c) => c.id));
+  const [ventas, asesores] = await Promise.all([generarVentas(f, diasLista, nuevas.map((c) => c.id)), o.asesores ? generarAsesores(f) : undefined]);
 
   return {
     ventas,
+    ...(asesores ? { asesores } : {}),
     rango: { desde: f.desde, hasta: f.hasta, dias: diasLista.length },
     indicadores: {
       nuevas: nuevas.length,
@@ -223,4 +246,67 @@ async function generarVentas(f: FiltrosReporte, diasLista: string[], conversacio
     porEstado: [...porEstado.entries()].sort((a, b) => b[1] - a[1]).map(([estado, total]) => ({ estado, etiqueta: ETIQUETA_ESTADO[estado], total })),
     productos: [...porProducto.values()].sort((a, b) => b.unidades - a.unidades || b.monto - a.monto).slice(0, 10),
   };
+}
+
+async function generarAsesores(f: FiltrosReporte): Promise<FilaAsesor[]> {
+  const inicio = inicioDe(f.desde);
+  const fin = new Date(inicioDe(f.hasta).getTime() + DIA);
+  const canal = f.canal === "todos" ? undefined : f.canal;
+  const sinSimulado = canalesDeReporte().length < CANALES.length;
+  const porCanalConv: Prisma.ConversationWhereInput = canal ? { canal } : sinSimulado ? { canal: { not: "simulado" } } : {};
+  const delCanal: Prisma.OrderWhereInput = canal ? { canal } : sinSimulado ? { canal: { not: "simulado" } } : {};
+
+  const agentes = await db.user.findMany({ where: { rol: "agente" }, orderBy: { nombre: "asc" }, select: { id: true, nombre: true, activo: true } });
+  if (agentes.length === 0) return [];
+  const ids = agentes.map((a) => a.id);
+  // Escrito por una persona: autor «asesor», con quién lo mandó, y sin pedido ligado (eso es un resumen o un aviso de pedido).
+  const escritos = { autor: "asesor", direccion: "saliente", pedidoId: null, enviadoPorId: { in: ids } } satisfies Prisma.MessageWhereInput;
+
+  const [mensajes, pagados] = await Promise.all([
+    db.message.findMany({ where: { ...escritos, fecha: { gte: inicio, lt: fin }, conversacion: porCanalConv }, select: { enviadoPorId: true, conversacionId: true } }),
+    db.orderEvent.findMany({
+      where: { aEstado: "pagado", fecha: { gte: inicio, lt: fin }, pedido: { estado: { notIn: NO_SON_VENTA }, ...delCanal } },
+      select: { fecha: true, pedido: { select: { id: true, total: true, conversacionId: true, creadoPorId: true } } },
+    }),
+  ]);
+  const convVentas = [...new Set(pagados.map((e) => e.pedido.conversacionId).filter((x): x is string => !!x))];
+  // La primera vez que cada asesor escribió en cada conversación con venta (en cualquier fecha, no solo en el rango).
+  const primeros = convVentas.length
+    ? await db.message.groupBy({ by: ["conversacionId", "enviadoPorId"], where: { ...escritos, conversacionId: { in: convVentas } }, _min: { fecha: true } })
+    : [];
+
+  const filas = new Map<string, FilaAsesor>(agentes.map((a) => [a.id, { ...a, mensajes: 0, conversaciones: 0, participo: { ventas: 0, monto: 0, cerroOtro: 0 }, creados: { ventas: 0, monto: 0 } }]));
+  const convs = new Map<string, Set<string>>();
+  for (const m of mensajes) {
+    const fila = m.enviadoPorId ? filas.get(m.enviadoPorId) : undefined;
+    if (!fila) continue;
+    fila.mensajes++;
+    (convs.get(fila.id) ?? convs.set(fila.id, new Set()).get(fila.id)!).add(m.conversacionId);
+  }
+  for (const [id, set] of convs) filas.get(id)!.conversaciones = set.size;
+
+  // Un pedido pasa a «pagado» una sola vez; aun así, cada pedido cuenta una sola vez.
+  const vistos = new Set<string>();
+  for (const e of pagados) {
+    if (vistos.has(e.pedido.id)) continue;
+    vistos.add(e.pedido.id);
+    const creador = e.pedido.creadoPorId ? filas.get(e.pedido.creadoPorId) : undefined;
+    if (creador) {
+      creador.creados.ventas++;
+      creador.creados.monto += e.pedido.total;
+    }
+    for (const p of primeros) {
+      if (p.conversacionId !== e.pedido.conversacionId || !p._min.fecha || p._min.fecha > e.fecha) continue;
+      const fila = p.enviadoPorId ? filas.get(p.enviadoPorId) : undefined;
+      if (!fila) continue;
+      fila.participo.ventas++;
+      fila.participo.monto += e.pedido.total;
+      if (e.pedido.creadoPorId !== fila.id) fila.participo.cerroOtro++;
+    }
+  }
+
+  // Los asesores desactivados solo aparecen si hicieron algo en el rango.
+  return [...filas.values()]
+    .filter((x) => x.activo || x.mensajes > 0 || x.participo.ventas > 0 || x.creados.ventas > 0)
+    .sort((a, b) => b.mensajes - a.mensajes || b.participo.monto - a.participo.monto || a.nombre.localeCompare(b.nombre));
 }

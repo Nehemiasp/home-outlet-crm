@@ -69,8 +69,8 @@ function Reporte({ titulo, tabla, archivo, children }: { titulo: string; tabla: 
   );
 }
 
-export function VistaReportes({ inicial }: { inicial: Reportes }) {
-  const [pestana, setPestana] = useState<"atencion" | "ventas" | "asistente">("atencion");
+export function VistaReportes({ inicial, verAsesores = false }: { inicial: Reportes; verAsesores?: boolean }) {
+  const [pestana, setPestana] = useState<"atencion" | "ventas" | "asistente" | "asesores">("atencion");
   const [preset, setPreset] = useState<"7" | "30" | "90" | "custom">("30");
   const [desde, setDesde] = useState(inicial.rango.desde);
   const [hasta, setHasta] = useState(inicial.rango.hasta);
@@ -123,6 +123,12 @@ export function VistaReportes({ inicial }: { inicial: Reportes }) {
   const qCorto = (n: number) => `Q${n.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
 
   const dias = `${d.rango.dias} ${d.rango.dias === 1 ? "día" : "días"}`;
+  const asesores = d.asesores ?? [];
+  const totalMensajes = asesores.reduce((s, a) => s + a.mensajes, 0);
+  const ventasConAsesor = asesores.reduce((s, a) => s + a.participo.ventas, 0);
+  const cerroOtro = asesores.reduce((s, a) => s + a.participo.cerroOtro, 0);
+  const columnasAsesores = ["Asesor", "Mensajes escritos", "Conversaciones", "Ventas en que participó", "Monto de esas ventas (Q)", "De esas, las cerró otra persona", "Pedidos que él creó", "Monto de sus pedidos (Q)"];
+  const filasAsesores = asesores.map((a) => [a.activo ? a.nombre : `${a.nombre} (desactivado)`, a.mensajes, a.conversaciones, a.participo.ventas, quetzales(a.participo.monto).toFixed(2), a.participo.cerroOtro, a.creados.ventas, quetzales(a.creados.monto).toFixed(2)]);
 
   return (
     <div className="flex flex-col gap-4 p-6">
@@ -166,6 +172,7 @@ export function VistaReportes({ inicial }: { inicial: Reportes }) {
           { id: "atencion", texto: "Atención" },
           { id: "ventas", texto: "Ventas" },
           { id: "asistente", texto: "Asistente" },
+          ...(verAsesores ? [{ id: "asesores", texto: "Asesores" }] : []),
         ]}
       />
 
@@ -304,6 +311,79 @@ export function VistaReportes({ inicial }: { inicial: Reportes }) {
                 />
               </Reporte>
             </div>
+          </>
+        )}
+
+        {pestana === "asesores" && verAsesores && (
+          <>
+            <p className="meta max-w-3xl text-texto-suave">
+              Solo lo ve el administrador. Cuenta a los asesores (rol agente); oficina, jefes de tienda y administradores no aparecen. Los mensajes son los que el asesor le escribió al cliente: no cuentan el asistente, las notas internas ni los resúmenes y avisos automáticos de pedidos. Una venta cuenta para cada asesor que le escribió al cliente antes de que se confirmara el pago, aunque el pedido lo haya creado otra persona.
+            </p>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <TarjetaKPI etiqueta="Mensajes de asesores" valor={String(totalMensajes)} contexto={`En ${dias}`} />
+              <TarjetaKPI etiqueta="Ventas con un asesor en la conversación" valor={String(ventasConAsesor)} contexto="Suma por asesor: una venta puede contar para dos" />
+              <TarjetaKPI etiqueta="Las cerró otra persona" valor={String(cerroOtro)} contexto="El pedido lo creó oficina, un jefe u otro asesor" />
+            </div>
+
+            <section aria-label="Asesores" className="flex flex-col gap-3 rounded-tarjeta border border-linea bg-superficie p-4">
+              <h2 className="cuerpo-fuerte">Lo que hizo cada asesor</h2>
+              {asesores.length === 0 ? (
+                <p className="cuerpo text-texto-suave">No hay asesores con el rol agente.</p>
+              ) : (
+                <div tabIndex={0} role="region" aria-label="Tabla de asesores" className="relative overflow-x-auto rounded-campo border border-linea">
+                  <table className="cuerpo w-full border-collapse">
+                    <caption className="sr-only">Lo que hizo cada asesor</caption>
+                    <thead>
+                      <tr className="border-b border-linea text-left">
+                        <th scope="col" className="cuerpo-fuerte px-3 py-2">Asesor</th>
+                        <th scope="col" className="cuerpo-fuerte px-3 py-2 text-right">Mensajes escritos</th>
+                        <th scope="col" className="cuerpo-fuerte px-3 py-2 text-right">Conversaciones</th>
+                        <th scope="col" className="cuerpo-fuerte px-3 py-2 text-right">Ventas en que participó</th>
+                        <th scope="col" className="cuerpo-fuerte px-3 py-2 text-right">Las cerró otra persona</th>
+                        <th scope="col" className="cuerpo-fuerte px-3 py-2 text-right">Pedidos que él creó</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {asesores.map((a) => (
+                        <tr key={a.id} className="border-b border-linea last:border-b-0">
+                          <td className="px-3 py-2">
+                            {a.nombre}
+                            {!a.activo && <span className="meta text-texto-suave"> · desactivado</span>}
+                          </td>
+                          <td className="cuerpo-fuerte px-3 py-2 text-right tabular-nums">{a.mensajes}</td>
+                          <td className="px-3 py-2 text-right tabular-nums">{a.conversaciones}</td>
+                          <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap">
+                            {a.participo.ventas}
+                            {a.participo.ventas > 0 && <span className="meta text-texto-suave"> · {formatQ(a.participo.monto)}</span>}
+                          </td>
+                          <td className="px-3 py-2 text-right tabular-nums">{a.participo.cerroOtro}</td>
+                          <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap">
+                            {a.creados.ventas}
+                            {a.creados.ventas > 0 && <span className="meta text-texto-suave"> · {formatQ(a.creados.monto)}</span>}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              <Boton variante="secundario" tamano="sm" className="self-start" onClick={() => descargarCsv(`asesores-${d.rango.desde}-${d.rango.hasta}`, [columnasAsesores, ...filasAsesores])}>
+                <Download className="size-4" aria-hidden />
+                Exportar CSV
+              </Boton>
+            </section>
+
+            {asesores.length > 0 && (
+              <Reporte titulo="Mensajes escritos por asesor" archivo={`mensajes-por-asesor-${d.rango.desde}-${d.rango.hasta}`} tabla={{ columnas: columnasAsesores, filas: filasAsesores }}>
+                <BarrasHorizontales
+                  titulo="Mensajes escritos por asesor"
+                  unidad="mensajes a clientes"
+                  destacarMaximo
+                  datos={asesores.map((a) => ({ etiqueta: a.nombre, valor: a.mensajes }))}
+                  resumen={totalMensajes === 0 ? "Ningún asesor escribió mensajes en este rango." : `Los asesores escribieron ${totalMensajes} mensajes. ${asesores.slice(0, 3).map((a) => `${a.nombre}: ${a.mensajes}`).join(", ")}.`}
+                />
+              </Reporte>
+            )}
           </>
         )}
 

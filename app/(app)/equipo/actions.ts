@@ -47,7 +47,7 @@ export async function activarme(): Promise<Resultado> {
 }
 
 /* ── Panel del equipo (administrador y jefe de tienda) ── */
-const soloAdmin = { ok: false, error: "Solo un administrador o un jefe de tienda puede hacer esto." } as const;
+const soloAdmin = { ok: false, error: "Solo un administrador, un jefe de tienda o alguien de oficina puede hacer esto." } as const;
 
 /** Cada asesor con su estado, desde hace cuánto, el motivo de la pausa y cuántas conversaciones abiertas tiene. */
 export async function obtenerPanelEquipo(): Promise<FilaEquipo[]> {
