@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, Check, ChevronDown, Loader2, Search, X, type LucideIcon } from "lucide-react";
+import { AlertCircle, Check, ChevronDown, FileText, Loader2, Search, Upload, X, type LucideIcon } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { Tooltip } from "./tooltip";
@@ -355,6 +355,136 @@ export function Selector({
         )}
       </div>
     </Envoltura>
+  );
+}
+
+/* ── Campo de archivo ──
+   Una zona visible (borde punteado, ícono y texto) en lugar del control nativo, que parece texto suelto. Se toca para elegir
+   o se arrastra el archivo encima. Con el archivo elegido muestra el nombre, el tamaño y una miniatura si es imagen, con
+   «Cambiar» y «Quitar». Revisa el tipo y el tamaño para avisar antes de enviar; el servidor lo vuelve a validar. */
+const tamanoLegible = (bytes: number) => (bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`);
+
+export function CampoArchivo({
+  etiqueta, accept, formatos, ayuda, archivo, onCambio, maxBytes = 5 * 1024 * 1024, error,
+}: {
+  etiqueta: string;
+  /** Igual que en `<input type="file">`: tipos MIME o extensiones separados por comas. */
+  accept: string;
+  /** Lo que se acepta, en palabras: «JPG, PNG o PDF de hasta 5 MB». */
+  formatos: string;
+  ayuda?: string;
+  archivo: File | null;
+  onCambio: (archivo: File | null) => void;
+  maxBytes?: number;
+  error?: string;
+}) {
+  const id = useId();
+  const entrada = useRef<HTMLInputElement>(null);
+  const [encima, setEncima] = useState(false);
+  const [aviso, setAviso] = useState("");
+  const [vista, setVista] = useState<string | null>(null);
+
+  // Miniatura de la imagen elegida (se libera al cambiar o al cerrar).
+  useEffect(() => {
+    if (!archivo || !archivo.type.startsWith("image/")) return setVista(null);
+    const url = URL.createObjectURL(archivo);
+    setVista(url);
+    return () => URL.revokeObjectURL(url);
+  }, [archivo]);
+
+  const permitidos = accept.split(",").map((t) => t.trim().toLowerCase()).filter(Boolean);
+  const elegir = (f: File | undefined) => {
+    if (!f) return;
+    const tipoOk = permitidos.some((t) => (t.startsWith(".") ? f.name.toLowerCase().endsWith(t) : t.endsWith("/*") ? f.type.startsWith(t.slice(0, -1)) : f.type === t));
+    if (!tipoOk) return setAviso(`Ese tipo de archivo no se acepta. ${formatos}.`);
+    if (f.size > maxBytes) return setAviso(`El archivo pesa ${tamanoLegible(f.size)}: el máximo es ${tamanoLegible(maxBytes)}.`);
+    setAviso("");
+    onCambio(f);
+  };
+  const mensaje = aviso || error;
+
+  return (
+    <div className="flex flex-col gap-1">
+      <span id={`${id}-etiqueta`} className="cuerpo-fuerte">
+        {etiqueta}
+      </span>
+      <input
+        ref={entrada}
+        type="file"
+        accept={accept}
+        className="hidden"
+        tabIndex={-1}
+        aria-hidden
+        onChange={(e) => {
+          elegir(e.target.files?.[0]);
+          e.target.value = ""; // para poder volver a elegir el mismo archivo
+        }}
+      />
+      {archivo ? (
+        <div className={cn("flex items-center gap-3 rounded-campo border bg-superficie p-3", mensaje ? "border-error" : "border-texto-suave")}>
+          {vista ? (
+            // eslint-disable-next-line @next/next/no-img-element -- miniatura local (blob:), no pasa por el optimizador
+            <img src={vista} alt="" className="size-12 shrink-0 rounded-campo border border-linea object-cover" />
+          ) : (
+            <span className="flex size-12 shrink-0 items-center justify-center rounded-campo bg-fondo" aria-hidden>
+              <FileText className="size-6 text-texto-suave" />
+            </span>
+          )}
+          <div className="min-w-0 flex-1">
+            <p className="cuerpo-fuerte truncate" title={archivo.name}>
+              {archivo.name}
+            </p>
+            <p className="meta text-texto-suave">{tamanoLegible(archivo.size)}</p>
+          </div>
+          <Boton variante="secundario" tamano="sm" onClick={() => entrada.current?.click()} aria-describedby={`${id}-etiqueta`}>
+            Cambiar
+          </Boton>
+          <BotonIcono etiqueta="Quitar el archivo" icono={X} onClick={() => { setAviso(""); onCambio(null); }} />
+        </div>
+      ) : (
+        <button
+          type="button"
+          aria-labelledby={`${id}-etiqueta ${id}-accion`}
+          aria-describedby={mensaje || ayuda ? `${id}-msg` : undefined}
+          onClick={() => entrada.current?.click()}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setEncima(true);
+          }}
+          onDragLeave={() => setEncima(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setEncima(false);
+            elegir(e.dataTransfer.files?.[0]);
+          }}
+          className={cn(
+            "flex w-full flex-col items-center gap-2 rounded-campo border-2 border-dashed px-4 py-5 text-center transition-colors",
+            encima ? "border-naranja bg-naranja-suave" : mensaje ? "border-error bg-superficie" : "border-texto-suave bg-fondo hover:border-texto hover:bg-superficie",
+          )}
+        >
+          <span className="flex size-10 items-center justify-center rounded-full bg-superficie shadow-minima" aria-hidden>
+            <Upload className="size-5 text-texto" />
+          </span>
+          <span id={`${id}-accion`} className="cuerpo">
+            <span className="cuerpo-fuerte text-naranja-texto underline underline-offset-2">Elegir archivo</span>
+            <span className="max-md:hidden"> o arrástrelo aquí</span>
+          </span>
+          <span className="meta text-texto-suave">{formatos}</span>
+        </button>
+      )}
+      {mensaje ? (
+        <p id={`${id}-msg`} role="alert" className="meta flex items-center gap-1 text-error">
+          <AlertCircle className="size-4 shrink-0" aria-hidden />
+          {mensaje}
+        </p>
+      ) : (
+        ayuda && (
+          <p id={`${id}-msg`} className="meta text-texto-suave">
+            {ayuda}
+          </p>
+        )
+      )}
+    </div>
   );
 }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Boton, CampoTexto, Selector } from "@/components/ui/form";
+import { Boton, CampoArchivo, CampoTexto, Selector } from "@/components/ui/form";
 import { Modal } from "@/components/ui/estructura";
 import { useToast } from "@/components/ui/toast";
 import type { ResultadoAviso } from "@/lib/pedidos/avisos";
@@ -53,11 +53,7 @@ export function SubirComprobante({ abierto, onCerrar, pedido, metodos, bancos, o
   return (
     <Modal abierto={abierto} onCerrar={onCerrar} titulo="Subir comprobante">
       <form onSubmit={guardar} className="flex flex-col gap-4">
-        <label className="flex flex-col gap-1">
-          <span className="cuerpo-fuerte">Imagen del comprobante</span>
-          <input type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => setArchivo(e.target.files?.[0] ?? null)} className="cuerpo" />
-          <span className="meta text-texto-suave">JPG, PNG o WebP de hasta 5 MB.</span>
-        </label>
+        <CampoArchivo etiqueta="Imagen del comprobante" accept="image/jpeg,image/png,image/webp" formatos="JPG, PNG o WebP de hasta 5 MB" archivo={archivo} onCambio={setArchivo} />
         <Selector etiqueta="Método" opciones={metodos.map((m) => ({ valor: m.id, texto: m.nombre }))} value={tipo} onCambio={setTipo} />
         <CampoTexto etiqueta="Banco" autoComplete="off" maxLength={60} list="bancos-subir" value={banco} onChange={(e) => setBanco(e.target.value)} />
         <datalist id="bancos-subir">

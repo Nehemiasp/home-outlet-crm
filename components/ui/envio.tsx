@@ -3,7 +3,7 @@
 import { Download, FileText } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Modal } from "@/components/ui/estructura";
-import { Boton, CampoTexto, Selector } from "@/components/ui/form";
+import { Boton, CampoArchivo, CampoTexto, Selector } from "@/components/ui/form";
 
 const PROPIA = "__propia";
 export type DatosEnvioForm = { /** Vacía = entrega propia. */ paqueteria: string; guia: string; archivo: File | null };
@@ -68,14 +68,14 @@ export function ModalEnviado({
         {porPaqueteria && (
           <>
             <CampoTexto etiqueta="Número de guía" required autoComplete="off" maxLength={60} value={guia} onChange={(e) => setGuia(e.target.value)} />
-            <label className="flex flex-col gap-1">
-              <span className="cuerpo-fuerte">Guía de la paquetería (foto o PDF)</span>
-              <input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" onChange={(e) => setArchivo(e.target.files?.[0] ?? null)} className="cuerpo" />
-              <span className="meta text-texto-suave">
-                JPG, PNG, WebP o PDF de hasta 5 MB.
-                {archivoActual && ` Ya tiene una adjunta (${archivoActual}): elija otra solo para reemplazarla.`}
-              </span>
-            </label>
+            <CampoArchivo
+              etiqueta="Guía de la paquetería (foto o PDF)"
+              accept="image/jpeg,image/png,image/webp,application/pdf"
+              formatos="JPG, PNG, WebP o PDF de hasta 5 MB"
+              ayuda={archivoActual ? `Ya tiene una adjunta (${archivoActual}): elija otra solo para reemplazarla.` : undefined}
+              archivo={archivo}
+              onCambio={setArchivo}
+            />
           </>
         )}
         {(falta || error) && (
