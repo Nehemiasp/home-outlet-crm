@@ -130,16 +130,18 @@ El jefe de tienda y el administrador **no tienen estado**: ven el resumen del eq
 
 ## 5b. Despacho (bodega)
 
-Es la pantalla de inicio de **bodega** (el administrador y el jefe de tienda también la ven). Muestra los pedidos **ya pagados**, del más antiguo al más nuevo, en tres pestañas: **Por preparar**, **Preparando** y **Listos y enviados**. Cada tarjeta trae el cliente, a dónde va (o en qué tienda recoge), la dirección y los productos con su cantidad y la ubicación de donde salen. **No lleva precios ni pagos.**
+Es la pantalla de inicio de **bodega** (el administrador y el jefe de tienda también la ven). Muestra los pedidos **ya pagados**, del más antiguo al más nuevo, en cuatro pestañas: **Por preparar**, **Preparando**, **Por enviar** y **Listos y enviados**. Cada tarjeta trae el cliente, a dónde va (o en qué tienda recoge), la dirección y los productos con su cantidad y la ubicación de donde salen. **No lleva precios ni pagos.**
 
 - **Hoja de bodega:** abre la hoja para imprimir y empacar (sin precios).
 - **Empezar a preparar:** el pedido pasa a «Preparando».
-- **Listo para recoger / Marcar como enviado:** pide confirmar porque **se le avisa al cliente por el chat**. Al enviar se elige **cómo sale** (ver «Marcar como enviado» en la sección 6). Bodega también sube la guía de la paquetería y la puede abrir desde aquí.
+- **Listo para recoger** (pedidos para recoger): pide confirmar porque **se le avisa al cliente por el chat**.
+- **Pendiente de envío** (pedidos con envío, ya empacados): **obliga a elegir por dónde sale**, una paquetería de la lista o «Entrega propia». El pedido pasa a la pestaña **Por enviar**, donde la tarjeta dice «Sale por Forza» o «Entrega propia», y aparece en las **etiquetas de envío**. No se le avisa al cliente todavía.
+- **Marcar como enviado:** solo pide la **guía**, el número y la foto o PDF, porque la paquetería ya se eligió. Con entrega propia no pide nada. Aquí sí **se le avisa al cliente por el chat** (ver «Marcar como enviado» en la sección 6). Bodega sube la guía y la puede abrir desde aquí.
 - **Marcar como entregado:** cierra el pedido.
 
-**Etiquetas de envío:** el botón **Etiquetas de envío**, arriba a la derecha de Despacho, abre en otra pestaña una hoja con **todos los pedidos con envío que todavía no salen**: pagados, preparando o listos, y los de pago contra entrega. Los de recoger en tienda no entran. Caben **8 por hoja carta**, con línea punteada para recortar. Cada etiqueta lleva:
+**Etiquetas de envío:** en la pestaña **Por enviar** de Despacho está el botón **Etiquetas de envío** (solo aparece ahí, y solo si hay pedidos por enviar). Abre en otra pestaña una hoja con **los pedidos pendientes de envío**, los de la pestaña «Por enviar», que ya tienen elegida la paquetería o entrega propia. Caben **8 por hoja carta**, con línea punteada para recortar. Cada etiqueta lleva:
 - el número de pedido;
-- la paquetería, o «por definir» si aún no se eligió;
+- la paquetería, o «Entrega propia»;
 - el nombre y el teléfono del cliente;
 - la dirección, con municipio y departamento;
 - los productos con cantidad y precio (si son más de 4, dice cuántos faltan);
@@ -203,14 +205,17 @@ El cliente paga al recibir su pedido. Solo se puede elegir con **Envío**.
 Mientras el pedido siga **pendiente de pago**, en el detalle use **Cambiar forma de pago** y elija la nueva: el sistema le manda al cliente el resumen actualizado (con el enlace si es tarjeta, con las cuentas si es banco). Si ya hay un comprobante por verificar, primero resuélvalo. Si cambió **desde tarjeta** y el cliente igualmente pagó el enlace anterior, ese pago queda **en revisión** (no se pierde) para que lo revise una persona.
 
 ### Estados de un pedido
-**Borrador → Pendiente de pago → Pago en revisión → Pagado → Preparando → Listo para recoger / Enviado → Entregado.** También **Cancelado** y **Vencido**.
+**Borrador → Pendiente de pago → Pago en revisión → Pagado → Preparando →** para recoger: **Listo para recoger → Entregado**; con envío: **Pendiente de envío → Enviado → Entregado.** También **Cancelado** y **Vencido**.
 
-Dentro del pedido, el botón principal siempre es el siguiente paso: **Marcar como preparando**, **Marcar como listo para recoger** (avisa al cliente), **Marcar como enviado** (ver abajo) y **Marcar como entregado**.
+Dentro del pedido, el botón principal siempre es el siguiente paso: **Marcar como preparando**, **Marcar como listo para recoger** (avisa al cliente), **Pasar a pendiente de envío**, **Marcar como enviado** (ver abajo) y **Marcar como entregado**.
+
+### Pendiente de envío
+Con envío, después de preparar el pedido hay que pasarlo a **Pendiente de envío** y **elegir por dónde sale** (obligatorio): **una paquetería** (Forza, Cargo Expreso, Guatex… la lista la arma el administrador en **Ajustes → Pagos y envíos**) o **Entrega propia** (la lleva alguien de la tienda). No le llega nada al cliente todavía. Desde aquí el pedido sale en las **etiquetas de envío** de Despacho.
 
 ### Marcar como enviado
-En la ventana se elige **¿Cómo sale?**:
-- **Entrega propia** (la lleva alguien de la tienda): no pide guía ni archivo.
-- **Una paquetería** (Forza, Cargo Expreso, Guatex… la lista la arma el administrador en **Ajustes → Pagos y envíos**): **exige** el **número de guía** y la **guía de la paquetería adjunta**, una foto o un PDF (JPG, PNG, WebP o PDF de hasta 5 MB). Sin el archivo no se puede marcar como enviado.
+La ventana ya dice por dónde sale el pedido:
+- **Entrega propia:** no pide guía ni archivo; solo se confirma.
+- **Una paquetería:** **exige** el **número de guía** y la **guía de la paquetería adjunta**, una foto o un PDF (JPG, PNG, WebP o PDF de hasta 5 MB). Sin el archivo no se puede marcar como enviado.
 
 Al cliente le llegan dos mensajes: el aviso «¡Su pedido va en camino!» con la paquetería y el número de guía, y después el archivo de la guía. Por WhatsApp el PDF sale como documento. Si el canal no deja enviar (pasó la ventana, no está conectado o no acepta PDF, como Facebook, Instagram y TikTok), el pedido queda igual **enviado** con la guía guardada y el sistema le ofrece **Descargar guía** para mandarla a mano. La guía adjunta se ve en el detalle del pedido y en Despacho, y el historial dice quién marcó el envío y cuándo.
 La hoja **Bodega** (imprimible, sin precios) sirve para empacar.

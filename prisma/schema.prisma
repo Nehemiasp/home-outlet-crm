@@ -468,6 +468,7 @@ enum EstadoPedido {
   en_revision
   pagado
   preparando
+  pendiente_envio // con envío: ya se eligió por dónde sale (paquetería o entrega propia); falta entregarlo a la paquetería
   listo_para_recoger
   enviado
   entregado

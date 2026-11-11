@@ -68,7 +68,7 @@ export async function puedeVerArchivo(u: Actor, nombre: string) {
   if (u.rol === "bodega") {
     const [producto, guia] = await Promise.all([
       db.product.count({ where: { imagenes: { has: url } } }),
-      db.order.count({ where: { guiaArchivoUrl: url, estado: { in: ["pagado", "preparando", "listo_para_recoger", "enviado"] } } }),
+      db.order.count({ where: { guiaArchivoUrl: url, estado: { in: ["pagado", "preparando", "pendiente_envio", "listo_para_recoger", "enviado"] } } }),
     ]);
     return producto + guia > 0;
   }

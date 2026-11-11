@@ -80,7 +80,7 @@ function ultimoProductoMencionado(previos: MensajeIa[]): string | undefined {
 }
 
 const ESTADO_EN: Record<string, string> = {
-  pendiente_pago: "waiting for payment", en_revision: "under payment review", pagado: "paid", preparando: "being prepared", listo_para_recoger: "ready for pickup",
+  pendiente_pago: "waiting for payment", en_revision: "under payment review", pagado: "paid", preparando: "being prepared", pendiente_envio: "packed and about to ship", listo_para_recoger: "ready for pickup",
   enviado: "on its way", entregado: "delivered", cancelado: "cancelled", vencido: "expired",
 };
 

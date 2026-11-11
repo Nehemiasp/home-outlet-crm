@@ -16,8 +16,8 @@ const POR_HOJA = 8;
 const MAX_LINEAS = 4;
 
 /**
- * Etiquetas de envío: todos los pedidos con envío que todavía no salen, varias por hoja, para identificar los paquetes al
- * despacharlos. Llevan precios y el total (decisión de Nehemias): la abre también bodega. No es la guía de la paquetería.
+ * Etiquetas de envío: los pedidos «pendientes de envío» (empacados y con la paquetería elegida, o entrega propia), varias por
+ * hoja, para identificar los paquetes al despacharlos. Llevan precios y el total (decisión de Nehemias): la abre también bodega. No es la guía de la paquetería.
  */
 export default async function Etiquetas() {
   const usuario = await requireConBodega();
@@ -34,15 +34,15 @@ export default async function Etiquetas() {
         <div>
           <h1 className="titulo-pagina">Etiquetas de envío</h1>
           <p className="meta mt-1 max-w-2xl text-texto-suave">
-            {etiquetas.length === 1 ? "1 pedido" : `${etiquetas.length} pedidos`} con envío que todavía no sale{etiquetas.length === 1 ? "" : "n"} · {POR_HOJA} por hoja
-            carta{hojas.length > 1 ? ` · ${hojas.length} hojas` : ""}. Sirven para identificar los paquetes; no son la guía de la paquetería.
+            {etiquetas.length === 1 ? "1 pedido pendiente" : `${etiquetas.length} pedidos pendientes`} de envío · {POR_HOJA} por hoja carta{hojas.length > 1 ? ` · ${hojas.length} hojas` : ""}.
+            Sirven para identificar los paquetes; no son la guía de la paquetería.
           </p>
         </div>
         {etiquetas.length > 0 && <BotonImprimir />}
       </div>
 
       {etiquetas.length === 0 ? (
-        <EstadoVacio icono={Truck} titulo="No hay envíos pendientes" descripcion="Aquí aparecen los pedidos con envío que ya se pueden despachar y todavía no se marcan como enviados." />
+        <EstadoVacio icono={Truck} titulo="No hay pedidos pendientes de envío" descripcion="Aparecen aquí cuando en Despacho un pedido empacado se pasa a «Pendiente de envío» y se elige por dónde sale." />
       ) : (
         hojas.map((hoja, i) => (
           <section
@@ -67,7 +67,7 @@ function Etiqueta({ e }: { e: EtiquetaEnvio }) {
     <article className="flex min-w-0 flex-col overflow-hidden rounded-[0.08in] border border-dashed border-carbon p-[0.12in] text-[10.5px] leading-snug text-texto [break-inside:avoid]">
       <header className="flex items-baseline justify-between gap-2 border-b border-carbon pb-1">
         <span className="text-[13px] font-bold">{e.codigo}</span>
-        <span className="truncate font-semibold uppercase">{e.paqueteria ?? "Paquetería por definir"}</span>
+        <span className="truncate font-semibold uppercase">{e.paqueteria ?? "Entrega propia"}</span>
       </header>
 
       <div className="mt-1">

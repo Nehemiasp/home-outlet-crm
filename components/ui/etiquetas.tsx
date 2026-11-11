@@ -1,4 +1,4 @@
-import { Ban, Bot, Clock, Eye, FilePen, FlaskConical, Package, PackageCheck, Store, TimerOff, Truck, User, CircleCheck, type LucideIcon } from "lucide-react";
+import { Ban, Bot, Clock, Eye, FilePen, FlaskConical, Package, PackageCheck, PackageOpen, Store, TimerOff, Truck, User, CircleCheck, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Tooltip } from "./tooltip";
 
@@ -210,6 +210,7 @@ const ESTADO_PEDIDO = {
   en_revision: ["aviso", "Pago en revisión", Eye],
   pagado: ["exito", "Pagado", CircleCheck],
   preparando: ["info", "Preparando", Package],
+  pendiente_envio: ["info", "Pendiente de envío", PackageOpen],
   listo_para_recoger: ["info", "Listo para recoger", Store],
   enviado: ["info", "Enviado", Truck],
   entregado: ["exito", "Entregado", PackageCheck],

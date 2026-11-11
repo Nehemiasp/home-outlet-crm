@@ -11,7 +11,7 @@ import { CANALES } from "@/lib/canales/tipos";
 import { cargarPedido, contarPorVerificar, listarPedidos, VISTAS, type ContadoresPedidos, type DetallePedido, type FilaPedido, type FiltrosPedidos } from "@/lib/pedidos/consultas";
 import { ESTADOS } from "@/lib/pedidos/estados";
 import { listarCotizaciones, type FilaCotizacion } from "@/lib/pedidos/cotizaciones";
-import { avanzarPedido, guardarGuia, marcarEnviado } from "@/lib/pedidos/gestion";
+import { avanzarPedido, guardarGuia, marcarEnviado, marcarPendienteEnvio } from "@/lib/pedidos/gestion";
 import { envioDeFormulario } from "@/lib/pedidos/formulario-envio";
 import { vencerReservas } from "@/lib/pedidos/vencimiento";
 import { crearEnlaceDePago, tarjetaActiva } from "@/lib/pagos-tarjeta/cobros";
@@ -159,7 +159,14 @@ export async function avanzar(pedidoId: string, a: string, sobrePedido: boolean)
   return avanzarPedido(id.parse(pedidoId), z.enum(ESTADOS).parse(a), quien, { sobrePedido });
 }
 
-/** «Marcar como enviado»: llega como formulario porque trae el archivo de la guía. `paqueteria` vacía = entrega propia. */
+/** «Pendiente de envío»: por dónde sale el pedido. `paqueteria` vacía = entrega propia. */
+export async function pasarAPendienteEnvio(pedidoId: string, paqueteria: string) {
+  const quien = await actor();
+  if (!(await puedeVerPedido(quien, id.parse(pedidoId)))) return NO_EXISTE;
+  return marcarPendienteEnvio(id.parse(pedidoId), quien, z.string().max(60).parse(paqueteria) || null);
+}
+
+/** «Marcar como enviado»: llega como formulario porque trae el archivo de la guía (la paquetería ya está en el pedido). */
 export async function marcarComoEnviado(datos: FormData) {
   const quien = await actor();
   const p = envioDeFormulario(datos);

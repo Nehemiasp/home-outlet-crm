@@ -14,7 +14,7 @@ export type Vista = (typeof VISTAS)[number];
 export const ESTADOS_DE_VISTA: Record<Vista, readonly EstadoPedido[] | null> = {
   "por-verificar": ["en_revision"],
   pendientes: ["pendiente_pago"],
-  "en-proceso": ["pagado", "preparando", "listo_para_recoger", "enviado"],
+  "en-proceso": ["pagado", "preparando", "pendiente_envio", "listo_para_recoger", "enviado"],
   entregados: ["entregado"],
   todos: null,
 };

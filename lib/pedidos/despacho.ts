@@ -6,16 +6,16 @@ import { puedeVerPedido } from "@/lib/visibilidad";
 import type { ResultadoAviso } from "./avisos";
 import { tiendaDeRecoger } from "./ajustes";
 import { siguientes } from "./estados";
-import { avanzarPedido, marcarEnviado, type EnvioPedido, type ResultadoGuia } from "./gestion";
+import { avanzarPedido, marcarEnviado, marcarPendienteEnvio, type EnvioPedido, type ResultadoGuia } from "./gestion";
 
 /**
  * Despacho: lo que necesita quien empaca y entrega (el rol de bodega). Pedidos ya pagados, con los productos, las
  * cantidades y a dónde van; SIN precios, pagos, formas de pago ni conversaciones. Lo arma el servidor con un `select`
  * propio (no reutiliza el detalle del pedido), así ningún dato de dinero llega al navegador de bodega.
  */
-export const ESTADOS_DESPACHO = ["pagado", "preparando", "listo_para_recoger", "enviado"] as const satisfies readonly EstadoPedido[];
-/** Los pasos que bodega puede dar: preparar, dejarlo listo o enviarlo, y entregarlo. No cancela, no reactiva y no toca pagos. */
-export const PASOS_BODEGA = ["preparando", "listo_para_recoger", "enviado", "entregado"] as const satisfies readonly EstadoPedido[];
+export const ESTADOS_DESPACHO = ["pagado", "preparando", "pendiente_envio", "listo_para_recoger", "enviado"] as const satisfies readonly EstadoPedido[];
+/** Los pasos que bodega puede dar: preparar, dejarlo listo (recoger) o pendiente de envío, enviarlo, y entregarlo. No cancela, no reactiva y no toca pagos. */
+export const PASOS_BODEGA = ["preparando", "pendiente_envio", "listo_para_recoger", "enviado", "entregado"] as const satisfies readonly EstadoPedido[];
 /** En despacho: los pagados en adelante y, con pago contra entrega, también los pendientes de pago (salen antes de cobrar). */
 const EN_DESPACHO: Prisma.OrderWhereInput = { OR: [{ estado: { in: [...ESTADOS_DESPACHO] } }, { estado: "pendiente_pago", metodoPago: "contra_entrega" }] };
 
@@ -82,8 +82,8 @@ export async function cargarHoja(id: string, u: { id: string; rol: ActorPedido["
 }
 
 /**
- * Etiquetas de envío: una hoja con todos los pedidos con envío que todavía no salen (pagados, preparando o listos, y los de
- * contra entrega), varias por página, para identificar los paquetes al despacharlos. A diferencia del resto del despacho,
+ * Etiquetas de envío: una hoja con los pedidos «pendientes de envío» (ya empacados y con la paquetería elegida, o entrega
+ * propia), varias por página, para identificar los paquetes al despacharlos. A diferencia del resto del despacho,
  * SÍ lleva precios y el total: lo decidió Nehemias el 10-nov-2026 (esta hoja la imprime también bodega). No lleva pagos,
  * formas de pago ni conversaciones. No tiene que ver con la guía de la paquetería.
  */
@@ -96,7 +96,7 @@ export type EtiquetaEnvio = {
   /** «Morales, Izabal». */
   lugar: string;
   zona: string | null;
-  /** La paquetería, si ya se eligió al prepararlo; si no, null («por definir»). */
+  /** La paquetería elegida al pasarlo a pendiente de envío; null = entrega propia. */
   paqueteria: string | null;
   /** Una por producto: si el pedido lo partió por ubicación, aquí se suman. Montos en centavos. */
   lineas: { nombre: string; cantidad: number; precio: number }[];
@@ -105,10 +105,7 @@ export type EtiquetaEnvio = {
   total: number;
 };
 
-const POR_ENVIAR: Prisma.OrderWhereInput = {
-  entrega: "envio",
-  OR: [{ estado: { in: ["pagado", "preparando", "listo_para_recoger"] } }, { estado: "pendiente_pago", metodoPago: "contra_entrega" }],
-};
+const POR_ENVIAR: Prisma.OrderWhereInput = { entrega: "envio", estado: "pendiente_envio" };
 
 /** Las etiquetas, del pedido más antiguo al más nuevo (el mismo orden del despacho). */
 export async function listarEtiquetasEnvio(): Promise<EtiquetaEnvio[]> {
@@ -142,12 +139,20 @@ type Fallo = { ok: false; error: string };
 
 /**
  * Un paso de bodega sobre un pedido en despacho. Avisa al cliente cuando corresponde (listo para recoger y enviado), como en el
- * detalle. «Enviado» pide cómo sale (entrega propia o paquetería con guía y archivo): ver `marcarEnviado`.
+ * detalle. «Pendiente de envío» pide por dónde sale (`pendienteEnvioDespacho`) y «enviado», la guía (ver `marcarEnviado`).
  */
 export async function avanzarDespacho(pedidoId: string, a: EstadoPedido, actor: ActorPedido & { nombre: string }, envio?: EnvioPedido): Promise<{ ok: true; aviso?: ResultadoAviso; guia?: ResultadoGuia } | Fallo> {
   if (!(PASOS_BODEGA as readonly EstadoPedido[]).includes(a)) return { ok: false, error: "Ese paso no lo da bodega." };
   const p = await db.order.findFirst({ where: { id: pedidoId, ...EN_DESPACHO }, select: { estado: true } });
   if (!p) return { ok: false, error: "El pedido no existe o no está listo para despachar." };
-  if (a === "enviado") return envio ? marcarEnviado(pedidoId, actor, envio) : { ok: false, error: "Indique cómo sale el pedido." };
+  if (a === "pendiente_envio") return { ok: false, error: "Elija por dónde sale el pedido." };
+  if (a === "enviado") return envio ? marcarEnviado(pedidoId, actor, envio) : { ok: false, error: "Escriba la guía de la paquetería." };
   return avanzarPedido(pedidoId, a, actor);
+}
+
+/** «Pendiente de envío» desde Despacho: la paquetería (de la lista de Ajustes) o `null` = entrega propia. */
+export async function pendienteEnvioDespacho(pedidoId: string, actor: ActorPedido & { nombre: string }, paqueteria: string | null): Promise<{ ok: true } | Fallo> {
+  const p = await db.order.findFirst({ where: { id: pedidoId, ...EN_DESPACHO }, select: { id: true } });
+  if (!p) return { ok: false, error: "El pedido no existe o no está listo para despachar." };
+  return marcarPendienteEnvio(pedidoId, actor, paqueteria);
 }

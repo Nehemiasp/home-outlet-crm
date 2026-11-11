@@ -5,7 +5,7 @@ import path from "node:path";
 import { after, before, describe, test } from "node:test";
 import { extensionDeGuia, revisarGuia } from "@/lib/almacenamiento";
 import { db } from "@/lib/db";
-import { marcarEnviado } from "@/lib/pedidos/gestion";
+import { avanzarPedido, marcarEnviado, marcarPendienteEnvio } from "@/lib/pedidos/gestion";
 import type { Canal } from "@/generated/prisma/client";
 
 // Necesita la base de datos (npm run db). Lo que crea lleva el prefijo PRUEBA-GUIA y se borra al final, con los archivos subidos.
@@ -34,7 +34,7 @@ describe("archivo de la guía", () => {
   });
 });
 
-describe("marcar como enviado (con base de datos)", () => {
+describe("pendiente de envío y marcar como enviado (con base de datos)", () => {
   let agente: { id: string; nombre: string; rol: "agente" };
   let contactoId: string;
   let n = 0;
@@ -50,6 +50,11 @@ describe("marcar como enviado (con base de datos)", () => {
         subtotal: 10_000, total: 12_500, costoEnvio: 2_500, metodoPago: "transferencia", lineas: { create: [{ sku: "PRUEBA-GUIA", nombre: "PRUEBA-GUIA producto", precio: 10_000, cantidad: 1 }] },
       },
     });
+  };
+  /** Preparado → pendiente de envío, por la paquetería elegida (null = entrega propia). */
+  const aPendiente = async (pedidoId: string, paqueteria: string | null) => {
+    const r = await marcarPendienteEnvio(pedidoId, agente, paqueteria);
+    assert.ok(r.ok, JSON.stringify(r));
   };
   const ultimos = (pedidoId: string) => db.message.findMany({ where: { pedidoId }, orderBy: { fecha: "asc" } });
   const anotar = async (pedidoId: string) => {
@@ -76,10 +81,32 @@ describe("marcar como enviado (con base de datos)", () => {
     await db.$disconnect();
   });
 
+  test("pendiente de envío: exige elegir por dónde sale, guarda la paquetería y no le escribe al cliente", async () => {
+    const o = await pedido();
+    assert.equal((await avanzarPedido(o.id, "pendiente_envio", agente)).ok, false); // sin elegir, no
+    const fuera = await marcarPendienteEnvio(o.id, agente, "Inventada");
+    assert.ok(!fuera.ok && /lista de Ajustes/.test(fuera.error));
+    await aPendiente(o.id, "Forza");
+    const guardado = await db.order.findUniqueOrThrow({ where: { id: o.id } });
+    assert.deepEqual([guardado.estado, guardado.paqueteria], ["pendiente_envio", "Forza"]);
+    assert.equal((await db.orderEvent.findFirstOrThrow({ where: { pedidoId: o.id, aEstado: "pendiente_envio" } })).nota, "Sale por Forza");
+    assert.equal(await db.message.count({ where: { pedidoId: o.id } }), 0); // el aviso sale al enviarlo, con la guía
+    const recoger = await pedido({ entrega: "recoger" });
+    assert.equal((await marcarPendienteEnvio(recoger.id, agente, "Forza")).ok, false);
+  });
+
+  test("de preparando no se salta a enviado: primero pendiente de envío", async () => {
+    const o = await pedido();
+    const r = await marcarEnviado(o.id, agente, { guia: "F-9", archivo: archivo(PNG, "g.png") });
+    assert.ok(!r.ok && /pendiente de envío/.test(r.error));
+    assert.equal((await db.order.findUniqueOrThrow({ where: { id: o.id } })).estado, "preparando");
+  });
+
   test("entrega propia: sin guía ni archivo, y el aviso no habla de guía", async () => {
     const o = await pedido();
     await db.order.update({ where: { id: o.id }, data: { guia: "escrita antes" } });
-    const r = await marcarEnviado(o.id, agente, { paqueteria: null, guia: "", archivo: null });
+    await aPendiente(o.id, null);
+    const r = await marcarEnviado(o.id, agente, { guia: "", archivo: null });
     assert.ok(r.ok && !r.guia, JSON.stringify(r));
     const guardado = await db.order.findUniqueOrThrow({ where: { id: o.id } });
     assert.deepEqual([guardado.estado, guardado.guia, guardado.paqueteria, guardado.guiaArchivoUrl], ["enviado", null, null, null]);
@@ -91,7 +118,8 @@ describe("marcar como enviado (con base de datos)", () => {
 
   test("por paquetería con PDF: por un canal que manda documentos sale como documento, con su nombre", async () => {
     const o = await pedido();
-    const r = await marcarEnviado(o.id, agente, { paqueteria: "Cargo Expreso", guia: "CE-55", archivo: archivo(PDF, "guia cargo.pdf") });
+    await aPendiente(o.id, "Cargo Expreso");
+    const r = await marcarEnviado(o.id, agente, { guia: "CE-55", archivo: archivo(PDF, "guia cargo.pdf") });
     await anotar(o.id);
     assert.ok(r.ok && r.guia?.estado === "enviada", JSON.stringify(r));
     const [aviso, doc] = await ultimos(o.id);
@@ -102,7 +130,8 @@ describe("marcar como enviado (con base de datos)", () => {
 
   test("si el canal no deja enviar, el pedido igual queda enviado con la guía guardada, para mandarla a mano", async () => {
     const o = await pedido({ canal: "facebook" });
-    const r = await marcarEnviado(o.id, agente, { paqueteria: "Forza", guia: "F-1", archivo: archivo(PNG, "foto.png") });
+    await aPendiente(o.id, "Forza");
+    const r = await marcarEnviado(o.id, agente, { guia: "F-1", archivo: archivo(PNG, "foto.png") });
     await anotar(o.id);
     assert.ok(r.ok && r.aviso?.estado === "copiar" && r.guia?.estado === "manual", JSON.stringify(r));
     const guardado = await db.order.findUniqueOrThrow({ where: { id: o.id } });
@@ -110,14 +139,15 @@ describe("marcar como enviado (con base de datos)", () => {
     assert.equal(await db.message.count({ where: { pedidoId: o.id } }), 0);
   });
 
-  test("se rechaza: archivo que no es foto ni PDF, paquetería fuera de la lista, pedido para recoger; y no queda archivo suelto", async () => {
+  test("se rechaza: archivo que no es foto ni PDF, guía vacía por paquetería, pedido para recoger; y no queda archivo suelto", async () => {
     const o = await pedido();
-    const txt = await marcarEnviado(o.id, agente, { paqueteria: "Forza", guia: "F-2", archivo: archivo(Buffer.from("texto"), "guia.txt") });
+    await aPendiente(o.id, "Forza");
+    const txt = await marcarEnviado(o.id, agente, { guia: "F-2", archivo: archivo(Buffer.from("texto"), "guia.txt") });
     assert.ok(!txt.ok && /JPG, PNG o WebP, o un PDF/.test(txt.error));
-    assert.equal((await marcarEnviado(o.id, agente, { paqueteria: "Inventada", guia: "F-2", archivo: archivo(PNG, "g.png") })).ok, false);
+    assert.equal((await marcarEnviado(o.id, agente, { guia: "", archivo: archivo(PNG, "g.png") })).ok, false); // por paquetería, la guía es obligatoria
     const recoger = await pedido({ entrega: "recoger" });
-    assert.equal((await marcarEnviado(recoger.id, agente, { paqueteria: null, guia: "", archivo: null })).ok, false);
+    assert.equal((await marcarEnviado(recoger.id, agente, { guia: "", archivo: null })).ok, false);
     const sigue = await db.order.findUniqueOrThrow({ where: { id: o.id } });
-    assert.deepEqual([sigue.estado, sigue.guiaArchivoUrl], ["preparando", null]);
+    assert.deepEqual([sigue.estado, sigue.guiaArchivoUrl], ["pendiente_envio", null]);
   });
 });

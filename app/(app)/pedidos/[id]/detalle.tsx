@@ -14,8 +14,8 @@ import { siguientes } from "@/lib/pedidos/estados";
 import type { ResultadoAviso } from "@/lib/pedidos/avisos";
 import { useActualizacion } from "@/lib/tiempo-real";
 import { formatQ, formatTelefono } from "@/lib/utils";
-import { actualizarGuia, avanzar, cambiarFormaPago, enviarEnlaceTarjeta, marcarComoEnviado, obtener, rechazar, verificar, type PedidoConPermisos } from "../actions";
-import { AvisoGuiaManual, EnlaceGuia, ModalEnviado, type DatosEnvioForm } from "@/components/ui/envio";
+import { actualizarGuia, avanzar, cambiarFormaPago, enviarEnlaceTarjeta, marcarComoEnviado, obtener, pasarAPendienteEnvio, rechazar, verificar, type PedidoConPermisos } from "../actions";
+import { AvisoGuiaManual, EnlaceGuia, ModalEnviado, ModalPendienteEnvio, type DatosEnvioForm } from "@/components/ui/envio";
 import { nombreMetodo } from "@/lib/pedidos/metodos";
 import { EnlaceDuplicado } from "@/components/ui/pedidos";
 import { SubirComprobante } from "./subir-comprobante";
@@ -33,6 +33,7 @@ export function Detalle({ inicial }: { inicial: PedidoConPermisos }) {
   const [subir, setSubir] = useState(false);
   const [cancelar, setCancelar] = useState(false);
   const [enviar, setEnviar] = useState(false);
+  const [pendiente, setPendiente] = useState(false);
   const [reactivar, setReactivar] = useState(false);
   const [sobrePedido, setSobrePedido] = useState(false);
   const [guia, setGuia] = useState(p.guia ?? "");
@@ -60,13 +61,24 @@ export function Detalle({ inicial }: { inicial: PedidoConPermisos }) {
     tras(r.aviso);
   };
 
+  /** «Pendiente de envío»: por dónde sale ("" = entrega propia). */
+  const aPendiente = async (paqueteria: string) => {
+    setTrabajando(true);
+    setErrorEnvio("");
+    const r = await pasarAPendienteEnvio(p.id, paqueteria);
+    setTrabajando(false);
+    if (!r.ok) return setErrorEnvio(r.error);
+    avisar("Pedido pendiente de envío");
+    setPendiente(false);
+    refrescar();
+  };
+
   /** «Marcar como enviado»: va como formulario porque lleva el archivo de la guía. */
   const enviarPedido = async (d: DatosEnvioForm) => {
     setTrabajando(true);
     setErrorEnvio("");
     const datos = new FormData();
     datos.set("pedidoId", p.id);
-    datos.set("paqueteria", d.paqueteria);
     datos.set("guia", d.guia);
     if (d.archivo) datos.set("archivo", d.archivo);
     const r = await marcarComoEnviado(datos);
@@ -127,6 +139,8 @@ export function Detalle({ inicial }: { inicial: PedidoConPermisos }) {
       ? { texto: "Verificar pago", accion: () => setVerPago(primerPagoPorVerificar.id) }
       : sig.includes("preparando")
         ? { texto: "Marcar como preparando", accion: () => void cambio("preparando", "Pedido en preparación") }
+        : sig.includes("pendiente_envio")
+          ? { texto: "Pasar a pendiente de envío", accion: () => (setErrorEnvio(""), setPendiente(true)) }
         : sig.includes("enviado")
           ? { texto: "Marcar como enviado", accion: () => (setErrorEnvio(""), setEnviar(true)) }
           : sig.includes("listo_para_recoger")
@@ -439,11 +453,21 @@ export function Detalle({ inicial }: { inicial: PedidoConPermisos }) {
       />
       <SubirComprobante abierto={subir} onCerrar={() => setSubir(false)} pedido={p} metodos={metodos} bancos={bancos} onRegistrado={(aviso) => { setSubir(false); tras(aviso); }} />
 
+      <ModalPendienteEnvio
+        abierto={pendiente}
+        codigo={p.codigo}
+        paqueterias={paqueterias}
+        actual={p.paqueteria}
+        trabajando={trabajando}
+        error={errorEnvio}
+        onCerrar={() => setPendiente(false)}
+        onConfirmar={(paq) => void aPendiente(paq)}
+      />
       <ModalEnviado
         abierto={enviar}
         codigo={p.codigo}
-        paqueterias={paqueterias}
-        guiaActual={{ paqueteria: p.paqueteria, guia: p.guia }}
+        paqueteria={p.paqueteria}
+        guiaActual={p.guia}
         archivoActual={p.guiaArchivo?.nombre}
         trabajando={trabajando}
         error={errorEnvio}

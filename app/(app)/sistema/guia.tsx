@@ -8,7 +8,7 @@ import { EstadoVacio, Esqueleto, EsqueletoConversacion } from "@/components/ui/e
 import { Avatar, AvatarAsistente, AvatarConCanal, ContadorNoLeidos, IconoCanal, Insignia, InsigniaAtencion, InsigniaCanal, InsigniaConversacion, InsigniaCotizacion, InsigniaEstado, InsigniaEtiqueta, InsigniaExistencia, InsigniaPago, LogoCanal, nombreCanal, tonos, tonosEstado, type Tono, type TonoEstado } from "@/components/ui/etiquetas";
 import { ListaCompras } from "@/components/ui/pedidos";
 import { AvisoInactividad, CodigosRespaldo, QrSegundoFactor } from "@/components/ui/seguridad";
-import { AvisoGuiaManual, EnlaceGuia, ModalEnviado } from "@/components/ui/envio";
+import { AvisoGuiaManual, EnlaceGuia, ModalEnviado, ModalPendienteEnvio } from "@/components/ui/envio";
 import { AreaTexto, Boton, BotonIcono, Buscador, CampoTexto, Casilla, ControlSegmentado, GrupoCasillas, Interruptor, Selector } from "@/components/ui/form";
 import { ControlDisponibilidad, InsigniaDisponibilidad, ModalPausaLarga } from "@/components/ui/disponibilidad";
 import { ModalAsignar, ModalDevolver, ResumenEquipo, TablaEquipo } from "@/components/ui/equipo";
@@ -171,6 +171,7 @@ export function Guia() {
   const [pausaLarga, setPausaLarga] = useState(false);
   const [inactividad, setInactividad] = useState(false);
   const [enviado, setEnviado] = useState(false);
+  const [pendienteEnvio, setPendienteEnvio] = useState(false);
   const [guiaManual, setGuiaManual] = useState(false);
   const [devolver, setDevolver] = useState(false);
   const [asignar, setAsignar] = useState(false);
@@ -556,6 +557,9 @@ export function Guia() {
               ))}
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-2" aria-label="Envío con guía">
+              <Boton variante="secundario" tamano="sm" onClick={() => setPendienteEnvio(true)}>
+                Ver «Pendiente de envío»
+              </Boton>
               <Boton variante="secundario" tamano="sm" onClick={() => setEnviado(true)}>
                 Ver «Marcar como enviado»
               </Boton>
@@ -1004,7 +1008,8 @@ export function Guia() {
         onQuitar={() => (setAsignar(false), avisar("Asignación quitada"))}
       />
       <ModalDevolver abierto={devolver} onCerrar={() => setDevolver(false)} onDevolver={() => (setDevolver(false), avisar("Devuelta a la cola"))} />
-      <ModalEnviado abierto={enviado} codigo="HO-000123" paqueterias={["Forza", "Cargo Expreso", "Guatex"]} onCerrar={() => setEnviado(false)} onConfirmar={(d) => (setEnviado(false), avisar(d.paqueteria ? `Enviado por ${d.paqueteria}` : "Entrega propia"))} />
+      <ModalPendienteEnvio abierto={pendienteEnvio} codigo="HO-000123" paqueterias={["Forza", "Cargo Expreso", "Guatex"]} onCerrar={() => setPendienteEnvio(false)} onConfirmar={(paq) => (setPendienteEnvio(false), avisar(paq ? `Saldrá por ${paq}` : "Entrega propia"))} />
+      <ModalEnviado abierto={enviado} codigo="HO-000123" paqueteria="Forza" onCerrar={() => setEnviado(false)} onConfirmar={(d) => (setEnviado(false), avisar(`Enviado con guía ${d.guia || "(sin número)"}`))} />
       <AvisoGuiaManual guia={guiaManual ? { url: "#", nombre: "guia-forza-123.pdf" } : null} onCerrar={() => setGuiaManual(false)} />
       <AvisoInactividad abierto={inactividad} segundos={42} onSeguir={() => setInactividad(false)} onSalir={() => (setInactividad(false), avisar("Aquí se cerraría la sesión"))} />
       <ModalPausaLarga abierto={pausaLarga} minutos={15} onActivar={() => (setPausaLarga(false), avisar("Disponible otra vez"))} onSeguir={() => setPausaLarga(false)} />

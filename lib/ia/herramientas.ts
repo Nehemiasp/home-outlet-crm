@@ -124,7 +124,7 @@ export async function ejecutarHerramienta(nombre: string, entrada: unknown, ctx:
       // Solo pedidos de este contacto: un código ajeno responde igual que uno que no existe.
       const o = codigo
         ? await db.order.findFirst({ where: { ...base, codigo: { equals: codigo, mode: "insensitive" } }, include: incluir })
-        : ((await db.order.findFirst({ where: { ...base, estado: { in: ["pendiente_pago", "en_revision", "pagado", "preparando", "listo_para_recoger", "enviado"] } }, orderBy: { creada: "desc" }, include: incluir })) ??
+        : ((await db.order.findFirst({ where: { ...base, estado: { in: ["pendiente_pago", "en_revision", "pagado", "preparando", "pendiente_envio", "listo_para_recoger", "enviado"] } }, orderBy: { creada: "desc" }, include: incluir })) ??
           (await db.order.findFirst({ where: base, orderBy: { creada: "desc" }, include: incluir })));
       if (!o) return { contenido: json({ pedido: null }), consultado: codigo ? `Buscó el pedido ${codigo} y no es de este cliente` : "Buscó el pedido del cliente y no encontró ninguno" };
       const verificado = o.pagos.filter((p) => p.estado === "verificado").reduce((t, p) => t + p.monto, 0);

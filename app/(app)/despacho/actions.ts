@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { avanzarDespacho, listarDespacho, type FilaDespacho } from "@/lib/pedidos/despacho";
+import { avanzarDespacho, listarDespacho, pendienteEnvioDespacho, type FilaDespacho } from "@/lib/pedidos/despacho";
 import { envioDeFormulario } from "@/lib/pedidos/formulario-envio";
 import type { ResultadoGuia } from "@/lib/pedidos/gestion";
 import { puedeDespachar } from "@/lib/permisos";
@@ -33,7 +33,13 @@ export async function darPaso(pedidoId: string, a: string): Promise<{ ok: true; 
   return avanzarDespacho(z.string().min(1).max(40).parse(pedidoId), p.data, u);
 }
 
-/** «Marcar como enviado» desde Despacho: entrega propia, o paquetería con número de guía y la guía adjunta (foto o PDF). */
+/** «Pendiente de envío» desde Despacho: por dónde sale. `paqueteria` vacía = entrega propia. */
+export async function pendienteDesdeDespacho(pedidoId: string, paqueteria: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const u = await actor();
+  return pendienteEnvioDespacho(z.string().min(1).max(40).parse(pedidoId), u, z.string().max(60).parse(paqueteria) || null);
+}
+
+/** «Marcar como enviado» desde Despacho: con paquetería, el número de guía y la guía adjunta (foto o PDF); con entrega propia, nada. */
 export async function enviarDesdeDespacho(datos: FormData): Promise<{ ok: true; aviso?: ResultadoAviso; guia?: ResultadoGuia } | { ok: false; error: string }> {
   const u = await actor();
   const p = envioDeFormulario(datos);

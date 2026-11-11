@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { obtenerAjustesPedidos } from "@/lib/pedidos/ajustes";
 import { costoSegunPago } from "@/lib/pedidos/envio";
 import { siguientes } from "@/lib/pedidos/estados";
-import { avanzarPedido, marcarEnviado } from "@/lib/pedidos/gestion";
+import { avanzarPedido, marcarEnviado, marcarPendienteEnvio } from "@/lib/pedidos/gestion";
 import { compatibleConEntrega } from "@/lib/pedidos/metodos";
 import { cambiarFormaDePago, construirResumen, enviarAlCliente, errorDeForma, guardarBorrador, type ActorPedidos } from "@/lib/pedidos/pedidos";
 import type { EntradaPedido } from "@/lib/pedidos/tipos";
@@ -110,7 +110,8 @@ describe("pago contra entrega (con base de datos)", () => {
     assert.ok((await avanzarPedido(g.pedidoId, "preparando", agente)).ok); // sin pago previo
     const s = await stock();
     assert.deepEqual([s.cantidad, s.apartado], [8, 0]);
-    assert.ok((await marcarEnviado(g.pedidoId, agente, { paqueteria: null, guia: "", archivo: null })).ok);
+    assert.ok((await marcarPendienteEnvio(g.pedidoId, agente, null)).ok); // entrega propia
+    assert.ok((await marcarEnviado(g.pedidoId, agente, { guia: "", archivo: null })).ok);
     assert.ok((await avanzarPedido(g.pedidoId, "entregado", agente)).ok);
     const entregado = await db.order.findUniqueOrThrow({ where: { id: g.pedidoId }, include: { pagos: true } });
     assert.equal(entregado.estado, "entregado");

@@ -6,7 +6,7 @@ import path from "node:path";
 import { after, before, describe, test } from "node:test";
 import { cambiarPermisoPagos, cambiarRol } from "@/lib/ajustes";
 import { db } from "@/lib/db";
-import { avanzarDespacho, cargarHoja, ESTADOS_DESPACHO, listarDespacho, listarEtiquetasEnvio } from "@/lib/pedidos/despacho";
+import { avanzarDespacho, cargarHoja, ESTADOS_DESPACHO, listarDespacho, listarEtiquetasEnvio, pendienteEnvioDespacho } from "@/lib/pedidos/despacho";
 import { esBodega, inicioDe, puedeAjustarExistencias, puedeDespachar, puedeGestionarProductos, puedeUnirContactos, puedeVerAjustes, puedeVerReportes, puedeVerificarPagos, veTodo, type Actor, type Rol } from "@/lib/permisos";
 import { puedeVerArchivo } from "@/lib/visibilidad";
 import { aislar, crearUsuario, limpiar, PREFIJO, restaurar } from "./apoyo-equipo";
@@ -121,23 +121,25 @@ describe("despacho de bodega (con base de datos)", () => {
     assert.deepEqual(uno.pasos, ["preparando"]); // de pagado solo se puede empezar a preparar (no cancelar)
   });
 
-  test("etiquetas de envío: solo los envíos que no han salido (y contra entrega), con precios y productos sumados", async () => {
-    // Uno de contra entrega, sin pagar todavía, con el mismo producto partido en dos ubicaciones.
-    await db.order.create({
-      data: {
-        codigo: "PREQ-000005", contactoId, canal: "simulado", estado: "pendiente_pago", entrega: "envio", metodoPago: "contra_entrega", direccion: "Barrio El Centro", departamento: "Izabal", municipio: "Puerto Barrios",
-        paqueteria: "Forza", subtotal: 30_000, descuentoMonto: 1_000, costoEnvio: 3_500, total: 32_500,
-        lineas: { create: [{ sku: "PRUEBA-EQ-2", nombre: "PRUEBA-EQ Otro", precio: 15_000, cantidad: 1 }, { sku: "PRUEBA-EQ-2", nombre: "PRUEBA-EQ Otro", precio: 15_000, cantidad: 1 }] },
-      },
-    });
+  test("etiquetas de envío: solo los pendientes de envío, con su paquetería (o entrega propia), precios y productos sumados", async () => {
+    const pendienteEnvio = (codigo: string, extra: object) =>
+      db.order.create({
+        data: {
+          codigo, contactoId, canal: "simulado", estado: "pendiente_envio", entrega: "envio", metodoPago: "contra_entrega", direccion: "Barrio El Centro", departamento: "Izabal", municipio: "Puerto Barrios",
+          subtotal: 30_000, descuentoMonto: 1_000, costoEnvio: 3_500, total: 32_500, ...extra,
+          // El mismo producto partido en dos ubicaciones: en la etiqueta va en una sola línea.
+          lineas: { create: [{ sku: "PRUEBA-EQ-2", nombre: "PRUEBA-EQ Otro", precio: 15_000, cantidad: 1 }, { sku: "PRUEBA-EQ-2", nombre: "PRUEBA-EQ Otro", precio: 15_000, cantidad: 1 }] },
+        },
+      });
+    await pendienteEnvio("PREQ-000005", { paqueteria: "Forza" });
+    await pendienteEnvio("PREQ-000006", { paqueteria: null }); // entrega propia
     const mias = (await listarEtiquetasEnvio()).filter((e) => e.codigo.startsWith("PREQ-"));
-    // El pagado con envío y el de contra entrega; no el pendiente por transferencia, ni el ya enviado, ni el de recoger.
-    assert.deepEqual(mias.map((e) => e.codigo), ["PREQ-000001", "PREQ-000005"]);
-    const [uno, ce] = mias as [(typeof mias)[number], (typeof mias)[number]];
-    assert.deepEqual([uno.cliente.startsWith(PREFIJO), uno.telefono, uno.lugar, uno.direccion, uno.paqueteria], [true, "+50255559901", "Morales, Izabal", "Calle 1, zona 2", null]);
-    assert.deepEqual(uno.lineas, [{ nombre: "PRUEBA-EQ Producto", cantidad: 2, precio: 10_000 }]);
-    assert.deepEqual([uno.costoEnvio, uno.total], [2_500, 22_500]);
-    assert.deepEqual([ce.paqueteria, ce.lineas, ce.descuento, ce.total], ["Forza", [{ nombre: "PRUEBA-EQ Otro", cantidad: 2, precio: 15_000 }], 1_000, 32_500]);
+    // Ni el pagado (aún no se empaca), ni el pendiente de pago, ni el ya enviado, ni el de recoger.
+    assert.deepEqual(mias.map((e) => e.codigo), ["PREQ-000005", "PREQ-000006"]);
+    const [forza, propia] = mias as [(typeof mias)[number], (typeof mias)[number]];
+    assert.deepEqual([forza.cliente.startsWith(PREFIJO), forza.telefono, forza.lugar, forza.direccion, forza.paqueteria], [true, "+50255559901", "Puerto Barrios, Izabal", "Barrio El Centro", "Forza"]);
+    assert.deepEqual([forza.lineas, forza.costoEnvio, forza.descuento, forza.total], [[{ nombre: "PRUEBA-EQ Otro", cantidad: 2, precio: 15_000 }], 3_500, 1_000, 32_500]);
+    assert.equal(propia.paqueteria, null);
     assert.equal(JSON.stringify(mias).includes("metodoPago"), false); // la forma de pago no viaja
   });
 
@@ -151,7 +153,7 @@ describe("despacho de bodega (con base de datos)", () => {
 
   test("bodega avanza el pedido paso a paso, sin saltarse ni cancelar", async () => {
     const png = new File([Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(24)])], "guia.png", { type: "image/png" });
-    const envio = (guia: string) => ({ paqueteria: "Forza", guia, archivo: png });
+    const envio = (guia: string) => ({ guia, archivo: png });
     assert.equal((await avanzarDespacho(pagado, "cancelado", BODEGA_ACTOR())).ok, false);
     assert.equal((await avanzarDespacho(pagado, "pendiente_pago", BODEGA_ACTOR())).ok, false);
     assert.equal((await avanzarDespacho(pagado, "enviado", BODEGA_ACTOR(), envio("G-1"))).ok, false); // falta preparar
@@ -159,15 +161,20 @@ describe("despacho de bodega (con base de datos)", () => {
     assert.equal((await db.order.findUniqueOrThrow({ where: { id: pendiente } })).estado, "pendiente_pago");
 
     assert.equal((await avanzarDespacho(pagado, "preparando", BODEGA_ACTOR())).ok, true);
-    assert.equal((await avanzarDespacho(pagado, "enviado", BODEGA_ACTOR())).ok, false); // sin decir cómo sale
-    assert.equal((await avanzarDespacho(pagado, "enviado", BODEGA_ACTOR(), envio("  "))).ok, false); // por paquetería exige el número de guía
-    assert.equal((await avanzarDespacho(pagado, "enviado", BODEGA_ACTOR(), { ...envio("G-1"), paqueteria: "Mensajería inventada" })).ok, false); // solo las de Ajustes
+    assert.equal((await avanzarDespacho(pagado, "enviado", BODEGA_ACTOR(), envio("G-1"))).ok, false); // falta pendiente de envío
+    assert.equal((await avanzarDespacho(pagado, "pendiente_envio", BODEGA_ACTOR())).ok, false); // sin decir por dónde sale
+    assert.equal((await pendienteEnvioDespacho(pagado, BODEGA_ACTOR(), "Mensajería inventada")).ok, false); // solo las de Ajustes
+    assert.equal((await pendienteEnvioDespacho(pendiente, BODEGA_ACTOR(), "Forza")).ok, false); // no está en despacho
     assert.equal((await db.order.findUniqueOrThrow({ where: { id: pagado } })).estado, "preparando");
+    assert.equal((await pendienteEnvioDespacho(pagado, BODEGA_ACTOR(), "Forza")).ok, true);
+    assert.equal((await avanzarDespacho(pagado, "enviado", BODEGA_ACTOR())).ok, false); // sin la guía
+    assert.equal((await avanzarDespacho(pagado, "enviado", BODEGA_ACTOR(), envio("  "))).ok, false); // por paquetería exige el número de guía
+    assert.equal((await db.order.findUniqueOrThrow({ where: { id: pagado } })).estado, "pendiente_envio");
     const enviado = await avanzarDespacho(pagado, "enviado", BODEGA_ACTOR(), envio("GUIA-77"));
     assert.ok(enviado.ok && enviado.guia?.estado === "manual"); // bodega sube la guía; sin conversación, se manda a mano
     const o = await db.order.findUniqueOrThrow({ where: { id: pagado } });
     assert.deepEqual([o.estado, o.guia, o.paqueteria], ["enviado", "GUIA-77", "Forza"]);
-    assert.equal((await db.orderEvent.count({ where: { pedidoId: pagado, usuarioId: bodega.id } })) >= 2, true); // queda quién lo hizo
+    assert.equal((await db.orderEvent.count({ where: { pedidoId: pagado, usuarioId: bodega.id } })) >= 3, true); // queda quién lo hizo (preparar, pendiente, enviar)
     const nombre = o.guiaArchivoUrl!.replace("/api/archivos/", "");
     assert.equal(await puedeVerArchivo(bodega, nombre), true); // bodega abre la guía de un pedido en despacho
     assert.equal((await listarDespacho()).find((f) => f.id === pagado)?.guiaArchivo?.nombre, "guia.png");

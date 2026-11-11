@@ -24,15 +24,18 @@ describe("estados del pedido", () => {
     assert.equal(transicionValida("cancelado", "pendiente_pago", "envio"), false);
   });
 
-  test("«listo para recoger» solo con recoger y «enviado» solo con envío", () => {
+  test("«listo para recoger» solo con recoger; con envío, «pendiente de envío» y luego «enviado»", () => {
     assert.deepEqual(siguientes("preparando", "recoger"), ["listo_para_recoger", "cancelado"]);
-    assert.deepEqual(siguientes("preparando", "envio"), ["enviado", "cancelado"]);
+    assert.deepEqual(siguientes("preparando", "envio"), ["pendiente_envio", "cancelado"]);
+    assert.deepEqual(siguientes("pendiente_envio", "envio"), ["enviado", "cancelado"]);
+    assert.equal(transicionValida("preparando", "enviado", "envio"), false); // ya no se salta el paso
+    assert.equal(transicionValida("preparando", "pendiente_envio", "recoger"), false);
     assert.equal(transicionValida("preparando", "enviado", "recoger"), false);
   });
 
   test("todos los estados están en la tabla y ninguno vuelve a borrador", () => {
     for (const de of ESTADOS) for (const a of siguientes(de, "envio")) assert.notEqual(a, "borrador");
-    assert.equal(ESTADOS.length, 10);
+    assert.equal(ESTADOS.length, 11);
   });
 });
 

@@ -6,7 +6,7 @@ import { useState } from "react";
 import { FotoProducto } from "@/app/(app)/catalogo/existencias";
 import { EstadoVacio } from "@/components/ui/estados";
 import { InsigniaEstado } from "@/components/ui/etiquetas";
-import { AvisoGuiaManual, EnlaceGuia, ModalEnviado, type DatosEnvioForm } from "@/components/ui/envio";
+import { AvisoGuiaManual, EnlaceGuia, ModalEnviado, ModalPendienteEnvio, type DatosEnvioForm } from "@/components/ui/envio";
 import { Boton } from "@/components/ui/form";
 import { EncabezadoPagina, Modal, PestanasConContador } from "@/components/ui/estructura";
 import { useToast } from "@/components/ui/toast";
@@ -14,21 +14,23 @@ import type { EstadoPedido } from "@/generated/prisma/client";
 import type { FilaDespacho } from "@/lib/pedidos/despacho";
 import { formatTelefono } from "@/lib/utils";
 import { useActualizacion } from "@/lib/tiempo-real";
-import { darPaso, enviarDesdeDespacho, listarParaDespacho } from "./actions";
+import { darPaso, enviarDesdeDespacho, listarParaDespacho, pendienteDesdeDespacho } from "./actions";
 
 const PESTANAS = [
   { id: "por-preparar", texto: "Por preparar", estados: ["pagado"] },
   { id: "preparando", texto: "Preparando", estados: ["preparando"] },
+  { id: "por-enviar", texto: "Por enviar", estados: ["pendiente_envio"] },
   { id: "por-entregar", texto: "Listos y enviados", estados: ["listo_para_recoger", "enviado"] },
 ] as const;
 
 const TEXTO_PASO: Partial<Record<EstadoPedido, string>> = {
   preparando: "Empezar a preparar",
+  pendiente_envio: "Pendiente de envío",
   listo_para_recoger: "Listo para recoger",
   enviado: "Marcar como enviado",
   entregado: "Marcar como entregado",
 };
-/** «Listo para recoger» le avisa al cliente por el chat: se confirma antes. «Enviado» tiene su propia ventana (cómo sale y la guía). */
+/** «Listo para recoger» le avisa al cliente por el chat: se confirma antes. «Pendiente de envío» (por dónde sale) y «Enviado» (la guía) tienen su ventana. */
 const AVISAN: readonly EstadoPedido[] = ["listo_para_recoger"];
 
 export function ListaDespacho({ paqueterias }: { paqueterias: string[] }) {
@@ -37,6 +39,7 @@ export function ListaDespacho({ paqueterias }: { paqueterias: string[] }) {
   const [pestana, setPestana] = useState<(typeof PESTANAS)[number]["id"]>("por-preparar");
   const [confirmar, setConfirmar] = useState<{ pedido: FilaDespacho; a: EstadoPedido } | null>(null);
   const [enviando, setEnviando] = useState<FilaDespacho | null>(null);
+  const [pendiente, setPendiente] = useState<FilaDespacho | null>(null);
   const [errorEnvio, setErrorEnvio] = useState("");
   const [guiaManual, setGuiaManual] = useState<{ url: string; nombre: string } | null>(null);
   const [trabajando, setTrabajando] = useState(false);
@@ -59,8 +62,23 @@ export function ListaDespacho({ paqueterias }: { paqueterias: string[] }) {
     if (a === "enviado") {
       setErrorEnvio("");
       setEnviando(p);
+    } else if (a === "pendiente_envio") {
+      setErrorEnvio("");
+      setPendiente(p);
     } else if (AVISAN.includes(a)) setConfirmar({ pedido: p, a });
     else void ejecutar(p, a);
+  };
+
+  /** «Pendiente de envío»: por dónde sale ("" = entrega propia). */
+  const aPendiente = async (p: FilaDespacho, paqueteria: string) => {
+    setTrabajando(true);
+    setErrorEnvio("");
+    const r = await pendienteDesdeDespacho(p.id, paqueteria);
+    setTrabajando(false);
+    if (!r.ok) return setErrorEnvio(r.error);
+    setPendiente(null);
+    avisar(`Pedido ${p.codigo} pendiente de envío`);
+    refrescar();
   };
 
   /** «Marcar como enviado»: va como formulario porque lleva el archivo de la guía. */
@@ -69,7 +87,6 @@ export function ListaDespacho({ paqueterias }: { paqueterias: string[] }) {
     setErrorEnvio("");
     const datos = new FormData();
     datos.set("pedidoId", p.id);
-    datos.set("paqueteria", d.paqueteria);
     datos.set("guia", d.guia);
     if (d.archivo) datos.set("archivo", d.archivo);
     const r = await enviarDesdeDespacho(datos);
@@ -84,12 +101,7 @@ export function ListaDespacho({ paqueterias }: { paqueterias: string[] }) {
 
   return (
     <div className="flex flex-col gap-4 p-6">
-      <EncabezadoPagina titulo="Despacho" detalle="Pedidos ya pagados que hay que empacar y entregar, del más antiguo al más nuevo. Sin precios ni pagos.">
-        <Link href="/despacho/etiquetas" target="_blank" rel="noopener" className="cuerpo-fuerte inline-flex h-10 items-center gap-2 rounded-campo border border-linea bg-superficie px-4 hover:bg-fondo max-md:min-h-11">
-          <Printer className="size-4" aria-hidden />
-          Etiquetas de envío
-        </Link>
-      </EncabezadoPagina>
+      <EncabezadoPagina titulo="Despacho" detalle="Pedidos ya pagados que hay que empacar y entregar, del más antiguo al más nuevo. Sin precios ni pagos." />
       <PestanasConContador
         etiqueta="Estado del despacho"
         activa={pestana}
@@ -97,9 +109,25 @@ export function ListaDespacho({ paqueterias }: { paqueterias: string[] }) {
         pestanas={PESTANAS.map((p) => ({ id: p.id, texto: p.texto, contador: datos ? de(p.id).length : undefined, urgente: p.id === "por-preparar" }))}
       />
 
+      {/* Las etiquetas de envío solo sirven para los pedidos que esperan a la paquetería: el botón vive en «Por enviar». */}
+      {pestana === "por-enviar" && visibles.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-tarjeta border border-linea bg-superficie p-3">
+          <p className="cuerpo text-texto-suave">
+            Imprima las etiquetas para identificar {visibles.length === 1 ? "el paquete al entregarlo" : `los ${visibles.length} paquetes al entregarlos`} a la paquetería.
+          </p>
+          <Link href="/despacho/etiquetas" target="_blank" rel="noopener" className="cuerpo-fuerte inline-flex h-10 items-center gap-2 rounded-campo border border-linea bg-superficie px-4 hover:bg-fondo max-md:min-h-11">
+            <Printer className="size-4" aria-hidden />
+            Etiquetas de envío
+          </Link>
+        </div>
+      )}
       {fallo && !datos && <p role="alert" className="meta text-error">No se pudo cargar. Se reintenta solo.</p>}
       {datos && visibles.length === 0 ? (
-        <EstadoVacio icono={Truck} titulo="No hay pedidos aquí" descripcion={pestana === "por-preparar" ? "Cuando se confirme el pago de un pedido aparecerá en esta lista." : "Nada por ahora."} />
+        <EstadoVacio
+          icono={Truck}
+          titulo="No hay pedidos aquí"
+          descripcion={pestana === "por-preparar" ? "Cuando se confirme el pago de un pedido aparecerá en esta lista." : pestana === "por-enviar" ? "Aquí quedan los pedidos empacados, con la paquetería elegida, hasta que se marquen como enviados." : "Nada por ahora."}
+        />
       ) : (
         <ul className="grid gap-4 lg:grid-cols-2">
           {visibles.map((p) => (
@@ -117,6 +145,7 @@ export function ListaDespacho({ paqueterias }: { paqueterias: string[] }) {
                 <InsigniaEstado estado={p.estado} />
               </div>
               {p.entrega === "envio" && p.direccion && <p className="cuerpo whitespace-pre-wrap">{p.direccion}</p>}
+              {p.estado === "pendiente_envio" && !p.guia && <p className="cuerpo-fuerte">{p.paqueteria ? `Sale por ${p.paqueteria}` : "Entrega propia"}</p>}
               {p.guia && (
                 <p className="meta text-texto-suave">
                   {p.paqueteria ? `${p.paqueteria} · ` : ""}Guía: {p.guia}
@@ -185,11 +214,21 @@ export function ListaDespacho({ paqueterias }: { paqueterias: string[] }) {
           </form>
         )}
       </Modal>
+      <ModalPendienteEnvio
+        abierto={!!pendiente}
+        codigo={pendiente?.codigo ?? ""}
+        paqueterias={paqueterias}
+        actual={pendiente?.paqueteria}
+        trabajando={trabajando}
+        error={errorEnvio}
+        onCerrar={() => setPendiente(null)}
+        onConfirmar={(paq) => pendiente && void aPendiente(pendiente, paq)}
+      />
       <ModalEnviado
         abierto={!!enviando}
         codigo={enviando?.codigo ?? ""}
-        paqueterias={paqueterias}
-        guiaActual={enviando ? { paqueteria: enviando.paqueteria, guia: enviando.guia } : undefined}
+        paqueteria={enviando?.paqueteria ?? null}
+        guiaActual={enviando?.guia}
         archivoActual={enviando?.guiaArchivo?.nombre}
         trabajando={trabajando}
         error={errorEnvio}

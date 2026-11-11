@@ -7,7 +7,7 @@ import { db } from "@/lib/db";
 import { puedeCancelarPedido, puedeDescontar, puedeSobrePedido, puedeVerificarPagos } from "@/lib/permisos";
 import { obtenerAjustesPedidos } from "@/lib/pedidos/ajustes";
 import { cambiarEstado } from "@/lib/pedidos/flujo";
-import { avanzarPedido, marcarEnviado } from "@/lib/pedidos/gestion";
+import { avanzarPedido, marcarEnviado, marcarPendienteEnvio } from "@/lib/pedidos/gestion";
 import { unlink } from "node:fs/promises";
 import path from "node:path";
 import { vencerReservas } from "@/lib/pedidos/vencimiento";
@@ -167,14 +167,15 @@ describe("vencimiento de reservas y avisos de estado (con base de datos)", () =>
     await db.order.update({ where: { id: envio.id }, data: { estado: "preparando" } });
     assert.equal((await avanzarPedido(envio.id, "listo_para_recoger", agente)).ok, false); // un envío no se «recoge»
     const directo = await avanzarPedido(envio.id, "enviado", agente);
-    assert.ok(!directo.ok && /cómo sale/i.test(directo.error)); // «enviado» solo entra por marcarEnviado, que valida la guía
+    assert.ok(!directo.ok && /guía/i.test(directo.error)); // «enviado» solo entra por marcarEnviado, que valida la guía
+    assert.ok((await marcarPendienteEnvio(envio.id, agente, "Forza")).ok); // antes de enviarlo, por dónde sale
     const png = new File([Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(24)])], "guía forza.png", { type: "image/png" });
-    const sinGuia = await marcarEnviado(envio.id, agente, { paqueteria: "Forza", guia: "   ", archivo: png });
+    const sinGuia = await marcarEnviado(envio.id, agente, { guia: "   ", archivo: png });
     assert.ok(!sinGuia.ok && /número de guía/i.test(sinGuia.error));
-    const sinArchivo = await marcarEnviado(envio.id, agente, { paqueteria: "Forza", guia: "GT123456", archivo: null });
+    const sinArchivo = await marcarEnviado(envio.id, agente, { guia: "GT123456", archivo: null });
     assert.ok(!sinArchivo.ok && /Adjunte la guía/.test(sinArchivo.error));
-    assert.equal(await estado(envio.id), "preparando");
-    const e = await marcarEnviado(envio.id, agente, { paqueteria: "Forza", guia: "GT123456", archivo: png });
+    assert.equal(await estado(envio.id), "pendiente_envio");
+    const e = await marcarEnviado(envio.id, agente, { guia: "GT123456", archivo: png });
     assert.ok(e.ok && e.guia?.estado === "enviada", JSON.stringify(e));
     const o = await db.order.findUniqueOrThrow({ where: { id: envio.id } });
     assert.deepEqual([o.guia, o.paqueteria, o.guiaArchivoNombre], ["GT123456", "Forza", "guía forza.png"]);
