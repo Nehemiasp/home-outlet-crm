@@ -106,10 +106,10 @@ export async function leyendaDeProducto(productId: string) {
 
 /* ── Plantillas aprobadas (fuera de la ventana de 24 horas son lo único que se puede enviar) ── */
 type ComponentePlantilla = { type: string; format?: string; text?: string; buttons?: { type: string; url?: string }[] };
-type PlantillaMeta = { name: string; language: string; status: string; category: string; components?: ComponentePlantilla[] };
+export type PlantillaMeta = { name: string; language: string; status: string; category: string; components?: ComponentePlantilla[] };
 
 /** Solo las que el sistema sabe llenar: variables numeradas en el cuerpo y nada de medios, ni códigos, ni variables en botones. */
-function plantillaSoportada(p: PlantillaMeta): PlantillaCanal | null {
+export function plantillaSoportada(p: PlantillaMeta): PlantillaCanal | null {
   if (p.status !== "APPROVED" || p.category === "AUTHENTICATION") return null;
   const partes = p.components ?? [];
   if (partes.some((c) => !["HEADER", "BODY", "FOOTER", "BUTTONS"].includes(c.type))) return null; // carrusel, ofertas limitadas, etc.

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { CheckCircle2, CircleDashed } from "lucide-react";
 import { Insignia, InsigniaCanal } from "@/components/ui/etiquetas";
-import { estadoCanales } from "@/lib/canales";
+import { estadoCanales, whatsappPorYCloud } from "@/lib/canales";
 import type { Channel } from "@/lib/canales/tipos";
 
 export const metadata: Metadata = { title: "Canales · Ajustes · Home Outlet" };
@@ -20,8 +20,16 @@ const VARIABLES: Partial<Record<Channel, string[]>> = {
   tiktok: ["TIKTOK_ACCESS_TOKEN", "TIKTOK_BUSINESS_ID", "TIKTOK_APP_SECRET"],
 };
 
+/** Con WHATSAPP_PROVEEDOR=ycloud, WhatsApp va por YCloud (coexistencia con la app del celular). */
+const NOTA_YCLOUD =
+  "Conectado por YCloud con coexistencia: el número sigue funcionando en la app de WhatsApp Business del celular y en WhatsApp Web, y lo que se escriba desde ahí también aparece aquí. Webhook en YCloud: https://<dominio>/api/webhooks/whatsapp.";
+const VARIABLES_YCLOUD = ["YCLOUD_API_KEY", "YCLOUD_WEBHOOK_SECRET", "YCLOUD_NUMERO"];
+
 export default function Canales() {
   const canales = estadoCanales();
+  const porYCloud = whatsappPorYCloud();
+  const nota = (c: Channel) => (c === "whatsapp" && porYCloud ? NOTA_YCLOUD : NOTAS[c]);
+  const variables = (c: Channel) => (c === "whatsapp" && porYCloud ? VARIABLES_YCLOUD : VARIABLES[c]);
   return (
     <section aria-label="Canales" className="flex max-w-3xl flex-col gap-4">
       <p className="cuerpo text-texto-suave">Estado de cada canal por el que pueden escribir los clientes. Los canales se activan en la configuración del servidor, no desde esta pantalla.</p>
@@ -34,12 +42,12 @@ export default function Canales() {
                 {c.activo ? "Activo" : "Pendiente de conexión"}
               </Insignia>
             </div>
-            <p className="cuerpo text-texto-suave">{NOTAS[c.canal]}</p>
-            {VARIABLES[c.canal] && (
+            <p className="cuerpo text-texto-suave">{nota(c.canal)}</p>
+            {variables(c.canal) && (
               <div>
                 <p className="cuerpo-fuerte">Datos que hacen falta</p>
                 <ul className="meta mt-1 flex flex-col gap-1">
-                  {VARIABLES[c.canal]!.map((v) => {
+                  {variables(c.canal)!.map((v) => {
                     const falta = c.faltantes.includes(v);
                     return (
                       <li key={v} className={falta ? "text-aviso" : "text-exito"}>

@@ -2,9 +2,13 @@ import { adaptadorSimulado } from "./simulado";
 import { adaptadorFacebook, adaptadorInstagram, metaFaltantes } from "./meta-mensajeria";
 import { adaptadorTikTok, tiktokFaltantes } from "./tiktok";
 import { adaptadorWhatsApp, whatsappFaltantes } from "./whatsapp";
+import { adaptadorYCloud, ycloudFaltantes } from "./ycloud";
 import { CANALES, type Channel, type ChannelAdapter } from "./tipos";
 
 export { CANALES };
+
+/** WhatsApp se conecta directo con Meta (de fábrica) o por YCloud con WHATSAPP_PROVEEDOR=ycloud (para la coexistencia). */
+export const whatsappPorYCloud = () => process.env.WHATSAPP_PROVEEDOR?.trim().toLowerCase() === "ycloud";
 
 const adaptadores: Record<Channel, ChannelAdapter> = {
   simulado: adaptadorSimulado,
@@ -16,7 +20,7 @@ const adaptadores: Record<Channel, ChannelAdapter> = {
 
 /** Variables de entorno que faltan para conectar el canal (vacío = listo). */
 const faltantes = (canal: Channel): string[] =>
-  canal === "whatsapp" ? [...whatsappFaltantes()] : canal === "facebook" || canal === "instagram" ? [...metaFaltantes(canal)] : canal === "tiktok" ? [...tiktokFaltantes()] : [];
+  canal === "whatsapp" ? [...(whatsappPorYCloud() ? ycloudFaltantes() : whatsappFaltantes())] : canal === "facebook" || canal === "instagram" ? [...metaFaltantes(canal)] : canal === "tiktok" ? [...tiktokFaltantes()] : [];
 
 /** CHANNELS_ENABLED=simulado,whatsapp */
 export function canalesHabilitados(valor = process.env.CHANNELS_ENABLED ?? "") {
@@ -27,7 +31,7 @@ export function canalesHabilitados(valor = process.env.CHANNELS_ENABLED ?? "") {
 export function adaptador(canal: Channel): ChannelAdapter | null {
   if (!canalesHabilitados().has(canal)) return null;
   if (faltantes(canal).length) return null;
-  return adaptadores[canal];
+  return canal === "whatsapp" && whatsappPorYCloud() ? adaptadorYCloud : adaptadores[canal];
 }
 
 /** Para la pantalla de Ajustes: estado de cada canal y qué datos faltan. */

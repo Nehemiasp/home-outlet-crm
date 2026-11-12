@@ -1,5 +1,5 @@
 import { adaptador } from "@/lib/canales";
-import type { Channel, InboundMessage, OutboundMessage } from "@/lib/canales/tipos";
+import type { Channel, InboundMessage, MensajeSincronizado, OutboundMessage } from "@/lib/canales/tipos";
 import { textoVentanaCerrada } from "@/lib/canales/ventana";
 import { db } from "@/lib/db";
 import { alResponder } from "@/lib/equipo/compartida";
@@ -54,6 +54,77 @@ export async function recibirMensaje(m: InboundMessage): Promise<{ duplicado: bo
     });
   } catch (e) {
     if (duplicado(e)) return { duplicado: true }; // llegó dos veces al mismo tiempo
+    throw e;
+  }
+}
+
+/**
+ * Guarda un mensaje que no pasó por el CRM (WhatsApp con coexistencia). Idempotente por `externalMessageId`.
+ *  - «eco»: lo que el equipo escribió desde la app de WhatsApp Business o WhatsApp Web. Queda como mensaje del equipo (sin
+ *    persona: no se sabe quién lo escribió) y, como en cualquier respuesta de una persona, el asistente deja de contestar en esa
+ *    conversación. Si estaba cerrada, se reabre.
+ *  - «historial»: lo que se sincroniza al conectar el número (hasta 6 meses). Se guarda con su fecha original, sin avisos, sin
+ *    contar como no leído, sin despertar al asistente y sin reabrir nada: una conversación creada solo por el historial queda
+ *    cerrada y con la fecha de su primer mensaje (así no aparece como conversación nueva de hoy en los reportes).
+ */
+export async function guardarSincronizado(m: MensajeSincronizado, origen: "eco" | "historial"): Promise<{ duplicado: boolean; conversacionId?: string }> {
+  if (await db.message.findUnique({ where: { externalMessageId: m.externalMessageId }, select: { id: true } })) return { duplicado: true };
+  try {
+    return await db.$transaction(async (tx) => {
+      const identidad = await tx.channelIdentity.findUnique({ where: { canal_externalContactId: { canal: m.channel, externalContactId: m.externalContactId } } });
+      let contactoId = identidad?.contactoId;
+      if (!contactoId) {
+        const telefono = conTelefono(m.channel) ? normalizarTelefono(m.externalContactId) : null;
+        const existente = telefono ? await tx.contact.findUnique({ where: { telefono } }) : null;
+        const contacto = existente ?? (await tx.contact.create({ data: { nombre: m.contactName?.trim() || telefono || "Cliente nuevo", telefono } }));
+        contactoId = contacto.id;
+        await tx.channelIdentity.create({ data: { contactoId, canal: m.channel, externalContactId: m.externalContactId, alias: conTelefono(m.channel) ? null : (m.contactName ?? null) } });
+      }
+
+      const entrante = m.direccion === "entrante";
+      const previa = await tx.conversation.findFirst({ where: { contactoId, canal: m.channel }, orderBy: { lastMessageAt: "desc" } });
+      let conversacionId: string;
+      if (!previa) {
+        conversacionId = (
+          await tx.conversation.create({
+            data: {
+              contactoId, canal: m.channel, creada: m.timestamp, lastMessageAt: m.timestamp, lastInboundAt: entrante ? m.timestamp : null,
+              ...(origen === "historial" ? { estado: "cerrada" as const } : { atendidaPor: "asesor" as const }),
+            },
+          })
+        ).id;
+      } else {
+        conversacionId = previa.id;
+        const mas = (a: Date | null) => !a || m.timestamp > a; // el historial llega desordenado: solo se avanza, nunca se retrocede
+        await tx.conversation.update({
+          where: { id: previa.id },
+          data: {
+            ...(mas(previa.lastMessageAt) ? { lastMessageAt: m.timestamp } : {}),
+            ...(entrante && mas(previa.lastInboundAt) ? { lastInboundAt: m.timestamp } : {}),
+            ...(m.timestamp < previa.creada ? { creada: m.timestamp } : {}),
+            // Un eco es una persona del equipo respondiendo: el asistente se aparta y la conversación vuelve a estar abierta.
+            ...(origen === "eco" ? { atendidaPor: "asesor" as const, esperandoAsesorDesde: null, ...(previa.estado === "cerrada" ? { estado: "abierta" as const } : {}) } : {}),
+          },
+        });
+      }
+
+      await tx.message.create({
+        data: {
+          conversacionId,
+          direccion: m.direccion,
+          autor: entrante ? "cliente" : "asesor",
+          tipo: m.type,
+          texto: m.text,
+          archivoUrl: m.mediaUrl,
+          externalMessageId: m.externalMessageId,
+          estado: entrante ? undefined : "enviado",
+          fecha: m.timestamp,
+        },
+      });
+      return { duplicado: false, conversacionId };
+    });
+  } catch (e) {
+    if (duplicado(e)) return { duplicado: true };
     throw e;
   }
 }

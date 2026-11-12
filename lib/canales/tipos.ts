@@ -9,7 +9,7 @@ export type Channel = (typeof CANALES)[number];
  */
 export class ErrorDeCanal extends Error {
   readonly seguro = true;
-  constructor(canal: string, estado: number, codigo?: number, explicacion?: string) {
+  constructor(canal: string, estado: number, codigo?: number | string, explicacion?: string) {
     super(`${canal} respondió ${estado}${codigo ? ` (código ${codigo})` : ""}${explicacion ? `: ${explicacion}` : ""}`);
     this.name = "ErrorDeCanal";
   }
@@ -24,6 +24,15 @@ export interface InboundMessage {
   text?: string;
   mediaUrl?: string;
   timestamp: Date;
+}
+
+/**
+ * Un mensaje que no pasó por el CRM pero hay que guardar (WhatsApp con coexistencia): lo que el equipo escribió desde la app de
+ * WhatsApp Business o WhatsApp Web («eco»), o un mensaje del historial que se sincroniza al conectar el número.
+ */
+export interface MensajeSincronizado extends Omit<InboundMessage, "channel"> {
+  channel: Channel;
+  direccion: "entrante" | "saliente";
 }
 
 export interface OutboundMessage {
@@ -66,7 +75,8 @@ export interface ChannelAdapter {
   maxSalientes?: number;
   /** Cuántos mensajes de la plataforma ocupa este envío (un texto largo o una tarjeta de producto salen en varios). Sin esto, uno. */
   contarMensajes?(m: OutboundMessage): number;
-  parseWebhook(req: Request): Promise<{ messages: InboundMessage[]; statuses: StatusUpdate[] }>;
+  /** `ecos` e `historial`: solo con coexistencia (WhatsApp por YCloud). Ver `MensajeSincronizado`. */
+  parseWebhook(req: Request): Promise<{ messages: InboundMessage[]; statuses: StatusUpdate[]; ecos?: MensajeSincronizado[]; historial?: MensajeSincronizado[] }>;
   verifyWebhook(req: Request): Promise<boolean>;
   /** Respuesta al GET con que Meta comprueba la dirección del webhook: el `hub.challenge`, o null si el token no coincide. */
   verifySubscription?(url: URL): string | null;

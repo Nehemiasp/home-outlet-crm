@@ -5,7 +5,7 @@ import { aplicarEstado } from "@/lib/estado-entrega";
 import { procesarMensajeEntrante } from "@/lib/ia/atencion";
 import { ipDelCliente } from "@/lib/ip";
 import { minutosBloqueado, registrarFallo } from "@/lib/limite-intentos";
-import { recibirMensaje } from "@/lib/mensajeria";
+import { guardarSincronizado, recibirMensaje } from "@/lib/mensajeria";
 import { registrarError } from "@/lib/registro";
 
 // Webhook común. Nunca se registran tokens ni contenido de mensajes, solo el canal y el tipo de error.
@@ -44,12 +44,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ canal: 
   // Responder rápido y procesar después.
   after(async () => {
     try {
-      const { messages, statuses } = await adp.parseWebhook(copia());
+      const { messages, statuses, ecos = [], historial = [] } = await adp.parseWebhook(copia());
       for (const m of messages) {
         const r = await recibirMensaje(m);
         if (!r.duplicado && r.conversacionId) await procesarMensajeEntrante(r.conversacionId);
       }
       for (const s of statuses) await aplicarEstado(s);
+      // Coexistencia (WhatsApp por YCloud): lo escrito desde la app del celular y el historial sincronizado. No despiertan al asistente.
+      for (const m of ecos) await guardarSincronizado(m, "eco");
+      for (const m of historial) await guardarSincronizado(m, "historial");
     } catch (e) {
       registrarError(`webhook ${canal}`, e);
     }
