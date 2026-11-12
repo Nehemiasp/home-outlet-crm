@@ -61,6 +61,16 @@ export async function revisarGuia(archivo: unknown): Promise<{ ok: true; archivo
 }
 
 /** Valida y guarda una imagen que llegó en un formulario (JPG, PNG o WebP de hasta 5 MB). */
+/** Un comprobante de pago subido a mano: foto (JPG, PNG o WebP) o PDF (por ejemplo, el de Paggo), de hasta 5 MB. */
+export async function guardarComprobanteSubido(archivo: unknown): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
+  if (!(archivo instanceof File) || archivo.size === 0) return { ok: false, error: "Adjunte la foto o el PDF del comprobante." };
+  if (archivo.size > MAX_BYTES) return { ok: false, error: "El archivo pesa más de 5 MB. Elija uno más liviano." };
+  const buffer = Buffer.from(await archivo.arrayBuffer());
+  const ext = extensionDeGuia(buffer);
+  if (!ext) return { ok: false, error: "Solo se aceptan fotos JPG, PNG o WebP, o un PDF." };
+  return { ok: true, url: (await almacenamiento.guardar(buffer, ext)).url };
+}
+
 export async function guardarImagenSubida(archivo: unknown): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
   if (!(archivo instanceof File) || archivo.size === 0) return { ok: false, error: "Elija una imagen." };
   if (archivo.size > MAX_BYTES) return { ok: false, error: "La imagen pesa más de 5 MB. Elija una más liviana." };

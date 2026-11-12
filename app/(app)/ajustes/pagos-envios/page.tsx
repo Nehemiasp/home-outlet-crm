@@ -6,7 +6,6 @@ import { AjustesDePedidos } from "./pedidos";
 import { Mensajes } from "./mensajes";
 import { Zonas } from "./zonas";
 import { configMensajes } from "@/lib/pedidos/avisos";
-import { pasarela } from "@/lib/pagos-tarjeta";
 
 export const metadata: Metadata = { title: "Pagos y envíos · Ajustes · Home Outlet" };
 
@@ -24,7 +23,6 @@ export default async function Pagina() {
     <div className="flex max-w-3xl flex-col gap-6">
       <AjustesDePedidos
         ubicaciones={ubicaciones}
-        tarjetaConectada={!!pasarela()}
         inicial={{
           prefijo: a.prefijo,
           horasReserva: String(a.horasReserva),

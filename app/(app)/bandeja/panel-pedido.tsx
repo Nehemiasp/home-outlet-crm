@@ -42,6 +42,7 @@ export function PanelPedido({ abierto, onCerrar, conversacionId, puedeEnviar, on
   const [entrega, setEntrega] = useState<"recoger" | "envio">("recoger");
   const [recogerEn, setRecogerEn] = useState<string | null>(null); // null = la tienda de Ajustes
   const [metodoPago, setMetodoPago] = useState<TipoPago | null>(null);
+  const [enlacePago, setEnlacePago] = useState(""); // con tarjeta: el enlace que genera el negocio en Paggo
   const [direccion, setDireccion] = useState("");
   const [referencia, setReferencia] = useState("");
   const [descTipo, setDescTipo] = useState<"monto" | "porcentaje">("monto");
@@ -65,6 +66,7 @@ export function PanelPedido({ abierto, onCerrar, conversacionId, puedeEnviar, on
     setEntrega("recoger");
     setRecogerEn(null);
     setMetodoPago(d.metodosPago.length === 1 ? d.metodosPago[0]!.id : null); // con una sola opción no hay nada que elegir
+    setEnlacePago("");
     setDireccion("");
     setReferencia("");
     setDescTipo("monto");
@@ -201,7 +203,7 @@ export function PanelPedido({ abierto, onCerrar, conversacionId, puedeEnviar, on
     setTrabajando(true);
     setError("");
     const modo = puedeEnviar ? "enviar" : "copiado";
-    const r = await enviarPedido(entrada, modo, sobrePedido);
+    const r = await enviarPedido(entrada, modo, sobrePedido, metodoPago === "tarjeta" ? enlacePago : "");
     setTrabajando(false);
     if (!r.ok) {
       onCambio(); // si falló después de apartar, el pedido ya cambió de estado
@@ -248,7 +250,7 @@ export function PanelPedido({ abierto, onCerrar, conversacionId, puedeEnviar, on
   const tiendaRecoger = recogerEn ?? datos?.ubicacionPorEntrega.recoger ?? null;
   const ubicacionDeLinea = (l: Linea) => l.ubicacionId ?? (entrega === "recoger" ? tiendaRecoger : datos?.ubicacionPorEntrega.envio) ?? null;
   const formas = (datos?.metodosPago ?? []).filter((m) => compatibleConEntrega(m.id, entrega)); // el efectivo solo si el cliente recoge
-  const bloqueado = !vista || !!errorVista || lineas.length === 0 || !metodoPago || (vista.sinExistencia && !(datos?.sinLimites && sobrePedido));
+  const bloqueado = !vista || !!errorVista || lineas.length === 0 || !metodoPago || (metodoPago === "tarjeta" && !enlacePago.trim()) || (vista.sinExistencia && !(datos?.sinLimites && sobrePedido));
 
   return (
     <PanelLateral abierto={abierto} onCerrar={onCerrar} titulo="Crear pedido">
@@ -478,9 +480,22 @@ export function PanelPedido({ abierto, onCerrar, conversacionId, puedeEnviar, on
                     </label>
                   ))}
                 </div>
+                {metodoPago === "tarjeta" && (
+                  <CampoTexto
+                    etiqueta="Enlace de pago (Paggo)"
+                    type="url"
+                    inputMode="url"
+                    autoComplete="off"
+                    placeholder="https://…"
+                    maxLength={500}
+                    value={enlacePago}
+                    onChange={(e) => setEnlacePago(e.target.value)}
+                    ayuda={vista ? `Genérelo en Paggo por ${formatQ(vista.total)} y péguelo aquí. Sale junto con el resumen del pedido.` : "Genérelo en Paggo por el total del pedido y péguelo aquí."}
+                  />
+                )}
                 <p className="meta text-texto-suave" aria-live="polite">
                   {metodoPago === "tarjeta"
-                    ? "Al enviar el pedido, el cliente recibe también un enlace seguro para pagar con tarjeta."
+                    ? "Cuando el cliente pague, registre el pago con el número de transacción y la captura o el PDF del comprobante."
                     : metodoPago === "efectivo_en_tienda"
                       ? "El cliente paga en efectivo al recoger. El pago se registra y se confirma cuando llegue."
                       : metodoPago === "contra_entrega"

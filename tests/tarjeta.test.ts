@@ -138,7 +138,7 @@ describe("pago con tarjeta de un pedido (con base de datos)", () => {
     assert.equal(r.monto, 75_000);
   });
 
-  test("no se puede enviar si el pedido no espera pago, si la tarjeta está apagada o si no hay pasarela", async () => {
+  test("no se puede enviar si el pedido no espera pago o la tarjeta está apagada; sin pasarela hace falta pegar el enlace", async () => {
     const o = await pedido();
     await cambiarEstado({ pedidoId: o.id, a: "cancelado", quien: { usuarioId: admin.id } });
     const cancelado = await crearEnlaceDePago(o.id, admin);
@@ -152,9 +152,16 @@ describe("pago con tarjeta de un pedido (con base de datos)", () => {
     await db.ajustesPedidos.update({ where: { id: "pedidos" }, data: { metodos: ["transferencia", "deposito", "tarjeta"] } });
 
     delete process.env.PASARELA;
-    const sinPasarela = await crearEnlaceDePago(o2.id, admin);
-    assert.ok(!sinPasarela.ok && /pasarela/.test(sinPasarela.error));
-    process.env.PASARELA = "simulada";
+    try {
+      const sinEnlace = await crearEnlaceDePago(o2.id, admin);
+      assert.ok(!sinEnlace.ok && /enlace de pago/.test(sinEnlace.error));
+      const pegado = await crearEnlaceDePago(o2.id, admin, "https://app.paggoapp.com/pay/PRUEBA-T");
+      assert.ok(pegado.ok && pegado.url === "https://app.paggoapp.com/pay/PRUEBA-T" && !pegado.reutilizado);
+      const otraVez = await crearEnlaceDePago(o2.id, admin); // sin enlace nuevo: se reenvía el abierto
+      assert.ok(otraVez.ok && otraVez.reutilizado && otraVez.url === "https://app.paggoapp.com/pay/PRUEBA-T");
+    } finally {
+      process.env.PASARELA = "simulada";
+    }
     assert.equal((await crearEnlaceDePago((await pedido()).id, { ...admin, rol: "agente" })).ok, true, "cualquiera que vea el pedido puede mandar el enlace (la acción valida la visibilidad)");
   });
 
@@ -252,13 +259,15 @@ describe("pago con tarjeta de un pedido (con base de datos)", () => {
     process.env.PASARELA = "simulada";
   });
 
-  test("encender la tarjeta en Ajustes exige una pasarela conectada", async () => {
+  test("encender la tarjeta en Ajustes ya no exige pasarela", async () => {
     const a = await obtenerAjustesPedidos();
     const entrada = { prefijo: a.prefijo, horasReserva: a.horasReserva, diasCotizacion: a.diasCotizacion, paqueterias: a.paqueterias, descuentoMaxAgente: a.descuentoMaxAgente, inventario: a.inventario, metodos: ["transferencia", "tarjeta"], envioGratisDesde: a.envioGratisDesde !== null ? (a.envioGratisDesde / 100).toFixed(2) : "", costoContraEntrega: (a.costoContraEntrega / 100).toFixed(2), envioGratisSinContraEntrega: a.envioGratisSinContraEntrega, ubicacionRecogerId: a.ubicacionRecogerId, ubicacionEnvioId: a.ubicacionEnvioId };
     delete process.env.PASARELA;
-    const sin = await guardarAjustesPedidos(entrada, admin);
-    assert.ok(!sin.ok && /pasarela de pago/.test(sin.error));
-    process.env.PASARELA = "simulada";
+    try {
+      assert.deepEqual(await guardarAjustesPedidos(entrada, admin), { ok: true });
+    } finally {
+      process.env.PASARELA = "simulada";
+    }
     assert.deepEqual(await guardarAjustesPedidos(entrada, admin), { ok: true });
   });
 });

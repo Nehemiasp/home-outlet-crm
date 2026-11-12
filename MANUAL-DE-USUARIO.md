@@ -164,7 +164,7 @@ Desde la conversación: botón **Crear pedido** (se abre un panel).
 7. Revise el **Resumen** (lo calcula el servidor, no se puede alterar).
 8. **Guardar borrador** (no aparta nada) o **Enviar al cliente**: aparta las existencias y le manda el resumen. Lo que lleva el resumen depende de la forma de pago:
    - **Transferencia o depósito:** las cuentas bancarias.
-   - **Tarjeta:** un enlace seguro para pagar (no lleva cuentas).
+   - **Tarjeta:** el enlace de pago de Paggo que usted pega (no lleva cuentas). Con **Tarjeta** aparece el campo **Enlace de pago (Paggo)**: genere el enlace en Paggo por el total que muestra el panel y péguelo; sin él no se puede enviar.
    - **Efectivo:** «Pagará en efectivo al recoger».
 
 En la lista de **Pedidos** y en el detalle se ve la forma de pago elegida.
@@ -186,8 +186,13 @@ En **Pedidos → Por verificar** (o en el detalle: **Verificar pago**) se ve el 
 - **Rechazar:** escriba el motivo; puede editar el mensaje que recibirá el cliente. El pedido vuelve a **Pendiente de pago**.
 - **Pagos parciales:** si se paga una parte, el pedido muestra «Pagado Q800 de Q1,250 · Falta Q450» y vuelve a esperar el resto (ya no vence solo).
 
-### Pago con tarjeta
-Se elige al crear el pedido (**Forma de pago → Tarjeta**) y el administrador tiene que haberla activado. El resumen que recibe el cliente ya trae el enlace seguro. Cuando el cliente paga, el pedido pasa solo a **Pagado**, sin que nadie verifique. Si necesita reenviar el enlace, en el detalle del pedido use **Reenviar enlace de pago**. Si el monto no coincide, o el pedido ya no esperaba pago, queda **en revisión** con un aviso para que lo resuelva una persona.
+### Pago con tarjeta (enlace de Paggo)
+El sistema no cobra la tarjeta: el enlace lo genera el negocio en **Paggo** y se pega en el pedido.
+1. Al crear el pedido elija **Forma de pago → Tarjeta** (el administrador tiene que haberla activado). Genere en Paggo un enlace por el total, péguelo en **Enlace de pago (Paggo)** y use **Enviar al cliente**: el enlace va dentro del resumen. Tiene que empezar con `https://`.
+2. Cuando el cliente pague, pídale la captura o el PDF del comprobante de Paggo. En el detalle del pedido use **Registrar comprobante**: adjunte la captura o el PDF y escriba el **número de transacción** (los dos son obligatorios; con tarjeta no se pide banco).
+3. Confírmelo con **Verificar pago**, igual que una transferencia. Al verificarse el total, el pedido pasa a **Pagado** y el enlace deja de verse como pendiente.
+
+Para mandar el enlace otra vez, en el detalle use **Reenviar enlace de pago**: trae el enlace anterior ya puesto; si generó uno nuevo en Paggo (por ejemplo, por otro monto), péguelo en su lugar.
 
 ### Pago en efectivo
 El cliente paga en la tienda al recoger. Cuando llegue, registre el pago (**Registrar comprobante**, método **Efectivo en la tienda**) y confírmelo con **Verificar pago**.
@@ -202,7 +207,7 @@ El cliente paga al recibir su pedido. Solo se puede elegir con **Envío**.
 - Si el cliente cambia de forma de pago mientras está pendiente, el total se vuelve a calcular con el envío que corresponda.
 
 ### Si el cliente cambia de idea
-Mientras el pedido siga **pendiente de pago**, en el detalle use **Cambiar forma de pago** y elija la nueva: el sistema le manda al cliente el resumen actualizado (con el enlace si es tarjeta, con las cuentas si es banco). Si ya hay un comprobante por verificar, primero resuélvalo. Si cambió **desde tarjeta** y el cliente igualmente pagó el enlace anterior, ese pago queda **en revisión** (no se pierde) para que lo revise una persona.
+Mientras el pedido siga **pendiente de pago**, en el detalle use **Cambiar forma de pago** y elija la nueva: el sistema le manda al cliente el resumen actualizado (con las cuentas si es banco; si cambia a tarjeta, le pide pegar el enlace de Paggo antes de enviarlo). Si ya hay un comprobante por verificar, primero resuélvalo. Si cambió **desde tarjeta** y el cliente igualmente pagó el enlace anterior, ese pago queda **en revisión** (no se pierde) para que lo revise una persona.
 
 ### Estados de un pedido
 **Borrador → Pendiente de pago → Pago en revisión → Pagado → Preparando →** para recoger: **Listo para recoger → Entregado**; con envío: **Pendiente de envío → Enviado → Entregado.** También **Cancelado** y **Vencido**.
@@ -279,7 +284,7 @@ Al entrar, si aún faltan cosas para trabajar con datos reales, se abre **Primer
 | **Asistente** | Encendido, mensaje de bienvenida, canales donde responde, tope mensual de gasto, **Preguntas frecuentes** y una zona para **probar** al asistente |
 | **Canales** | Qué canales están conectados y qué falta de cada uno |
 | **Datos del negocio** | Nombre, dirección, horario semanal, y los textos de formas de pago, envíos y garantía que usa el asistente |
-| **Pagos y envíos** | Métodos de pago activos (son las opciones que se pueden elegir al crear un pedido; la tarjeta solo se puede activar si hay una pasarela conectada), prefijo y horas de reserva, días que vale una cotización, descuento máximo del agente, **paqueterías** (una por línea; se eligen al marcar un pedido como enviado), inventario separado o compartido, envío gratis, **cuentas bancarias**, la **dirección de cada tienda** (la que recibe el cliente cuando recoge), **zonas de envío** (cada una cubre departamentos enteros o solo algunos municipios; la que no marca ninguno vale para «el resto del país»; dicen el tiempo de entrega, y no llevan costo mientras el envío lo ponga la forma de pago: Q35 contra entrega; con las demás, gratis desde Q200 y Q35 por debajo) y los **mensajes** que se mandan al cliente (se pueden editar y apagar) |
+| **Pagos y envíos** | Métodos de pago activos (son las opciones que se pueden elegir al crear un pedido; con la tarjeta se pega el enlace de Paggo al enviar el pedido), prefijo y horas de reserva, días que vale una cotización, descuento máximo del agente, **paqueterías** (una por línea; se eligen al marcar un pedido como enviado), inventario separado o compartido, envío gratis, **cuentas bancarias**, la **dirección de cada tienda** (la que recibe el cliente cuando recoge), **zonas de envío** (cada una cubre departamentos enteros o solo algunos municipios; la que no marca ninguno vale para «el resto del país»; dicen el tiempo de entrega, y no llevan costo mientras el envío lo ponga la forma de pago: Q35 contra entrega; con las demás, gratis desde Q200 y Q35 por debajo) y los **mensajes** que se mandan al cliente (se pueden editar y apagar) |
 
 **Importante al dar de baja a alguien:** *Desactivar* bloquea su entrada al instante y deja sin asignar sus conversaciones para que nadie quede esperando. Siempre debe quedar al menos un administrador activo.
 

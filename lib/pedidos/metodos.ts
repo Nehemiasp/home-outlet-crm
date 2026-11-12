@@ -20,7 +20,7 @@ export const METODOS: readonly MetodoPago[] = [
   { id: "transferencia", nombre: "Transferencia bancaria", requiereComprobante: true, disponible: true, porDefecto: true },
   { id: "deposito", nombre: "Depósito bancario", requiereComprobante: true, disponible: true, porDefecto: true },
   { id: "efectivo_en_tienda", nombre: "Efectivo en la tienda", requiereComprobante: false, disponible: true, porDefecto: false, nota: "Al recoger el pedido." },
-  { id: "tarjeta", nombre: "Tarjeta de crédito o débito", requiereComprobante: false, disponible: true, porDefecto: false, nota: "Necesita una pasarela de pago conectada." },
+  { id: "tarjeta", nombre: "Tarjeta de crédito o débito", requiereComprobante: false, disponible: true, porDefecto: false, nota: "Al enviar el pedido se pega el enlace de pago (Paggo) y el pago se confirma con su comprobante." },
   { id: "contra_entrega", nombre: "Pago contra entrega", requiereComprobante: false, disponible: true, porDefecto: true, nota: "Solo con envío; el envío cuesta lo que diga abajo." },
 ];
 

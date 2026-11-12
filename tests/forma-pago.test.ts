@@ -118,16 +118,52 @@ describe("forma de pago al crear el pedido (con base de datos)", () => {
     assert.ok(!envio.ok && /efectivo en tienda/i.test(envio.error));
   });
 
-  test("una forma apagada en Ajustes, o la tarjeta sin pasarela, se rechaza al guardar", async () => {
+  test("una forma apagada en Ajustes se rechaza al guardar; la tarjeta ya no necesita pasarela", async () => {
     const p = await producto();
     await ajustar({ metodos: ["transferencia"] });
     const apagada = await guardarBorrador(entrada(p.id, { metodoPago: "deposito" }), admin);
     assert.ok(!apagada.ok && /no está activo/.test(apagada.error));
     await ajustar({ metodos: ["transferencia", "deposito", "efectivo_en_tienda", "tarjeta"] });
     delete process.env.PASARELA;
-    const sin = await guardarBorrador(entrada(p.id, { metodoPago: "tarjeta" }), admin);
-    assert.ok(!sin.ok && /pasarela/.test(sin.error));
-    process.env.PASARELA = "simulada";
+    try {
+      const sin = await guardarBorrador(entrada(p.id, { metodoPago: "tarjeta" }), admin);
+      assert.ok(sin.ok, sin.ok ? "" : sin.error);
+    } finally {
+      process.env.PASARELA = "simulada";
+    }
+  });
+
+  test("tarjeta sin pasarela (Paggo): se pega el enlace al enviar, y el pago se confirma con número de transacción y comprobante", async () => {
+    delete process.env.PASARELA;
+    try {
+      const b = await borrador("tarjeta");
+      const sinEnlace = await enviar(b.id);
+      assert.ok(!sinEnlace.ok && /enlace de pago/.test(sinEnlace.error));
+      const malo = await enviarAlCliente(b.id, admin, { modo: "enviar", sobrePedido: false, enlacePago: "paggo.com/pagar/123" });
+      assert.ok(!malo.ok && /https/.test(malo.error));
+      assert.equal((await db.order.findUniqueOrThrow({ where: { id: b.id } })).estado, "borrador", "sin enlace correcto no se aparta nada");
+
+      const enlace = "https://app.paggoapp.com/pay/PRUEBA-FP-123";
+      const r = await enviarAlCliente(b.id, admin, { modo: "enviar", sobrePedido: false, enlacePago: enlace });
+      assert.ok(r.ok, r.ok ? "" : r.error);
+      assert.ok(r.texto.includes(enlace), "el enlace pegado va dentro del resumen");
+      const [cobro] = await cobros(b.id);
+      assert.deepEqual({ pasarela: cobro!.pasarela, url: cobro!.url, monto: cobro!.monto, estado: cobro!.estado }, { pasarela: "manual", url: enlace, monto: 125_000, estado: "creado" });
+
+      const base = { pedidoId: b.id, tipo: "tarjeta", banco: "", monto: "1,250.00", fecha: new Date().toLocaleDateString("en-CA", { timeZone: "America/Guatemala" }) };
+      const sinReferencia = await registrarPago({ ...base, referencia: "", archivoUrl: "/api/archivos/x.pdf" }, admin);
+      assert.ok(!sinReferencia.ok && /número de transacción/.test(sinReferencia.error));
+      const sinComprobante = await registrarPago({ ...base, referencia: "TX-998877" }, admin);
+      assert.ok(!sinComprobante.ok && /captura o el PDF/.test(sinComprobante.error));
+      const reg = await registrarPago({ ...base, referencia: "TX-998877", archivoUrl: "/api/archivos/00000000-0000-0000-0000-000000000000.pdf" }, admin);
+      assert.ok(reg.ok, reg.ok ? "" : reg.error);
+      const { verificarPago } = await import("@/lib/pedidos/pagos");
+      assert.ok((await verificarPago(reg.ok ? reg.pagoId : "", admin)).ok);
+      assert.equal((await db.order.findUniqueOrThrow({ where: { id: b.id } })).estado, "pagado");
+      assert.equal((await cobros(b.id))[0]!.estado, "pagado", "el enlace deja de verse como «esperando el pago»");
+    } finally {
+      process.env.PASARELA = "simulada";
+    }
   });
 
   test("si el pedido no se puede apartar (no alcanza la existencia), el cobro abierto se cancela y no queda enlace vivo", async () => {
@@ -164,14 +200,17 @@ describe("forma de pago al crear el pedido (con base de datos)", () => {
     assert.deepEqual({ forma: efectivo.formaPago, enlace: efectivo.enlace }, { forma: "efectivo_en_tienda", enlace: null });
   });
 
-  test("el panel ofrece las formas activas, y la tarjeta solo si hay pasarela", async () => {
+  test("el panel ofrece las formas activas, con o sin pasarela (la tarjeta se cobra con el enlace que se pega)", async () => {
     const con = await datosPanel(conv, admin);
     assert.ok(con.ok);
     assert.deepEqual(con.ok && con.datos.metodosPago.map((m) => m.id), ["transferencia", "deposito", "efectivo_en_tienda", "tarjeta"]);
     delete process.env.PASARELA;
-    const sin = await datosPanel(conv, admin);
-    assert.deepEqual(sin.ok && sin.datos.metodosPago.map((m) => m.id), ["transferencia", "deposito", "efectivo_en_tienda"]);
-    process.env.PASARELA = "simulada";
+    try {
+      const sin = await datosPanel(conv, admin);
+      assert.deepEqual(sin.ok && sin.datos.metodosPago.map((m) => m.id), ["transferencia", "deposito", "efectivo_en_tienda", "tarjeta"]);
+    } finally {
+      process.env.PASARELA = "simulada";
+    }
   });
 
   test("el texto del resumen que el administrador edita en Ajustes se usa de verdad", async () => {

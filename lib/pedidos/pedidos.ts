@@ -8,7 +8,6 @@ import { aplicarDatos, textoCuentas } from "@/lib/plantillas";
 import { normalizarTelefono } from "@/lib/telefono";
 import { formatQ, formatTelefono } from "@/lib/utils";
 import { abrirCobro, cancelarCobrosAbiertos } from "@/lib/pagos-tarjeta/abrir";
-import { pasarela } from "@/lib/pagos-tarjeta";
 import type { Prisma, TipoPago } from "@/generated/prisma/client";
 import { listarZonas, obtenerAjustesPedidos, tiendaDeRecoger, tiendasActivas } from "./ajustes";
 import { departamentoOficial, lugarGuardado, municipioOficial, textoLugar } from "@/lib/guatemala";
@@ -30,12 +29,11 @@ type ResultadoAviso = import("./avisos").ResultadoAviso;
 const MAX_LINEAS = 40;
 
 /**
- * Por qué una forma de pago no se puede usar en este pedido, o null si sirve: tiene que estar activa en Ajustes, la tarjeta
- * necesita una pasarela conectada, el efectivo en tienda solo vale cuando el cliente recoge y el pago contra entrega, cuando se envía.
+ * Por qué una forma de pago no se puede usar en este pedido, o null si sirve: tiene que estar activa en Ajustes, el efectivo en
+ * tienda solo vale cuando el cliente recoge y el pago contra entrega, cuando se envía.
  */
 export function errorDeForma(metodo: TipoPago, entrega: "recoger" | "envio", activos: readonly TipoPago[]): string | null {
   if (!activos.includes(metodo)) return `${nombreMetodo(metodo)} no está activo en Ajustes → Pagos y envíos.`;
-  if (metodo === "tarjeta" && !pasarela()) return "El pago con tarjeta necesita una pasarela de pago conectada.";
   if (!compatibleConEntrega(metodo, entrega)) return metodo === "contra_entrega" ? "El pago contra entrega solo sirve cuando el pedido se envía." : "El pago en efectivo en tienda solo sirve cuando el cliente recoge el pedido.";
   return null;
 }
@@ -369,7 +367,7 @@ export async function puedeEnviarPorCanal(conversacionId: string) {
  * Pasa el borrador a «pendiente de pago» (aparta las existencias) y le manda el resumen al cliente.
  * Con modo «copiado» no lo manda: devuelve el texto para copiarlo y deja constancia de que salió fuera del sistema.
  */
-export async function enviarAlCliente(pedidoId: string, actor: ActorPedidos, o: { modo: "enviar" | "copiado"; sobrePedido: boolean }): Promise<ResultadoPedido<{ texto: string }>> {
+export async function enviarAlCliente(pedidoId: string, actor: ActorPedidos, o: { modo: "enviar" | "copiado"; sobrePedido: boolean; enlacePago?: string | null }): Promise<ResultadoPedido<{ texto: string }>> {
   const pedido = await db.order.findUnique({ where: { id: pedidoId }, select: { estado: true, conversacionId: true, codigo: true, metodoPago: true, entrega: true, total: true, cotizacionId: true } });
   if (!pedido?.conversacionId) return fallo("El pedido no existe o no tiene conversación.");
   if (pedido.estado !== "borrador") return fallo("Este pedido ya se envió.");
@@ -379,9 +377,9 @@ export async function enviarAlCliente(pedidoId: string, actor: ActorPedidos, o: 
   if (o.sobrePedido && !puedeSobrePedido(actor)) return fallo("Solo un administrador o un jefe de tienda puede apartar «sobre pedido».");
   if (o.modo === "enviar" && !(await puedeEnviarPorCanal(pedido.conversacionId))) return fallo("Este canal no permite enviar mensajes ahora. Use «Copiar mensaje y marcar como enviado».");
 
-  // Con tarjeta, el cobro se pide antes de apartar: si la pasarela no responde, no se aparta nada.
+  // Con tarjeta, el enlace de pago (Paggo) se valida antes de apartar: sin un enlace correcto no se aparta nada.
   if (pedido.metodoPago === "tarjeta") {
-    const c = await abrirCobro({ pedidoId, codigo: pedido.codigo, monto: pedido.total, creadoPorId: actor.id });
+    const c = await abrirCobro({ pedidoId, codigo: pedido.codigo, monto: pedido.total, creadoPorId: actor.id, enlace: o.enlacePago });
     if (!c.ok) return fallo(c.error);
   }
   const r = await cambiarEstado({ pedidoId, a: "pendiente_pago", quien: { usuarioId: actor.id }, sobrePedido: o.sobrePedido, nota: o.modo === "copiado" ? "Resumen enviado fuera del sistema" : "Resumen enviado al cliente" });
@@ -429,7 +427,7 @@ export async function datosPanel(conversacionId: string, actor: ActorPedidos): P
       ubicaciones,
       ubicacionPorEntrega: { recoger: aj.ubicacionRecogerId, envio: aj.ubicacionEnvioId },
       envioGratisDesde: aj.envioGratisDesde,
-      metodosPago: METODOS.filter((m) => m.disponible && aj.metodos.includes(m.id) && (m.id !== "tarjeta" || !!pasarela())).map((m) => ({ id: m.id, nombre: m.nombre })),
+      metodosPago: METODOS.filter((m) => m.disponible && aj.metodos.includes(m.id)).map((m) => ({ id: m.id, nombre: m.nombre })),
       zonas: zonas.filter((z) => z.activa).map((z) => ({ nombre: z.nombre, departamentos: z.departamentos, municipios: z.municipios, costo: z.costo, tiempo: z.tiempo })),
       abiertos,
       cotizaciones: cotizaciones.map((c) => ({ id: c.id, codigo: c.codigo, total: c.total, validaHasta: c.validaHasta.toISOString(), estado: estadoDeCotizacion(c, ahora) })),
@@ -442,9 +440,10 @@ export async function datosPanel(conversacionId: string, actor: ActorPedidos): P
 
 /**
  * Cambia la forma de pago de un pedido pendiente de pago y le manda al cliente el resumen nuevo. Al pasar a tarjeta abre el
- * cobro por el saldo; al salir de tarjeta anula el cobro abierto. Con un comprobante por verificar no se puede: primero se resuelve.
+ * cobro por el saldo con el enlace de pago que pegó la persona; al salir de tarjeta anula el cobro abierto. Con un comprobante
+ * por verificar no se puede: primero se resuelve.
  */
-export async function cambiarFormaDePago(pedidoId: string, metodo: TipoPago, actor: ActorPedidos): Promise<ResultadoPedido<{ aviso: ResultadoAviso }>> {
+export async function cambiarFormaDePago(pedidoId: string, metodo: TipoPago, actor: ActorPedidos, enlacePago?: string | null): Promise<ResultadoPedido<{ aviso: ResultadoAviso }>> {
   const o = await db.order.findUnique({ where: { id: pedidoId }, select: { id: true, estado: true, codigo: true, conversacionId: true, metodoPago: true, entrega: true, total: true, subtotal: true, descuentoMonto: true, costoEnvio: true, departamento: true, municipio: true } });
   if (!o) return fallo("El pedido no existe.");
   if (o.estado !== "pendiente_pago") return fallo("Solo se puede cambiar la forma de pago de un pedido pendiente de pago.");
@@ -463,7 +462,7 @@ export async function cambiarFormaDePago(pedidoId: string, metodo: TipoPago, act
   const total = o.subtotal - o.descuentoMonto + costoEnvio;
   if (metodo === "tarjeta") {
     const verificado = (await db.payment.aggregate({ where: { pedidoId, estado: "verificado" }, _sum: { monto: true } }))._sum.monto ?? 0;
-    const c = await abrirCobro({ pedidoId, codigo: o.codigo, monto: saldoDe(total, verificado), creadoPorId: actor.id });
+    const c = await abrirCobro({ pedidoId, codigo: o.codigo, monto: saldoDe(total, verificado), creadoPorId: actor.id, enlace: enlacePago });
     if (!c.ok) return fallo(c.error);
   }
   // Contra entrega no vence (se cobra al entregar); al salir de contra entrega vuelve a correr la reserva.

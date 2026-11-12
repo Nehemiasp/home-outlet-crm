@@ -25,7 +25,7 @@ type Datos = {
 };
 
 /** Métodos de pago, reglas de los pedidos, inventario y envío gratis: se guardan juntos. */
-export function AjustesDePedidos({ inicial, ubicaciones, tarjetaConectada }: { inicial: Datos; ubicaciones: { id: string; nombre: string }[]; tarjetaConectada: boolean }) {
+export function AjustesDePedidos({ inicial, ubicaciones }: { inicial: Datos; ubicaciones: { id: string; nombre: string }[] }) {
   const router = useRouter();
   const avisar = useToast();
   const [d, setD] = useState(inicial);
@@ -66,8 +66,8 @@ export function AjustesDePedidos({ inicial, ubicaciones, tarjetaConectada }: { i
         <ul className="flex flex-col divide-y divide-linea">
           {METODOS.map((m) => (
             <li key={m.id} className="flex flex-wrap items-center justify-between gap-2 py-1">
-              <Interruptor etiqueta={m.nombre} activo={d.metodos.includes(m.id)} disabled={!m.disponible || (m.id === "tarjeta" && !tarjetaConectada && !d.metodos.includes("tarjeta"))} onCambio={(a) => alternar(m.id, a)} />
-              {m.nota && !(m.id === "tarjeta" && tarjetaConectada) && <span className="meta text-texto-suave">{m.nota}</span>}
+              <Interruptor etiqueta={m.nombre} activo={d.metodos.includes(m.id)} disabled={!m.disponible} onCambio={(a) => alternar(m.id, a)} />
+              {m.nota && <span className="meta text-texto-suave">{m.nota}</span>}
             </li>
           ))}
         </ul>

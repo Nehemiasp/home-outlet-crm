@@ -54,11 +54,16 @@ export async function registrarPago(e: EntradaPago, actor: ActorPagos): Promise<
   const aj = await obtenerAjustesPedidos();
   const metodo = METODOS.find((m) => m.id === e.tipo);
   if (!metodo || !aj.metodos.includes(metodo.id)) return fallo("Ese método de pago no está activo.");
-  const banco = e.banco.trim();
   const referencia = e.referencia.trim();
+  // Con tarjeta no hay banco: se guarda «Paggo» (por donde se cobró) para poder avisar si el mismo número de transacción se registra dos veces.
+  const banco = e.banco.trim() || (metodo.id === "tarjeta" ? "Paggo" : "");
   if (REQUIEREN_BANCO.includes(metodo.id)) {
     if (!banco) return fallo("Escriba el banco.");
     if (!referencia) return fallo("Escriba la referencia o el número de boleta.");
+  }
+  if (metodo.id === "tarjeta") {
+    if (!referencia) return fallo("Escriba el número de transacción del pago con tarjeta (aparece en Paggo).");
+    if (!e.archivoUrl && !e.mensajeId) return fallo("Adjunte la captura o el PDF del comprobante del pago con tarjeta.");
   }
   if (banco.length > 60 || referencia.length > 60) return fallo("El banco o la referencia pasan de 60 caracteres.");
 
@@ -127,6 +132,8 @@ export async function confirmarPago(pagoId: string, quien: ActorPagos | "sistema
     await cambiarEstado({ pedidoId: o.id, a: "pendiente_pago", quien: persona ? { usuarioId: persona.id } : "sistema", nota: `Pago parcial confirmado. Falta ${formatQ(r.saldo)}` });
     estado = "pendiente_pago";
   }
+  // Pagado con tarjeta: el enlace de pago abierto ya cumplió (deja de verse como «esperando el pago»).
+  if (cubierto && pago.tipo === "tarjeta") await db.cobroTarjeta.updateMany({ where: { pedidoId: o.id, estado: "creado" }, data: { estado: "pagado", resueltoEn: new Date() } });
   if (persona) await log(persona, "verificar_pago", "Payment", pagoId, { pedido: o.codigo, monto: pago.monto, estado });
   else await db.activityLog.create({ data: { accion: "verificar_pago", entidad: "Payment", entidadId: pagoId, detalle: { pedido: o.codigo, monto: pago.monto, estado, por: "Pasarela de tarjeta" } } });
   const resto = cubierto ? "" : ` · falta ${formatQ(r.saldo)}`;

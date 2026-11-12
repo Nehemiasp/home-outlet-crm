@@ -40,7 +40,7 @@ describe("estados del pedido", () => {
 });
 
 describe("métodos de pago", () => {
-  test("la tarjeta se puede encender solo si hay una pasarela (se valida al guardar los ajustes; ver tests/tarjeta.test.ts)", () => {
+  test("la tarjeta es un método disponible (se cobra con un enlace de pago pegado a mano; ver tests/forma-pago.test.ts)", () => {
     assert.ok(METODOS.some((m) => m.id === "tarjeta" && m.disponible && !m.porDefecto));
     assert.deepEqual(metodosSeleccionables(), ["transferencia", "deposito", "efectivo_en_tienda", "tarjeta", "contra_entrega"]);
     assert.deepEqual(METODOS.filter((m) => m.porDefecto).map((m) => m.id), ["transferencia", "deposito", "contra_entrega"]);
@@ -267,7 +267,7 @@ describe("pedidos (con base de datos)", () => {
     assert.equal((await ir("no-existe", "cancelado")).ok, false);
   });
 
-  test("ajustes: valida el prefijo, el descuento y que la tarjeta no se pueda encender sin pasarela", async () => {
+  test("ajustes: valida el prefijo y el descuento; la tarjeta se puede encender sin pasarela (enlace de Paggo pegado a mano)", async () => {
     const base = { prefijo: "HO-", horasReserva: 24, diasCotizacion: 3, paqueterias: ["Forza", "Cargo Expreso"], costoContraEntrega: "35.00", envioGratisSinContraEntrega: true, descuentoMaxAgente: 0, inventario: "separado" as const, metodos: ["transferencia", "deposito"], envioGratisDesde: "", ubicacionRecogerId: ubicA, ubicacionEnvioId: ubicB };
     assert.equal((await guardarAjustesPedidos({ ...base, prefijo: "ho pedidos" }, actor)).ok, false);
     assert.equal((await guardarAjustesPedidos({ ...base, descuentoMaxAgente: 101 }, actor)).ok, false);
@@ -276,10 +276,14 @@ describe("pedidos (con base de datos)", () => {
     assert.equal((await guardarAjustesPedidos({ ...base, diasCotizacion: 31 }, actor)).ok, false);
     assert.equal((await guardarAjustesPedidos({ ...base, paqueterias: [" ", ""] }, actor)).ok, false); // al menos una
     assert.equal((await guardarAjustesPedidos({ ...base, paqueterias: ["Forza", "forza"] }, actor)).ok, false); // repetida
-    const pasarelaAntes = process.env.PASARELA; // la tarjeta solo se puede encender con una pasarela conectada: aquí no hay ninguna
+    const pasarelaAntes = process.env.PASARELA;
     delete process.env.PASARELA;
-    assert.equal((await guardarAjustesPedidos({ ...base, metodos: ["transferencia", "tarjeta"] }, actor)).ok, false);
-    if (pasarelaAntes !== undefined) process.env.PASARELA = pasarelaAntes;
+    try {
+      assert.equal((await guardarAjustesPedidos({ ...base, metodos: ["transferencia", "tarjeta"] }, actor)).ok, true);
+    } finally {
+      if (pasarelaAntes !== undefined) process.env.PASARELA = pasarelaAntes;
+    }
+    await guardarAjustesPedidos(base, actor);
     assert.equal((await guardarAjustesPedidos({ ...base, metodos: [] }, actor)).ok, false);
     assert.equal((await guardarAjustesPedidos({ ...base, envioGratisDesde: "mucho" }, actor)).ok, false);
     assert.equal((await guardarAjustesPedidos({ ...base, costoContraEntrega: "caro" }, actor)).ok, false);

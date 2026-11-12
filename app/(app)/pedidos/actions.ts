@@ -1,7 +1,7 @@
 "use server";
 
 import { z } from "zod";
-import { guardarImagenSubida } from "@/lib/almacenamiento";
+import { guardarComprobanteSubido } from "@/lib/almacenamiento";
 import { puedeCancelarPedido, puedeVerificarPagos, veTodo } from "@/lib/permisos";
 import { previsualizarAviso } from "@/lib/pedidos/avisos";
 import { buscarDuplicados, registrarPago, rechazarPago, verificarPago, type ActorPagos } from "@/lib/pedidos/pagos";
@@ -17,7 +17,6 @@ import { vencerReservas } from "@/lib/pedidos/vencimiento";
 import { crearEnlaceDePago, tarjetaActiva } from "@/lib/pagos-tarjeta/cobros";
 import { cambiarFormaDePago } from "@/lib/pedidos/pedidos";
 import { obtenerAjustesPedidos } from "@/lib/pedidos/ajustes";
-import { pasarela } from "@/lib/pagos-tarjeta";
 import { compatibleConEntrega, METODOS } from "@/lib/pedidos/metodos";
 import { db } from "@/lib/db";
 import { requireUsuario } from "@/lib/session";
@@ -64,7 +63,7 @@ export async function subirComprobante(datos: FormData): Promise<PagoRegistrado 
   const p = entradaPago.safeParse(Object.fromEntries([...datos.entries()].filter(([k]) => k !== "archivo")));
   if (!p.success) return fallo("Revise los datos del comprobante.");
   if (!(await puedeVerPedido(a, p.data.pedidoId))) return NO_EXISTE;
-  const img = await guardarImagenSubida(datos.get("archivo"));
+  const img = await guardarComprobanteSubido(datos.get("archivo")); // foto o PDF (el comprobante de Paggo suele ser PDF)
   if (!img.ok) return img;
   const r = await registrarPago({ ...p.data, mensajeId: null, archivoUrl: img.url }, a);
   return r.ok ? { ...r, duplicados: await redactarDuplicados(a, r.duplicados) } : r;
@@ -141,16 +140,16 @@ export async function obtener(pedidoId: string): Promise<PedidoConPermisos | nul
     bancos: [...new Set(cuentas.map((c) => c.banco))],
     tarjeta: await tarjetaActiva(),
     paqueterias: aj.paqueterias,
-    // a qué formas de pago se puede cambiar: las activas (la tarjeta, solo con pasarela) que sirven para esa entrega
-    formasPago: METODOS.filter((m) => m.disponible && aj.metodos.includes(m.id) && (m.id !== "tarjeta" || !!pasarela()) && compatibleConEntrega(m.id, pedido.entrega)).map((m) => ({ id: m.id, nombre: m.nombre })),
+    // a qué formas de pago se puede cambiar: las activas que sirven para esa entrega (a tarjeta, pegando el enlace de pago)
+    formasPago: METODOS.filter((m) => m.disponible && aj.metodos.includes(m.id) && compatibleConEntrega(m.id, pedido.entrega)).map((m) => ({ id: m.id, nombre: m.nombre })),
   };
 }
 
-/** Pide a la pasarela el cobro del saldo y le manda el enlace al cliente. Quien ve el pedido puede mandarlo. */
-export async function enviarEnlaceTarjeta(pedidoId: string) {
+/** Le manda al cliente el enlace de pago con tarjeta que pegó la persona (Paggo); vacío = reenviar el abierto. Quien ve el pedido puede mandarlo. */
+export async function enviarEnlaceTarjeta(pedidoId: string, enlace: string) {
   const a = await actor();
   if (!(await puedeVerPedido(a, id.parse(pedidoId)))) return NO_EXISTE;
-  return crearEnlaceDePago(id.parse(pedidoId), a);
+  return crearEnlaceDePago(id.parse(pedidoId), a, z.string().max(600).parse(enlace));
 }
 
 export async function avanzar(pedidoId: string, a: string, sobrePedido: boolean) {
@@ -182,10 +181,10 @@ export async function actualizarGuia(pedidoId: string, guia: string) {
 }
 
 /** El cliente cambió de idea con el pedido ya enviado: se cambia la forma de pago y se le manda el resumen nuevo. */
-export async function cambiarFormaPago(pedidoId: string, metodo: string) {
+export async function cambiarFormaPago(pedidoId: string, metodo: string, enlacePago = "") {
   const a = await actor();
   if (!(await puedeVerPedido(a, id.parse(pedidoId)))) return NO_EXISTE;
   const m = z.enum(["transferencia", "deposito", "efectivo_en_tienda", "tarjeta", "contra_entrega"]).safeParse(metodo);
   if (!m.success) return fallo("Esa forma de pago no es válida.");
-  return cambiarFormaDePago(id.parse(pedidoId), m.data, a);
+  return cambiarFormaDePago(id.parse(pedidoId), m.data, a, z.string().max(600).parse(enlacePago) || null);
 }

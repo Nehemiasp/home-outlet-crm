@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Package, Printer } from "lucide-react";
+import { ArrowLeft, FileText, Package, Printer } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Insignia, InsigniaPago, InsigniaEstado, LogoCanal, nombreCanal } from "@/components/ui/etiquetas";
@@ -33,6 +33,7 @@ export function Detalle({ inicial }: { inicial: PedidoConPermisos }) {
   const [subir, setSubir] = useState(false);
   const [cancelar, setCancelar] = useState(false);
   const [enviar, setEnviar] = useState(false);
+  const [enlace, setEnlace] = useState<{ modo: "enviar" | "cambiar"; valor: string } | null>(null); // ventana para pegar el enlace de pago
   const [pendiente, setPendiente] = useState(false);
   const [reactivar, setReactivar] = useState(false);
   const [sobrePedido, setSobrePedido] = useState(false);
@@ -111,16 +112,20 @@ export function Detalle({ inicial }: { inicial: PedidoConPermisos }) {
     tras(r.aviso);
   };
 
-  const enviarEnlace = async () => {
+  /** Enviar (o reenviar) el enlace de pago con tarjeta, o cambiar la forma de pago a tarjeta: las dos piden el enlace de Paggo. */
+  const confirmarEnlace = async () => {
+    if (!enlace) return;
     setTrabajando(true);
-    const r = await enviarEnlaceTarjeta(p.id);
+    const r = enlace.modo === "enviar" ? await enviarEnlaceTarjeta(p.id, enlace.valor) : await cambiarFormaPago(p.id, "tarjeta", enlace.valor);
     setTrabajando(false);
     if (!r.ok) return avisar(r.error, "error");
-    avisar(r.reutilizado ? "Ya había un enlace abierto por este saldo; se volvió a enviar" : "Enlace de pago enviado al cliente");
+    avisar(enlace.modo === "cambiar" ? "Forma de pago cambiada a tarjeta" : "reutilizado" in r && r.reutilizado ? "Se volvió a enviar el mismo enlace" : "Enlace de pago enviado al cliente");
+    setEnlace(null);
     tras(r.aviso);
   };
 
   const cambiarForma = async (metodo: string) => {
+    if (metodo === "tarjeta") return setEnlace({ modo: "cambiar", valor: "" });
     setTrabajando(true);
     const r = await cambiarFormaPago(p.id, metodo);
     setTrabajando(false);
@@ -280,7 +285,7 @@ export function Detalle({ inicial }: { inicial: PedidoConPermisos }) {
               <h2 className="titulo-panel">Pagos</h2>
               <div className="flex flex-wrap items-center gap-2">
                 {puedeEnlace && (
-                  <Boton variante="secundario" tamano="sm" disabled={trabajando} onClick={enviarEnlace}>
+                  <Boton variante="secundario" tamano="sm" disabled={trabajando} onClick={() => setEnlace({ modo: "enviar", valor: cobroAbierto?.url ?? "" })}>
                     {p.metodoPago === "tarjeta" ? "Reenviar enlace de pago" : "Enviar enlace de pago con tarjeta"}
                   </Boton>
                 )}
@@ -302,9 +307,12 @@ export function Detalle({ inicial }: { inicial: PedidoConPermisos }) {
               {r.saldo > 0 ? <> · Falta <strong>{formatQ(r.saldo)}</strong></> : null}
               {r.enRevision > 0 ? <span className="text-texto-suave"> · {formatQ(r.enRevision)} en revisión</span> : null}
             </p>
-            {cobroAbierto && (
+            {cobroAbierto && p.estado === "pendiente_pago" && (
               <p className="meta text-texto-suave" aria-live="polite">
-                Enlace de pago con tarjeta de {formatQ(cobroAbierto.monto)} enviado, esperando el pago del cliente.
+                Enlace de pago con tarjeta de {formatQ(cobroAbierto.monto)} enviado, esperando el pago del cliente.{" "}
+                <a href={cobroAbierto.url} target="_blank" rel="noopener noreferrer" className="cuerpo-fuerte text-texto underline">
+                  Ver enlace
+                </a>
               </p>
             )}
             {cobroFallido && (
@@ -324,8 +332,15 @@ export function Detalle({ inicial }: { inicial: PedidoConPermisos }) {
                     <div className="flex flex-wrap items-center gap-3">
                       {x.comprobanteUrl && (
                         <button type="button" onClick={() => setVerPago(x.id)} aria-label={`Ver el comprobante de ${formatQ(x.monto)}`} className="shrink-0 cursor-zoom-in">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={x.comprobanteUrl} alt="" className="size-14 rounded-campo border border-linea bg-fondo object-cover" />
+                          {x.comprobanteUrl.endsWith(".pdf") ? (
+                            <span className="meta flex size-14 flex-col items-center justify-center gap-0.5 rounded-campo border border-linea bg-fondo font-bold text-texto-suave">
+                              <FileText className="size-5" aria-hidden />
+                              PDF
+                            </span>
+                          ) : (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={x.comprobanteUrl} alt="" className="size-14 rounded-campo border border-linea bg-fondo object-cover" />
+                          )}
                         </button>
                       )}
                       <div className="min-w-0 flex-1">
@@ -475,6 +490,31 @@ export function Detalle({ inicial }: { inicial: PedidoConPermisos }) {
         onConfirmar={(d) => void enviarPedido(d)}
       />
       <AvisoGuiaManual guia={guiaManual} onCerrar={() => setGuiaManual(null)} />
+
+      <Modal abierto={!!enlace} onCerrar={() => setEnlace(null)} titulo={enlace?.modo === "cambiar" ? "Cambiar a pago con tarjeta" : "Enlace de pago con tarjeta"}>
+        {enlace && (
+          <form
+            className="flex flex-col gap-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void confirmarEnlace();
+            }}
+          >
+            <p className="cuerpo">
+              Genere en Paggo un enlace por <strong>{formatQ(r.saldo)}</strong> y péguelo aquí. {enlace.modo === "cambiar" ? "Se le enviará al cliente el resumen nuevo con este enlace." : "Se le enviará al cliente por el chat."}
+            </p>
+            <CampoTexto etiqueta="Enlace de pago (Paggo)" type="url" inputMode="url" autoComplete="off" placeholder="https://…" maxLength={500} required value={enlace.valor} onChange={(e) => setEnlace({ ...enlace, valor: e.target.value })} />
+            <div className="flex justify-end gap-2">
+              <Boton variante="secundario" onClick={() => setEnlace(null)}>
+                Cancelar
+              </Boton>
+              <Boton type="submit" cargando={trabajando} disabled={!enlace.valor.trim()}>
+                {enlace.modo === "cambiar" ? "Cambiar y enviar" : "Enviar enlace"}
+              </Boton>
+            </div>
+          </form>
+        )}
+      </Modal>
 
       <Modal abierto={reactivar} onCerrar={() => setReactivar(false)} titulo="Reactivar pedido">
         <p className="cuerpo mb-4">Se vuelven a apartar las existencias y empieza de nuevo el tiempo de reserva. Si ya no alcanzan, no se reactiva.</p>

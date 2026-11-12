@@ -12,19 +12,17 @@ import type { EventoPasarela, Pasarela } from "./tipos";
 type Fallo = { ok: false; error: string };
 const fallo = (error: string): Fallo => ({ ok: false, error });
 
-/** ¿Se puede cobrar con tarjeta? Hay una pasarela conectada y el método está encendido en Ajustes. */
+/** ¿Se puede cobrar con tarjeta? Basta con que el método esté encendido en Ajustes (el enlace de pago lo pega la persona). */
 export async function tarjetaActiva() {
-  return !!pasarela() && (await obtenerAjustesPedidos()).metodos.includes("tarjeta");
+  return (await obtenerAjustesPedidos()).metodos.includes("tarjeta");
 }
 
 /**
- * Pide a la pasarela el cobro del saldo del pedido y le manda el enlace al cliente por la conversación. Si ya hay un cobro abierto
- * por ese mismo saldo, reutiliza su enlace (así el cliente no puede quedar con dos enlaces vivos por lo mismo).
- * El pedido no cambia de estado: solo cuando la pasarela avise que se pagó se registra y se confirma el pago.
+ * Le manda al cliente el enlace de pago con tarjeta por el saldo del pedido. `enlace` es el que pega la persona (Paggo); sin él se
+ * reenvía el que ya está abierto, o se pide a la pasarela si hubiera una conectada. El pedido no cambia de estado: el pago se
+ * registra con su comprobante y se confirma como cualquier otro.
  */
-export async function crearEnlaceDePago(pedidoId: string, actor: ActorPagos): Promise<{ ok: true; url: string; monto: number; reutilizado: boolean; aviso: ResultadoAviso } | Fallo> {
-  const p = pasarela();
-  if (!p) return fallo("No hay una pasarela de pago conectada.");
+export async function crearEnlaceDePago(pedidoId: string, actor: ActorPagos, enlace?: string | null): Promise<{ ok: true; url: string; monto: number; reutilizado: boolean; aviso: ResultadoAviso } | Fallo> {
   if (!(await obtenerAjustesPedidos()).metodos.includes("tarjeta")) return fallo("El pago con tarjeta no está activo en Ajustes → Pagos y envíos.");
   const pedido = await db.order.findUnique({ where: { id: pedidoId }, select: { id: true, codigo: true, estado: true, conversacionId: true } });
   if (!pedido) return fallo("El pedido no existe.");
@@ -33,7 +31,9 @@ export async function crearEnlaceDePago(pedidoId: string, actor: ActorPagos): Pr
   if (saldo <= 0) return fallo("El pedido no tiene saldo por pagar.");
   if (enRevision > 0) return fallo("Hay un comprobante por verificar. Revíselo antes de pedir otro pago.");
 
-  const cobro = await abrirCobro({ pedidoId: pedido.id, codigo: pedido.codigo, monto: saldo, creadoPorId: actor.id });
+  // Sin enlace nuevo: se reenvía el que ya está abierto por ese saldo (si lo hay).
+  const abierto = enlace?.trim() || pasarela() ? null : await db.cobroTarjeta.findFirst({ where: { pedidoId: pedido.id, estado: "creado", monto: saldo }, orderBy: { creado: "desc" }, select: { url: true } });
+  const cobro = await abrirCobro({ pedidoId: pedido.id, codigo: pedido.codigo, monto: saldo, creadoPorId: actor.id, enlace: enlace?.trim() || abierto?.url || null });
   if (!cobro.ok) return fallo(cobro.error);
   if (!cobro.reutilizado) {
     await log(actor, "crear_cobro_tarjeta", "CobroTarjeta", cobro.cobroId, { pedido: pedido.codigo, monto: saldo });

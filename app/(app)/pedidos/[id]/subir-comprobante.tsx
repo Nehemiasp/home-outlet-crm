@@ -37,7 +37,8 @@ export function SubirComprobante({ abierto, onCerrar, pedido, metodos, bancos, o
 
   const guardar = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!archivo) return setError("Elija la imagen del comprobante.");
+    if (!archivo) return setError(tipo === "tarjeta" ? "Adjunte la captura o el PDF del comprobante de Paggo." : "Elija la foto o el PDF del comprobante.");
+    if (tipo === "tarjeta" && !referencia.trim()) return setError("Escriba el número de transacción (aparece en Paggo).");
     setGuardando(true);
     setError("");
     const datos = new FormData();
@@ -53,15 +54,15 @@ export function SubirComprobante({ abierto, onCerrar, pedido, metodos, bancos, o
   return (
     <Modal abierto={abierto} onCerrar={onCerrar} titulo="Subir comprobante">
       <form onSubmit={guardar} className="flex flex-col gap-4">
-        <CampoArchivo etiqueta="Imagen del comprobante" accept="image/jpeg,image/png,image/webp" formatos="JPG, PNG o WebP de hasta 5 MB" archivo={archivo} onCambio={setArchivo} />
+        <CampoArchivo etiqueta={tipo === "tarjeta" ? "Comprobante de Paggo (captura o PDF)" : "Comprobante (foto o PDF)"} accept="image/jpeg,image/png,image/webp,application/pdf" formatos="JPG, PNG, WebP o PDF de hasta 5 MB" archivo={archivo} onCambio={setArchivo} />
         <Selector etiqueta="Método" opciones={metodos.map((m) => ({ valor: m.id, texto: m.nombre }))} value={tipo} onCambio={setTipo} />
-        <CampoTexto etiqueta="Banco" autoComplete="off" maxLength={60} list="bancos-subir" value={banco} onChange={(e) => setBanco(e.target.value)} />
+        {tipo !== "tarjeta" && <CampoTexto etiqueta="Banco" autoComplete="off" maxLength={60} list="bancos-subir" value={banco} onChange={(e) => setBanco(e.target.value)} />}
         <datalist id="bancos-subir">
           {bancos.map((b) => (
             <option key={b} value={b} />
           ))}
         </datalist>
-        <CampoTexto etiqueta="Referencia o número de boleta" autoComplete="off" maxLength={60} value={referencia} onChange={(e) => setReferencia(e.target.value)} />
+        <CampoTexto etiqueta={tipo === "tarjeta" ? "Número de transacción (Paggo)" : "Referencia o número de boleta"} autoComplete="off" maxLength={60} value={referencia} onChange={(e) => setReferencia(e.target.value)} />
         <div className="grid gap-4 sm:grid-cols-2">
           <CampoTexto etiqueta="Monto (Q)" inputMode="decimal" autoComplete="off" maxLength={12} value={monto} onChange={(e) => setMonto(e.target.value)} />
           <CampoTexto etiqueta="Fecha del pago" type="date" max={hoyGT()} value={fecha} onChange={(e) => setFecha(e.target.value)} />

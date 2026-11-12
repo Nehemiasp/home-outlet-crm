@@ -75,14 +75,14 @@ export async function descartarBorradorPedido(pedidoId: string): Promise<Resulta
 }
 
 /** Guarda y envía en un solo paso: el cliente nunca recibe un resumen de algo que no quedó guardado. */
-export async function enviarPedido(e: EntradaPedido, modo: "enviar" | "copiado", sobrePedido: boolean): Promise<ResultadoPedido<{ texto: string; codigo: string; pedidoId: string }>> {
+export async function enviarPedido(e: EntradaPedido, modo: "enviar" | "copiado", sobrePedido: boolean, enlacePago = ""): Promise<ResultadoPedido<{ texto: string; codigo: string; pedidoId: string }>> {
   const a = await actor();
   const p = entrada.safeParse(e);
   if (!p.success) return invalido;
   if (!(await ve(a, p.data.conversacionId, p.data.pedidoId, p.data.cotizacionId))) return noExiste;
   const g = await pedidos.guardarBorrador(p.data, a);
   if (!g.ok) return g;
-  const r = await pedidos.enviarAlCliente(g.pedidoId, a, { modo: z.enum(["enviar", "copiado"]).parse(modo), sobrePedido });
+  const r = await pedidos.enviarAlCliente(g.pedidoId, a, { modo: z.enum(["enviar", "copiado"]).parse(modo), sobrePedido, enlacePago: z.string().max(600).parse(enlacePago) || null });
   return r.ok ? { ok: true, texto: r.texto, codigo: g.codigo, pedidoId: g.pedidoId } : r;
 }
 

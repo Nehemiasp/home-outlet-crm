@@ -77,7 +77,12 @@ export function Verificacion({
       {pago && (
         <div className={lateral ? "flex flex-col gap-4" : "grid gap-4 md:grid-cols-2"}>
           <div className="flex flex-col gap-2">
-            {pago.comprobanteUrl ? (
+            {pago.comprobanteUrl?.endsWith(".pdf") ? (
+              <a href={pago.comprobanteUrl} target="_blank" rel="noreferrer" className="cuerpo-fuerte flex flex-col items-center gap-2 rounded-campo border border-dashed border-linea p-8 text-center hover:bg-fondo">
+                El comprobante es un PDF
+                <span className="text-naranja-texto underline">Abrir el PDF en una pestaña nueva</span>
+              </a>
+            ) : pago.comprobanteUrl ? (
               <a href={pago.comprobanteUrl} target="_blank" rel="noreferrer" aria-label="Abrir el comprobante en una pestaña nueva">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={pago.comprobanteUrl} alt="Comprobante de pago" className="max-h-[60vh] w-full rounded-campo border border-linea bg-fondo object-contain" />

@@ -127,7 +127,7 @@ export type DetallePedido = {
     comprobanteUrl: string | null; motivoRechazo: string | null; registradoPor: string | null; verificadoPor: string | null; verificadoEn: string | null; duplicados: DuplicadoVisible[];
   }[];
   /** Enlaces de pago con tarjeta pedidos a la pasarela, del más nuevo al más viejo. */
-  cobrosTarjeta: { id: string; monto: number; estado: "creado" | "pagado" | "fallido" | "cancelado"; creado: string }[];
+  cobrosTarjeta: { id: string; monto: number; estado: "creado" | "pagado" | "fallido" | "cancelado"; creado: string; url: string }[];
   /** La forma de pago elegida al crear el pedido, o null en los pedidos anteriores. */
   metodoPago: TipoPago | null;
   resumenPagos: { total: number; verificado: number; enRevision: number; saldo: number };
@@ -145,7 +145,7 @@ export async function cargarPedido(id: string, u: Actor): Promise<DetallePedido 
       lineas: { orderBy: [{ nombre: "asc" }, { id: "asc" }], include: { ubicacion: { select: { nombre: true } }, producto: { select: { imagenes: true } } } },
       pagos: { orderBy: { creado: "asc" }, include: { mensaje: { select: { archivoUrl: true } }, registradoPor: { select: { nombre: true } }, verificadoPor: { select: { nombre: true } } } },
       eventos: { orderBy: { fecha: "asc" }, include: { usuario: { select: { nombre: true } } } },
-      cobrosTarjeta: { orderBy: { creado: "desc" }, select: { id: true, monto: true, estado: true, creado: true } },
+      cobrosTarjeta: { orderBy: { creado: "desc" }, select: { id: true, monto: true, estado: true, creado: true, url: true } },
     },
   });
   if (!o) return null;
@@ -165,7 +165,7 @@ export async function cargarPedido(id: string, u: Actor): Promise<DetallePedido 
       duplicados: duplicados[i]!,
     })),
     metodoPago: o.metodoPago,
-    cobrosTarjeta: o.cobrosTarjeta.map((c) => ({ id: c.id, monto: c.monto, estado: c.estado, creado: c.creado.toISOString() })),
+    cobrosTarjeta: o.cobrosTarjeta.map((c) => ({ id: c.id, monto: c.monto, estado: c.estado, creado: c.creado.toISOString(), url: c.url })),
     resumenPagos: { total: o.total, verificado, enRevision, saldo: saldoDe(o.total, verificado) },
     pagoEstado: estadoDePago(o.total, o.pagos),
     eventos: o.eventos.map((e) => ({ id: e.id, de: e.deEstado, a: e.aEstado, quien: e.usuario?.nombre ?? (e.origen === "asistente" ? "Asistente" : "Sistema"), nota: e.nota, fecha: e.fecha.toISOString() })),
