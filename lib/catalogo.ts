@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+import { almacenamiento, extensionDeImagen } from "@/lib/almacenamiento";
 import { analizarProductosCsv, type FilaProductoCsv } from "@/lib/csv";
 import { db } from "@/lib/db";
 import { parsePrecio } from "@/lib/dinero";
@@ -129,6 +131,55 @@ export async function borrarProducto(id: string, actor: Actor): Promise<{ ok: tr
     db.activityLog.create({ data: { usuarioId: actor.id, accion: "borrar_producto", entidad: "Product", entidadId: id, detalle: { sku: p.sku, producto: p.nombre, por: actor.nombre } } }),
   ]);
   return { ok: true };
+}
+
+/* ── Fotos por SKU (varias a la vez, desde Importar) ── */
+
+/**
+ * A qué SKU pertenece un archivo por su nombre: el SKU más largo con el que empieza (sin distinguir mayúsculas),
+ * seguido del final, «-», «_», «.» o un espacio. Así «HO-001-aspiradora.jpg» es de HO-001 y no de HO-0011.
+ */
+export function skuDeArchivo(nombreArchivo: string, skus: string[]): string | null {
+  const n = nombreArchivo.trim().toLowerCase();
+  let elegido: string | null = null;
+  for (const sku of skus) {
+    const s = sku.toLowerCase();
+    if (!n.startsWith(s)) continue;
+    const siguiente = n.charAt(s.length);
+    if (siguiente !== "" && !"-_. ".includes(siguiente)) continue;
+    if (!elegido || s.length > elegido.length) elegido = sku;
+  }
+  return elegido;
+}
+
+export type FotoPorSku = { ok: true; sku: string; producto: string; estado: "principal" | "agregada" | "repetida" } | { ok: false; error: string };
+
+/**
+ * Agrega la foto al producto cuyo SKU va al inicio del nombre del archivo. Si el producto no tenía fotos, queda como
+ * principal; si ya tiene esa misma foto (mismo contenido), no se repite, así se puede volver a subir la carpeta sin duplicar.
+ */
+export async function asignarFotoPorSku(nombreArchivo: string, datos: Buffer, actor: Actor): Promise<FotoPorSku> {
+  const ext = extensionDeImagen(datos);
+  if (!ext) return { ok: false, error: "No es una imagen JPG, PNG o WebP." };
+  const skus = (await db.product.findMany({ select: { sku: true } })).map((p) => p.sku);
+  const sku = skuDeArchivo(nombreArchivo, skus);
+  if (!sku) return { ok: false, error: "El nombre del archivo no empieza con el SKU de ningún producto." };
+  const p = await db.product.findUniqueOrThrow({ where: { sku }, select: { id: true, nombre: true, imagenes: true } });
+
+  const huella = (b: Buffer) => createHash("sha256").update(b).digest("hex");
+  const nueva = huella(datos);
+  for (const url of p.imagenes) {
+    const actual = url.startsWith("/api/archivos/") ? await almacenamiento.leer(url.slice("/api/archivos/".length)) : null;
+    if (actual && huella(actual) === nueva) return { ok: true, sku, producto: p.nombre, estado: "repetida" };
+  }
+  if (p.imagenes.length >= MAX_IMAGENES) return { ok: false, error: `${sku} ya tiene ${MAX_IMAGENES} fotos, que es el máximo. Quite alguna desde el producto.` };
+
+  const { url } = await almacenamiento.guardar(datos, ext);
+  await db.$transaction([
+    db.product.update({ where: { id: p.id }, data: { imagenes: { push: url } } }),
+    db.activityLog.create({ data: { usuarioId: actor.id, accion: "foto_por_sku", entidad: "Product", entidadId: p.id, detalle: { sku, archivo: nombreArchivo, por: actor.nombre } } }),
+  ]);
+  return { ok: true, sku, producto: p.nombre, estado: p.imagenes.length === 0 ? "principal" : "agregada" };
 }
 
 /* ── Importación desde CSV ── */

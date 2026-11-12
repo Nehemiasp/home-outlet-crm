@@ -254,6 +254,7 @@ Pestañas: **Por verificar**, **Pendientes de pago**, **En proceso**, **Entregad
 - Todos ven los productos con su precio y existencias («En existencia», «Quedan N», «Agotado») y por ubicación, con «Disponible · Apartado».
 - **Jefe de tienda y administrador:** **Nuevo producto** (nombre, SKU, categoría, precio, descripción, fotos de hasta 5 MB en JPG, PNG o WebP) y edición de existencias por ubicación.
 - **Importar CSV** (jefe de tienda y administrador): archivo guardado desde Excel con las columnas `sku, nombre, categoria, precio, descripcion, existencia_puerto_barrios, existencia_mixco` (sirven también los nombres de antes, `existencia_tienda` y `existencia_linea`). Son obligatorias **sku, nombre y precio**. El sistema muestra una revisión antes de importar y marca las filas con errores.
+- **Fotos por SKU** (en la misma pantalla de **Importar CSV**, abajo): elija muchas fotos a la vez y cada una se agrega sola al producto cuyo **SKU va al inicio del nombre del archivo** (`HO-001-aspiradora.jpg` o `HO-001.jpg` van a HO-001). Si el producto no tenía fotos, queda como la principal. Si vuelve a subir la misma foto, no se repite. JPG, PNG o WebP de hasta 5 MB; máximo 5 fotos por producto. Importe primero el CSV para que los productos existan; la lista dice qué foto fue a qué producto y cuáles no se subieron y por qué.
 
 ## 9. Reportes (jefe de tienda y administrador)
 

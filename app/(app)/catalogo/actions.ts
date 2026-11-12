@@ -89,6 +89,16 @@ export async function subirFoto(formulario: FormData): Promise<{ ok: true; url: 
   return { ok: true, ...(await almacenamiento.guardar(buffer, ext)) };
 }
 
+/** Una foto de la carpeta: se asigna sola al producto cuyo SKU va al inicio del nombre del archivo (se suben de una en una). */
+export async function subirFotoPorSku(formulario: FormData): Promise<catalogo.FotoPorSku> {
+  const u = await admin();
+  if (!u) return fallo(SOLO_ADMIN);
+  const archivo = formulario.get("archivo");
+  if (!(archivo instanceof File) || archivo.size === 0) return fallo("El archivo está vacío.");
+  if (archivo.size > MAX_BYTES) return fallo("Pesa más de 5 MB. Elija una foto más liviana.");
+  return catalogo.asignarFotoPorSku(archivo.name.slice(0, 200), Buffer.from(await archivo.arrayBuffer()), u);
+}
+
 /* ── Importar CSV (solo admin) ── */
 const csv = z.string().max(MAX_CSV, "El archivo pesa más de 1 MB.");
 

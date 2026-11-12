@@ -9,6 +9,7 @@ import { Tabla, type Columna } from "@/components/ui/estructura";
 import type { FilaVistaPrevia } from "@/lib/catalogo-tipos";
 import { formatQ } from "@/lib/utils";
 import { importarCsv, previsualizarCsv } from "../actions";
+import { FotosPorSku } from "./fotos-por-sku";
 
 const PLANTILLA = "sku,nombre,categoria,precio,descripcion,existencia_puerto_barrios,existencia_mixco\nHG-100,Licuadora de ejemplo,Hogar,349.00,Descripción de ejemplo,5,2\n";
 const POR_PAGINA = 50;
@@ -165,6 +166,8 @@ export function Importador() {
           </Boton>
         </section>
       )}
+
+      <FotosPorSku />
     </div>
   );
 }
